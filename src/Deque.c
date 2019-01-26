@@ -3,13 +3,60 @@
 #include <stdlib.h>
 #include <string.h>
 
-void UDPC_Deque_init(UDPC_Deque *deque, uint32_t alloc_size)
+int UDPC_Deque_init(UDPC_Deque *deque, uint32_t alloc_size)
 {
-    deque->head = 0;
-    deque->tail = 0;
-    deque->size = 0;
+    UDPC_Deque_clear(deque);
     deque->alloc_size = alloc_size;
     deque->buf = malloc(alloc_size);
+    if(deque->buf)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+void UDPC_Deque_destroy(UDPC_Deque *deque)
+{
+    free(deque->buf);
+    deque->buf = NULL;
+}
+
+int UDPC_Deque_realloc(UDPC_Deque *deque, uint32_t new_size)
+{
+    if(new_size < deque->size)
+    {
+        return 0;
+    }
+    else if(deque->size != 0 && deque->tail <= deque->head)
+    {
+        char *buf = malloc(new_size);
+        memcpy(buf, &deque->buf[deque->head], deque->alloc_size - deque->head);
+        if(deque->tail != 0)
+        {
+            memcpy(&buf[deque->alloc_size - deque->head], deque->buf, deque->tail);
+        }
+        free(deque->buf);
+        deque->buf = buf;
+        deque->alloc_size = new_size;
+        return 1;
+    }
+    else
+    {
+        void *buf = realloc(deque->buf, new_size);
+        if(buf)
+        {
+            deque->buf = buf;
+            deque->alloc_size = new_size;
+            return 1;
+        }
+        else
+        {
+            return 0;
+        }
+    }
 }
 
 int UDPC_Deque_push_back(UDPC_Deque *deque, const char *data, uint32_t size)
@@ -86,12 +133,18 @@ uint32_t UDPC_Deque_get_available(UDPC_Deque *deque)
     return deque->alloc_size - deque->size;
 }
 
+uint32_t UDPC_Deque_get_used(UDPC_Deque *deque)
+{
+    return deque->size;
+}
+
 int UDPC_Deque_get_back(UDPC_Deque *deque, char **data, uint32_t *size)
 {
     int returnValue = 1;
     if(deque->size == 0)
     {
         *size = 0;
+        *data = NULL;
         return 0;
     }
     else if(*size > deque->size)
@@ -122,6 +175,7 @@ int UDPC_Deque_get_front(UDPC_Deque *deque, char **data, uint32_t *size)
     if(deque->size == 0)
     {
         *size = 0;
+        *data = NULL;
         return 0;
     }
     else if(*size > deque->size)
@@ -154,9 +208,7 @@ void UDPC_Deque_pop_back(UDPC_Deque *deque, uint32_t size)
     }
     else if(deque->size <= size)
     {
-        deque->head = 0;
-        deque->tail = 0;
-        deque->size = 0;
+        UDPC_Deque_clear(deque);
         return;
     }
 
@@ -180,9 +232,7 @@ void UDPC_Deque_pop_front(UDPC_Deque *deque, uint32_t size)
     }
     else if(deque->size <= size)
     {
-        deque->head = 0;
-        deque->tail = 0;
-        deque->size = 0;
+        UDPC_Deque_clear(deque);
         return;
     }
 
@@ -200,4 +250,79 @@ void UDPC_Deque_pop_front(UDPC_Deque *deque, uint32_t size)
             deque->head = 0;
         }
     }
+}
+
+int UDPC_Deque_index(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, char **out)
+{
+    uint32_t pos = unitSize * index;
+    uint32_t abspos;
+    if(pos >= deque->alloc_size)
+    {
+        *out = NULL;
+        return 0;
+    }
+
+    *out = malloc(unitSize);
+
+    if(pos + deque->head >= deque->alloc_size)
+    {
+        abspos = pos + deque->head - deque->alloc_size;
+    }
+    else
+    {
+        abspos = pos + deque->head;
+    }
+
+    if(abspos + unitSize >= deque->alloc_size)
+    {
+        memcpy(*out, &deque->buf[abspos], deque->alloc_size - abspos);
+        memcpy(*out, deque->buf, unitSize - (deque->alloc_size - abspos));
+    }
+    else
+    {
+        memcpy(*out, &deque->buf[abspos], unitSize);
+    }
+
+    return 1;
+}
+
+int UDPC_Deque_index_rev(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, char **out)
+{
+    uint32_t pos = unitSize * (index + 1);
+    uint32_t abspos;
+    if(pos >= deque->alloc_size)
+    {
+        *out = NULL;
+        return 0;
+    }
+
+    *out = malloc(unitSize);
+
+    if(pos > deque->tail)
+    {
+        abspos = deque->alloc_size - (pos - deque->tail);
+    }
+    else
+    {
+        abspos = deque->tail - pos;
+    }
+
+    if(abspos + unitSize >= deque->alloc_size)
+    {
+        memcpy(*out, &deque->buf[abspos], deque->alloc_size - abspos);
+        memcpy(*out, deque->buf, unitSize - (deque->alloc_size - abspos));
+    }
+    else
+    {
+        memcpy(*out, &deque->buf[abspos], unitSize);
+    }
+
+    return 1;
+}
+
+void UDPC_Deque_clear(UDPC_Deque *deque)
+{
+    deque->head = 0;
+    deque->tail = 0;
+    deque->size = 0;
 }
