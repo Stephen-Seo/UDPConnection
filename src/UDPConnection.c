@@ -1,8 +1,6 @@
 #include "UDPConnection.h"
 
-#include <time.h>
-
-UDPC_Context UDPC_init(unsigned short listenPort)
+UDPC_Context UDPC_init(uint16_t listenPort)
 {
     UDPC_Context context;
     context.error = 0;
@@ -45,6 +43,8 @@ UDPC_Context UDPC_init(unsigned short listenPort)
     DWORD nonblocking = 1;
     if(ioctlsocket(context.socketHandle, FIONBIO, &nonblocking) != 0)
     {
+#else
+    {
 #endif
         context.error = UDPCON_ERR_SOCKETNONBF;
         CleanupSocket(context.socketHandle);
@@ -56,7 +56,7 @@ UDPC_Context UDPC_init(unsigned short listenPort)
     return context;
 }
 
-UDPC_Context UDPC_init_threaded_update(unsigned short listenPort)
+UDPC_Context UDPC_init_threaded_update(uint16_t listenPort)
 {
     UDPC_Context context = UDPC_init(listenPort);
 
