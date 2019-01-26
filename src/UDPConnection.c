@@ -37,11 +37,11 @@ UDPC_Context UDPC_init(unsigned short listenPort)
     }
 
     // set nonblocking on socket
-#if PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_LINUX
+#if UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
     int nonblocking = 1;
     if(fcntl(context.socketHandle, F_SETFL, O_NONBLOCK, nonblocking) == -1)
     {
-#elif PLATFORM == PLATFORM_WINDOWS
+#elif UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
     DWORD nonblocking = 1;
     if(ioctlsocket(context.socketHandle, FIONBIO, &nonblocking) != 0)
     {

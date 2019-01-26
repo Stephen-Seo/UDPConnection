@@ -4,26 +4,26 @@
 #include <stdio.h>
 #include <threads.h>
 
-#define PLATFORM_WINDOWS 1
-#define PLATFORM_MAC 2
-#define PLATFORM_LINUX 3
-#define PLATFORM_UNKNOWN 0
+#define UDPC_PLATFORM_WINDOWS 1
+#define UDPC_PLATFORM_MAC 2
+#define UDPC_PLATFORM_LINUX 3
+#define UDPC_PLATFORM_UNKNOWN 0
 
 #if defined _WIN32
-  #define PLATFORM PLATFORM_WINDOWS
+  #define UDPC_PLATFORM UDPC_PLATFORM_WINDOWS
 #elif defined __APPLE__
-  #define PLATFORM PLATFORM_MAC
+  #define UDPC_PLATFORM UDPC_PLATFORM_MAC
 #elif defined __linux__
-  #define PLATFORM PLATFORM_LINUX
+  #define UDPC_PLATFORM UDPC_PLATFORM_LINUX
 #else
-  #define PLATFORM PLATFORM_UNKNOWN
+  #define UDPC_PLATFORM UDPC_PLATFORM_UNKNOWN
 #endif
 
-#if PLATFORM == PLATFORM_WINDOWS
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
   #include <winsock2.h>
 
   #define CleanupSocket(x) closesocket(x)
-#elif PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_LINUX
+#elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
   #include <sys/socket.h>
   #include <netinet/in.h>
   #include <fcntl.h>
