@@ -3,25 +3,28 @@
 #include <stdlib.h>
 #include <string.h>
 
-int UDPC_Deque_init(UDPC_Deque *deque, uint32_t alloc_size)
+UDPC_Deque* UDPC_Deque_init(uint32_t alloc_size)
 {
+    UDPC_Deque *deque = malloc(sizeof(UDPC_Deque));
     UDPC_Deque_clear(deque);
     deque->alloc_size = alloc_size;
     deque->buf = malloc(alloc_size);
     if(deque->buf)
     {
-        return 1;
+        return deque;
     }
     else
     {
-        return 0;
+        free(deque);
+        return NULL;
     }
 }
 
-void UDPC_Deque_destroy(UDPC_Deque *deque)
+void UDPC_Deque_destroy(UDPC_Deque **deque)
 {
-    free(deque->buf);
-    deque->buf = NULL;
+    free((*deque)->buf);
+    free(*deque);
+    *deque = NULL;
 }
 
 int UDPC_Deque_realloc(UDPC_Deque *deque, uint32_t new_size)
