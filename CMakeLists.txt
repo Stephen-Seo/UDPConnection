@@ -3,7 +3,7 @@ project(UDPConnection)
 
 set(UDPConnection_SOURCES
     src/UDPConnection.c
-    src/Deque.c
+    src/UDPC_Deque.c
 )
 
 set(CMAKE_C_FLAGS "-Wall -Wno-missing-braces")
@@ -19,3 +19,12 @@ endif()
 add_library(UDPConnection ${UDPConnection_SOURCES})
 
 target_compile_features(UDPConnection PUBLIC c_std_11)
+target_link_libraries(UDPConnection PUBLIC pthread)
+
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+    set(UDPC_UnitTest_SOURCES
+        src/test/UDPC_UnitTest.c)
+    add_executable(UnitTest ${UDPC_UnitTest_SOURCES})
+    target_link_libraries(UnitTest PUBLIC UDPConnection)
+    target_include_directories(UnitTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+endif()

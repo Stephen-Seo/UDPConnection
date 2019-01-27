@@ -1,4 +1,4 @@
-#include "Deque.h"
+#include "UDPC_Deque.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +41,12 @@ int UDPC_Deque_realloc(UDPC_Deque *deque, uint32_t new_size)
         free(deque->buf);
         deque->buf = buf;
         deque->alloc_size = new_size;
+        deque->head = 0;
+        deque->tail = deque->size;
+        if(deque->tail == deque->alloc_size)
+        {
+            deque->tail = 0;
+        }
         return 1;
     }
     else
@@ -59,7 +65,7 @@ int UDPC_Deque_realloc(UDPC_Deque *deque, uint32_t new_size)
     }
 }
 
-int UDPC_Deque_push_back(UDPC_Deque *deque, const char *data, uint32_t size)
+int UDPC_Deque_push_back(UDPC_Deque *deque, const void *data, uint32_t size)
 {
     if(deque->size + size > deque->alloc_size)
     {
@@ -90,14 +96,14 @@ int UDPC_Deque_push_back(UDPC_Deque *deque, const char *data, uint32_t size)
     }
     if(size > 0)
     {
-        memcpy(&deque->buf[deque->tail], &data[temp], size);
+        memcpy(&deque->buf[deque->tail], &((const char*)data)[temp], size);
         deque->tail += size;
         deque->size += size;
     }
     return 1;
 }
 
-int UDPC_Deque_push_front(UDPC_Deque *deque, const char *data, uint32_t size)
+int UDPC_Deque_push_front(UDPC_Deque *deque, const void *data, uint32_t size)
 {
     if(deque->size + size > deque->alloc_size)
     {
@@ -114,7 +120,7 @@ int UDPC_Deque_push_front(UDPC_Deque *deque, const char *data, uint32_t size)
 
     if(deque->head > 0)
     {
-        memcpy(deque->buf, &data[size - deque->head], deque->head);
+        memcpy(deque->buf, &((const char*)data)[size - deque->head], deque->head);
         deque->size += deque->head;
         size -= deque->head;
         deque->head = 0;
@@ -138,7 +144,7 @@ uint32_t UDPC_Deque_get_used(UDPC_Deque *deque)
     return deque->size;
 }
 
-int UDPC_Deque_get_back(UDPC_Deque *deque, char **data, uint32_t *size)
+int UDPC_Deque_get_back(UDPC_Deque *deque, void **data, uint32_t *size)
 {
     int returnValue = 1;
     if(deque->size == 0)
@@ -169,7 +175,7 @@ int UDPC_Deque_get_back(UDPC_Deque *deque, char **data, uint32_t *size)
     return returnValue;
 }
 
-int UDPC_Deque_get_front(UDPC_Deque *deque, char **data, uint32_t *size)
+int UDPC_Deque_get_front(UDPC_Deque *deque, void **data, uint32_t *size)
 {
     int returnValue = 1;
     if(deque->size == 0)
@@ -252,11 +258,11 @@ void UDPC_Deque_pop_front(UDPC_Deque *deque, uint32_t size)
     }
 }
 
-int UDPC_Deque_index(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, char **out)
+int UDPC_Deque_index(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, void **out)
 {
     uint32_t pos = unitSize * index;
     uint32_t abspos;
-    if(pos >= deque->alloc_size)
+    if(pos >= deque->size)
     {
         *out = NULL;
         return 0;
@@ -286,11 +292,11 @@ int UDPC_Deque_index(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, char 
     return 1;
 }
 
-int UDPC_Deque_index_rev(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, char **out)
+int UDPC_Deque_index_rev(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, void **out)
 {
     uint32_t pos = unitSize * (index + 1);
     uint32_t abspos;
-    if(pos >= deque->alloc_size)
+    if(pos >= deque->size + unitSize)
     {
         *out = NULL;
         return 0;

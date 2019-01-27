@@ -33,13 +33,13 @@ int UDPC_Deque_realloc(UDPC_Deque *deque, uint32_t new_size);
  * If there was not enough space in the Deque, then no data is inserted at all.
  * \return non-zero on success (there was enough size to insert data)
  */
-int UDPC_Deque_push_back(UDPC_Deque *deque, const char *data, uint32_t size);
+int UDPC_Deque_push_back(UDPC_Deque *deque, const void *data, uint32_t size);
 
 /*!
  * If there was not enough space in the Deque, then no data is inserted at all.
  * \return non-zero on success (there was enough size to insert data)
  */
-int UDPC_Deque_push_front(UDPC_Deque *deque, const char *data, uint32_t size);
+int UDPC_Deque_push_front(UDPC_Deque *deque, const void *data, uint32_t size);
 
 /*!
  * \return size in bytes of available data
@@ -58,7 +58,7 @@ uint32_t UDPC_Deque_get_used(UDPC_Deque *deque);
  * updated to allocated amount. If deque is empty, no data is allocated.
  * \return non-zero if full requested size was returned
  */
-int UDPC_Deque_get_back(UDPC_Deque *deque, char **data, uint32_t *size);
+int UDPC_Deque_get_back(UDPC_Deque *deque, void **data, uint32_t *size);
 
 /*!
  * \brief Get data from front of deque
@@ -67,7 +67,7 @@ int UDPC_Deque_get_back(UDPC_Deque *deque, char **data, uint32_t *size);
  * updated to allocated amount. If deque is empty, no data is allocated.
  * \return non-zero if full requested size was returned
  */
-int UDPC_Deque_get_front(UDPC_Deque *deque, char **data, uint32_t *size);
+int UDPC_Deque_get_front(UDPC_Deque *deque, void **data, uint32_t *size);
 
 /*!
  * \brief "free" data from the back of the deque
@@ -92,22 +92,22 @@ void UDPC_Deque_pop_front(UDPC_Deque *deque, uint32_t size);
  * The data will be indexed relative to the head of the Deque.
  * The out pointer will be malloc'd with size unitSize and will have a copy of
  * the data at the specified unitSize * index.
- * Note that the out data must be free'd, but nothing will be malloc'd on fail
+ * Note that the out data must be free'd, but on fail nothing will be malloc'd
  * and *out will be set to NULL.
- * \return non-zero if unitSize * index < allocated_size_of_Deque
+ * \return non-zero if unitSize * index < size
  */
-int UDPC_Deque_index(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, char **out);
+int UDPC_Deque_index(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, void **out);
 
 /*!
  * \brief Get a unitSize sized chunk of data at position relative to tail
  * The out pointer will be malloc'd with size unitSize and will have a copy of
- * the data at the specified unitSize * (index + 1) relative to tail in reverse
+ * the data at the specified unitSize * index relative to tail in reverse
  * direction.
- * Note that the out data must be free'd, but nothing will be malloc'd on fail
+ * Note that the out data must be free'd, but on fail nothing will be malloc'd
  * and *out will be set to NULL.
- * \return non-zero if unitSize * (index + 1) < allocated_size_of_Deque
+ * \return non-zero if unitSize * index < size
  */
-int UDPC_Deque_index_rev(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, char **out);
+int UDPC_Deque_index_rev(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, void **out);
 
 void UDPC_Deque_clear(UDPC_Deque *deque);
 
