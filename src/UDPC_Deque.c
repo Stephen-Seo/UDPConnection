@@ -20,11 +20,10 @@ UDPC_Deque* UDPC_Deque_init(uint32_t alloc_size)
     }
 }
 
-void UDPC_Deque_destroy(UDPC_Deque **deque)
+void UDPC_Deque_destroy(UDPC_Deque *deque)
 {
-    free((*deque)->buf);
-    free(*deque);
-    *deque = NULL;
+    free(deque->buf);
+    free(deque);
 }
 
 int UDPC_Deque_realloc(UDPC_Deque *deque, uint32_t new_size)

@@ -171,7 +171,7 @@ int main()
         deque->alloc_size, deque->size, deque->head, deque->tail);
     */
 
-    UDPC_Deque_destroy(&deque);
+    UDPC_Deque_destroy(deque);
     UNITTEST_REPORT()
     return 0;
 }

@@ -20,7 +20,7 @@ UDPC_Deque* UDPC_Deque_init(uint32_t alloc_size);
 /*!
  * Frees resources used by a UDPC_Deque
  */
-void UDPC_Deque_destroy(UDPC_Deque **deque);
+void UDPC_Deque_destroy(UDPC_Deque *deque);
 
 /*!
  * Fails if new_size is smaller than current size of Deque.
