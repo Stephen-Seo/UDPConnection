@@ -27,7 +27,10 @@
     if(memcmp(x, y, size) == 0) { printf("%d: ASSERT_NEQ_MEM(%s, %s, %s) FAILED\n", \
             __LINE__, #x, #y, #size); ++UDPC_uts.failed; } ++UDPC_uts.total;
 
-#define UNITTEST_REPORT() printf("%d/%d tests failed\n", UDPC_uts.failed, UDPC_uts.total);
+#define UNITTEST_REPORT(x) { \
+    printf("%s: %d/%d tests failed\n", #x, UDPC_uts.failed, UDPC_uts.total); \
+    UDPC_uts.failed = 0; \
+    UDPC_uts.total = 0; }
 
 
 typedef struct

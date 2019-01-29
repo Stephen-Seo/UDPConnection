@@ -172,6 +172,6 @@ int main()
     */
 
     UDPC_Deque_destroy(deque);
-    UNITTEST_REPORT()
+    UNITTEST_REPORT(DEQUE_TEST)
     return 0;
 }
