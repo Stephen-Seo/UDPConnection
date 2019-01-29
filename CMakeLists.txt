@@ -4,6 +4,7 @@ project(UDPConnection)
 set(UDPConnection_SOURCES
     src/UDPConnection.c
     src/UDPC_Deque.c
+    src/UDPC_Defines.c
 )
 
 set(CMAKE_C_FLAGS "-Wall -Wno-missing-braces")

@@ -6,20 +6,7 @@
 #include <time.h>
 #include <stdint.h>
 
-#define UDPC_PLATFORM_WINDOWS 1
-#define UDPC_PLATFORM_MAC 2
-#define UDPC_PLATFORM_LINUX 3
-#define UDPC_PLATFORM_UNKNOWN 0
-
-#if defined _WIN32
-  #define UDPC_PLATFORM UDPC_PLATFORM_WINDOWS
-#elif defined __APPLE__
-  #define UDPC_PLATFORM UDPC_PLATFORM_MAC
-#elif defined __linux__
-  #define UDPC_PLATFORM UDPC_PLATFORM_LINUX
-#else
-  #define UDPC_PLATFORM UDPC_PLATFORM_UNKNOWN
-#endif
+#include "UDPC_Defines.h"
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
   #include <winsock2.h>
@@ -33,13 +20,6 @@
 
   #define CleanupSocket(x) close(x)
 #endif
-
-#define UDPCON_ERR_SOCKETFAIL 1 // failed to create socket
-#define UDPCON_ERR_SOCKETBINDF 2 // failed to bind socket
-#define UDPCON_ERR_SOCKETNONBF 3 // failed to set non-blocking on socket
-#define UDPCON_ERR_MTXFAIL 4 // failed to create mutex
-#define UDPCON_ERR_CVFAIL 5 // failed to create condition variable
-#define UDPCON_ERR_THREADFAIL 6 // failed to create thread
 
 // This struct should not be used outside of this library
 typedef struct
@@ -101,11 +81,15 @@ typedef struct
     cnd_t threadCV;
 } UDPC_Context;
 
-UDPC_Context UDPC_init(uint16_t listenPort);
+UDPC_Context* UDPC_init(uint16_t listenPort);
 
-UDPC_Context UDPC_init_threaded_update(uint16_t listenPort);
+UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort);
 
 void UDPC_destroy(UDPC_Context *ctx);
+
+uint32_t UDPC_get_error(UDPC_Context *ctx);
+
+const char* UDPC_get_error_str(uint32_t error);
 
 int UDPC_INTERNAL_threadfn(void *context); // internal usage only
 
