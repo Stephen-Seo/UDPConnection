@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 #include "UDPC_Defines.h"
+#include "UDPC_Deque.h"
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
   #include <winsock2.h>
@@ -20,6 +21,8 @@
 
   #define CleanupSocket(x) close(x)
 #endif
+
+#define UDPC_CD_AMOUNT 32
 
 // This struct should not be used outside of this library
 typedef struct
@@ -54,8 +57,8 @@ typedef struct
     float toggleTimer;
     float toggledTimer;
     uint16_t port;
-    UDPC_INTERNAL_PacketInfo *sentPkts;
-    UDPC_INTERNAL_PacketInfo *sendPktQueue;
+    UDPC_Deque *sentPkts;
+    UDPC_Deque *sendPktQueue;
     struct timespec received;
     struct timespec sent;
     struct timespec rtt;
@@ -66,6 +69,7 @@ typedef struct
 {
     /*
      * 0x1 - is threaded
+     * 0x2 - is client
      */
     uint32_t flags;
     /*
@@ -79,11 +83,12 @@ typedef struct
     mtx_t tCVMtx;
     mtx_t tflagsMtx;
     cnd_t threadCV;
+    UDPC_Deque *connected;
 } UDPC_Context;
 
-UDPC_Context* UDPC_init(uint16_t listenPort);
+UDPC_Context* UDPC_init(uint16_t listenPort, int isClient);
 
-UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort);
+UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, int isClient);
 
 void UDPC_destroy(UDPC_Context *ctx);
 

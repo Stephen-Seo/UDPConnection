@@ -2,12 +2,13 @@
 
 #include <stdlib.h>
 
-UDPC_Context* UDPC_init(uint16_t listenPort)
+UDPC_Context* UDPC_init(uint16_t listenPort, int isClient)
 {
     UDPC_Context *context = malloc(sizeof(UDPC_Context));
     context->error = UDPC_SUCCESS;
     context->flags = 0;
     context->threadFlags = 0;
+    if(isClient != 0) context->flags |= 0x2;
 
     // create socket
     context->socketHandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -52,15 +53,21 @@ UDPC_Context* UDPC_init(uint16_t listenPort)
         CleanupSocket(context->socketHandle);
         context->socketHandle = 0;
         fprintf(stderr, "Failed to set non-blocking on socket\n");
+#if UDPC_PLATFORM == UDPC_PLATFORM_UNKNOWN
+        fprintf(stderr, "(Unknown platform)\n");
+#endif
         return context;
     }
+
+    context->connected = UDPC_Deque_init(sizeof(UDPC_INTERNAL_ConnectionData)
+            * (isClient != 0 ? 1 : UDPC_CD_AMOUNT));
 
     return context;
 }
 
-UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort)
+UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, int isClient)
 {
-    UDPC_Context *context = UDPC_init(listenPort);
+    UDPC_Context *context = UDPC_init(listenPort, isClient);
 
     context->error = mtx_init(&context->tCVMtx, mtx_timed);
     if(context->error != thrd_success)
@@ -118,6 +125,7 @@ UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort)
 void UDPC_destroy(UDPC_Context *ctx)
 {
     CleanupSocket(ctx->socketHandle);
+    UDPC_Deque_destroy(ctx->connected);
 
     if((ctx->flags & 0x1) != 0)
     {
