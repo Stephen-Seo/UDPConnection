@@ -328,6 +328,61 @@ int UDPC_Deque_index_rev(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, v
     return 1;
 }
 
+int UDPC_Deque_remove(UDPC_Deque *deque, uint32_t unitSize, uint32_t index)
+{
+    uint32_t pos = unitSize * index;
+    uint32_t abspos;
+    uint32_t lastpos;
+    if(deque->size == 0 || pos >= deque->size)
+    {
+        return 0;
+    }
+    else if(deque->size <= unitSize)
+    {
+        UDPC_Deque_clear(deque);
+        return 1;
+    }
+
+    if(pos + deque->head >= deque->alloc_size)
+    {
+        abspos = pos + deque->head - deque->alloc_size;
+    }
+    else
+    {
+        abspos = pos + deque->head;
+    }
+
+    if(deque->tail == 0)
+    {
+        lastpos = deque->alloc_size - unitSize;
+    }
+    else
+    {
+        lastpos = deque->tail - unitSize;
+    }
+
+    if(abspos != lastpos)
+    {
+        if(deque->tail == 0)
+        {
+            memcpy(&deque->buf[abspos], &deque->buf[deque->alloc_size - unitSize], unitSize);
+            deque->tail = deque->alloc_size - unitSize;
+        }
+        else
+        {
+            memcpy(&deque->buf[abspos], &deque->buf[deque->tail - unitSize], unitSize);
+            deque->tail -= unitSize;
+        }
+        deque->size -= unitSize;
+    }
+    else
+    {
+        UDPC_Deque_pop_back(deque, unitSize);
+    }
+
+    return 1;
+}
+
 void UDPC_Deque_clear(UDPC_Deque *deque)
 {
     deque->head = 0;

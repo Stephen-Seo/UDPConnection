@@ -166,7 +166,35 @@ int main()
     ASSERT_FALSE(UDPC_Deque_index_rev(deque, sizeof(int), 8, (void**)&temp));
     ASSERT_FALSE(temp);
 
+    // remove success front
+    ASSERT_TRUE(UDPC_Deque_remove(deque, sizeof(int), 0));
+    ASSERT_EQ(sizeof(int) * 7, deque->size);
+    ASSERT_EQ_MEM(deque->buf, &arr[7], sizeof(int));
+
+    // remove success end
+    ASSERT_TRUE(UDPC_Deque_remove(deque, sizeof(int), 6));
+    ASSERT_EQ(sizeof(int) * 6, deque->size);
+    ASSERT_EQ_MEM(&deque->buf[deque->tail - sizeof(int)], &arr[5], sizeof(int));
+
+    // remove success middle
+    ASSERT_TRUE(UDPC_Deque_remove(deque, sizeof(int), 2));
+    ASSERT_EQ(sizeof(int) * 5, deque->size);
+    ASSERT_EQ_MEM(&deque->buf[deque->head + sizeof(int) * 2], &arr[5], sizeof(int));
+
+    // remove success until empty
+    while(deque->size > 0)
+    {
+        ASSERT_TRUE(UDPC_Deque_remove(deque, sizeof(int), 0));
+    }
+    ASSERT_EQ(deque->size, 0);
+
     /*
+    for(int x = 0; x < deque->tail / sizeof(int); ++x)
+    {
+        temp = &deque->buf[x * sizeof(int)];
+        printf("%d: %d   ", x, *((int*)temp));
+    }
+    printf("\n");
     printf("asize %d, size %d, head %d, tail %d\n",
         deque->alloc_size, deque->size, deque->head, deque->tail);
     */

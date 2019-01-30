@@ -109,6 +109,13 @@ int UDPC_Deque_index(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, void 
  */
 int UDPC_Deque_index_rev(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, void **out);
 
+/*!
+ * \brief Replaces the data at index with data at the end (if exists)
+ * Note this will reduce the size of the Deque by unitSize amount.
+ * \return non-zero if data was removed
+ */
+int UDPC_Deque_remove(UDPC_Deque *deque, uint32_t unitSize, uint32_t index);
+
 void UDPC_Deque_clear(UDPC_Deque *deque);
 
 #endif
