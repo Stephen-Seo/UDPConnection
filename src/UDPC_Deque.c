@@ -6,6 +6,10 @@
 UDPC_Deque* UDPC_Deque_init(uint32_t alloc_size)
 {
     UDPC_Deque *deque = malloc(sizeof(UDPC_Deque));
+    if(!deque)
+    {
+        return NULL;
+    }
     UDPC_Deque_clear(deque);
     deque->alloc_size = alloc_size;
     deque->buf = malloc(alloc_size);
@@ -163,7 +167,12 @@ int UDPC_Deque_get_back(UDPC_Deque *deque, void **data, uint32_t *size)
 
     *data = malloc(*size);
 
-    if(deque->tail < *size)
+    if(deque->tail == 0)
+    {
+        memcpy(*data, &deque->buf[deque->alloc_size - *size], *size);
+        return returnValue;
+    }
+    else if(deque->tail < *size)
     {
         memcpy(data[*size - deque->tail], deque->buf, deque->tail);
         memcpy(
@@ -172,9 +181,32 @@ int UDPC_Deque_get_back(UDPC_Deque *deque, void **data, uint32_t *size)
             *size - deque->tail);
         return returnValue;
     }
+    else
+    {
+        memcpy(*data, &deque->buf[deque->tail - *size], *size);
+        return returnValue;
+    }
+}
 
-    memcpy(*data, &deque->buf[deque->tail - *size], *size);
-    return returnValue;
+void* UDPC_Deque_get_back_ptr(UDPC_Deque *deque, uint32_t unitSize)
+{
+    if(deque->size < unitSize)
+    {
+        return NULL;
+    }
+
+    if(deque->tail == 0 && deque->size >= unitSize)
+    {
+        return &deque->buf[deque->alloc_size - unitSize];
+    }
+    else if(deque->tail < unitSize)
+    {
+        return NULL;
+    }
+    else
+    {
+        return &deque->buf[deque->tail - unitSize];
+    }
 }
 
 int UDPC_Deque_get_front(UDPC_Deque *deque, void **data, uint32_t *size)
@@ -203,9 +235,21 @@ int UDPC_Deque_get_front(UDPC_Deque *deque, void **data, uint32_t *size)
             *size - (deque->alloc_size - deque->head));
         return returnValue;
     }
+    else
+    {
+        memcpy(*data, &deque->buf[deque->head], *size);
+        return returnValue;
+    }
+}
 
-    memcpy(*data, &deque->buf[deque->head], *size);
-    return returnValue;
+void* UDPC_Deque_get_front_ptr(UDPC_Deque *deque, uint32_t unitSize)
+{
+    if(deque->size < unitSize || deque->head + unitSize > deque->alloc_size)
+    {
+        return NULL;
+    }
+
+    return &deque->buf[deque->head];
 }
 
 void UDPC_Deque_pop_back(UDPC_Deque *deque, uint32_t size)
@@ -294,6 +338,32 @@ int UDPC_Deque_index(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, void 
     return 1;
 }
 
+void* UDPC_Deque_index_ptr(UDPC_Deque *deque, uint32_t unitSize, uint32_t index)
+{
+    uint32_t pos = unitSize * index;
+    uint32_t abspos;
+    if(pos >= deque->size)
+    {
+        return NULL;
+    }
+
+    if(pos + deque->head >= deque->alloc_size)
+    {
+        abspos = pos + deque->head - deque->alloc_size;
+    }
+    else
+    {
+        abspos = pos + deque->head;
+    }
+
+    if(abspos + unitSize > deque->alloc_size)
+    {
+        return NULL;
+    }
+
+    return &deque->buf[abspos];
+}
+
 int UDPC_Deque_index_rev(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, void **out)
 {
     uint32_t pos = unitSize * (index + 1);
@@ -326,6 +396,32 @@ int UDPC_Deque_index_rev(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, v
     }
 
     return 1;
+}
+
+void* UDPC_Deque_index_rev_ptr(UDPC_Deque *deque, uint32_t unitSize, uint32_t index)
+{
+    uint32_t pos = unitSize * (index + 1);
+    uint32_t abspos;
+    if(pos >= deque->size + unitSize)
+    {
+        return NULL;
+    }
+
+    if(pos > deque->tail)
+    {
+        abspos = deque->alloc_size - (pos - deque->tail);
+    }
+    else
+    {
+        abspos = deque->tail - pos;
+    }
+
+    if(abspos + unitSize > deque->alloc_size)
+    {
+        return NULL;
+    }
+
+    return &deque->buf[abspos];
 }
 
 int UDPC_Deque_remove(UDPC_Deque *deque, uint32_t unitSize, uint32_t index)

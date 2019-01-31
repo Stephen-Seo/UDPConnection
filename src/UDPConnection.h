@@ -20,11 +20,13 @@
   #include <unistd.h>
 
   #define CleanupSocket(x) close(x)
+#else
+  #define CleanupSocket(x) ((void)0)
 #endif
 
 #define UDPC_CD_AMOUNT 32
 
-// This struct should not be used outside of this library
+/// This struct should not be used outside of this library
 typedef struct
 {
     uint32_t addr;
@@ -39,7 +41,7 @@ typedef struct
     struct timespec sent;
 } UDPC_INTERNAL_PacketInfo;
 
-// This struct should not be used outside of this library
+/// This struct should not be used outside of this library
 typedef struct
 {
     /*
@@ -64,7 +66,7 @@ typedef struct
     struct timespec rtt;
 } UDPC_INTERNAL_ConnectionData;
 
-// This struct should not be modified, only passed to functions that require it
+/// This struct should not be modified, only passed to functions that require it
 typedef struct
 {
     /*
@@ -84,6 +86,7 @@ typedef struct
     mtx_t tflagsMtx;
     cnd_t threadCV;
     UDPC_Deque *connected;
+    struct timespec lastUpdated;
 } UDPC_Context;
 
 UDPC_Context* UDPC_init(uint16_t listenPort, int isClient);
@@ -95,6 +98,11 @@ void UDPC_destroy(UDPC_Context *ctx);
 uint32_t UDPC_get_error(UDPC_Context *ctx);
 
 const char* UDPC_get_error_str(uint32_t error);
+
+/// If threaded, this function is called automatically
+void UDPC_update(UDPC_Context *ctx);
+
+float UDPC_ts_diff_to_seconds(struct timespec *ts0, struct timespec *ts1);
 
 int UDPC_INTERNAL_threadfn(void *context); // internal usage only
 

@@ -62,6 +62,8 @@ UDPC_Context* UDPC_init(uint16_t listenPort, int isClient)
     context->connected = UDPC_Deque_init(sizeof(UDPC_INTERNAL_ConnectionData)
             * (isClient != 0 ? 1 : UDPC_CD_AMOUNT));
 
+    timespec_get(&context->lastUpdated, TIME_UTC);
+
     return context;
 }
 
@@ -164,6 +166,70 @@ const char* UDPC_get_error_str(uint32_t error)
     case UDPC_ERR_THREADFAIL: return UDPC_ERR_THREADFAIL_STR;
     default: return "Unknown error";
     }
+}
+
+void UDPC_update(UDPC_Context *ctx)
+{
+    // get dt
+    struct timespec ts;
+    timespec_get(&ts, TIME_UTC);
+    float dt = UDPC_ts_diff_to_seconds(&ts, &ctx->lastUpdated);
+    ctx->lastUpdated = ts;
+
+    // check rtt
+    for(int x = 0; x * sizeof(UDPC_INTERNAL_ConnectionData) < ctx->connected->size; ++x)
+    {
+        // TODO after fixing Deque
+    }
+}
+
+float UDPC_ts_diff_to_seconds(struct timespec *ts0, struct timespec *ts1)
+{
+    float sec = 0.0f;
+    if(!ts0 || !ts1)
+    {
+        return sec;
+    }
+
+    if(ts0->tv_sec > ts1->tv_sec)
+    {
+        sec = ts0->tv_sec - ts1->tv_sec;
+        if(ts0->tv_nsec > ts1->tv_nsec)
+        {
+            sec += ((float)(ts0->tv_nsec - ts1->tv_nsec)) / 1000000000.0f;
+        }
+        else if(ts0->tv_nsec < ts1->tv_nsec)
+        {
+            sec -= 1.0f;
+            sec += ((float)(1000000000 + ts0->tv_nsec - ts1->tv_nsec)) / 1000000000.0f;
+        }
+    }
+    else if(ts0->tv_sec < ts1->tv_sec)
+    {
+        sec = ts1->tv_sec - ts0->tv_sec;
+        if(ts0->tv_nsec < ts1->tv_nsec)
+        {
+            sec += ((float)(ts1->tv_nsec - ts0->tv_nsec)) / 1000000000.0f;
+        }
+        else if(ts0->tv_nsec > ts1->tv_nsec)
+        {
+            sec -= 1.0f;
+            sec += ((float)(1000000000 + ts1->tv_nsec - ts0->tv_nsec)) / 1000000000.0f;
+        }
+    }
+    else
+    {
+        if(ts0->tv_nsec > ts1->tv_nsec)
+        {
+            sec += ((float)(ts0->tv_nsec - ts1->tv_nsec)) / 1000000000.0f;
+        }
+        else
+        {
+            sec += ((float)(ts1->tv_nsec - ts0->tv_nsec)) / 1000000000.0f;
+        }
+    }
+
+    return sec;
 }
 
 int UDPC_INTERNAL_threadfn(void *context)

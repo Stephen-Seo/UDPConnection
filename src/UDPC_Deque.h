@@ -61,6 +61,14 @@ uint32_t UDPC_Deque_get_used(UDPC_Deque *deque);
 int UDPC_Deque_get_back(UDPC_Deque *deque, void **data, uint32_t *size);
 
 /*!
+ * \brief Get data ptr from back of deque
+ * The returned ptr is part of the Deque's internal buffer and must not be
+ * manually free'd; it will be free'd when the Deque itself is destroyed.
+ * \return non-null if tail of deque has contiguous data of size unitSize
+ */
+void* UDPC_Deque_get_back_ptr(UDPC_Deque *deque, uint32_t unitSize);
+
+/*!
  * \brief Get data from front of deque
  * Data must be free'd after use as it was allocated with malloc.
  * When size is greater than deque size, partial data is allocated, size is
@@ -68,6 +76,14 @@ int UDPC_Deque_get_back(UDPC_Deque *deque, void **data, uint32_t *size);
  * \return non-zero if full requested size was returned
  */
 int UDPC_Deque_get_front(UDPC_Deque *deque, void **data, uint32_t *size);
+
+/*!
+ * \brief Get data ptr from front of deque
+ * The returned ptr is part of the Deque's internal buffer and must not be
+ * manually free'd; it will be free'd when the Deque itself is destroyed.
+ * \return non-null if head of deque has contiguous data of size unitSize
+ */
+void* UDPC_Deque_get_front_ptr(UDPC_Deque *deque, uint32_t unitSize);
 
 /*!
  * \brief "free" data from the back of the deque
@@ -99,6 +115,15 @@ void UDPC_Deque_pop_front(UDPC_Deque *deque, uint32_t size);
 int UDPC_Deque_index(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, void **out);
 
 /*!
+ * \brief Get a ptr to the indexed data at position unitSize * index
+ * The ptr will be indexed relative to the head of the Deque.
+ * The returned ptr is part of the Deque's internal buffer and will be free'd
+ * when the Deque is destroyed, so it should not be free'd directly.
+ * \return non-null if indexed data is a valid contiguous part of the buffer
+ */
+void* UDPC_Deque_index_ptr(UDPC_Deque *deque, uint32_t unitSize, uint32_t index);
+
+/*!
  * \brief Get a unitSize sized chunk of data at position relative to tail
  * The out pointer will be malloc'd with size unitSize and will have a copy of
  * the data at the specified unitSize * index relative to tail in reverse
@@ -108,6 +133,15 @@ int UDPC_Deque_index(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, void 
  * \return non-zero if unitSize * index < size
  */
 int UDPC_Deque_index_rev(UDPC_Deque *deque, uint32_t unitSize, uint32_t index, void **out);
+
+/*!
+ * \brief Get a ptr to the indexed data at position unitSize * index
+ * The ptr will be indexed relative to the tail of the Deque.
+ * The returned ptr is part of the Deque's internal buffer and will be free'd
+ * when the Deque is destroyed, so it should not be free'd directly.
+ * \return non-null if indexed data is a valid contiguous part of the buffer
+ */
+void* UDPC_Deque_index_rev_ptr(UDPC_Deque *deque, uint32_t unitSize, uint32_t index);
 
 /*!
  * \brief Replaces the data at index with data at the end (if exists)

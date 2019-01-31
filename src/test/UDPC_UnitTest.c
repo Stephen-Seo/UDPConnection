@@ -36,11 +36,27 @@ int main()
     // push back success
     ASSERT_TRUE(UDPC_Deque_push_back(deque, arr, sizeof(int) * 4));
     ASSERT_EQ_MEM(arr, deque->buf, sizeof(int) * 4);
+    ASSERT_EQ_MEM(arr, UDPC_Deque_get_back_ptr(deque, sizeof(int) * 4), sizeof(int) * 4);
+    ASSERT_EQ_MEM(arr, UDPC_Deque_get_front_ptr(deque, sizeof(int) * 4), sizeof(int) * 4);
+    for(int x = 0; x < 4; ++x)
+    {
+        ASSERT_EQ_MEM(&arr[x], UDPC_Deque_index_ptr(deque, sizeof(int), x), sizeof(int));
+        ASSERT_EQ_MEM(&arr[3 - x], UDPC_Deque_index_rev_ptr(deque, sizeof(int), x), sizeof(int));
+    }
     ASSERT_EQ(deque->size, sizeof(int) * 4);
 
     // push front success
     ASSERT_TRUE(UDPC_Deque_push_front(deque, &arr[4], sizeof(int) * 4));
     ASSERT_EQ_MEM(&arr[4], &deque->buf[sizeof(int) * 12], sizeof(int) * 4);
+    ASSERT_EQ_MEM(arr, UDPC_Deque_get_back_ptr(deque, sizeof(int) * 4), sizeof(int) * 4);
+    ASSERT_EQ_MEM(&arr[4], UDPC_Deque_get_front_ptr(deque, sizeof(int) * 4), sizeof(int) * 4);
+    for(int x = 0; x < 4; ++x)
+    {
+        ASSERT_EQ_MEM(&arr[x + 4], UDPC_Deque_index_ptr(deque, sizeof(int), x), sizeof(int));
+        ASSERT_EQ_MEM(&arr[x], UDPC_Deque_index_ptr(deque, sizeof(int), x + 4), sizeof(int));
+        ASSERT_EQ_MEM(&arr[3 - x], UDPC_Deque_index_rev_ptr(deque, sizeof(int), x), sizeof(int));
+        ASSERT_EQ_MEM(&arr[7 - x], UDPC_Deque_index_rev_ptr(deque, sizeof(int), x + 4), sizeof(int));
+    }
     ASSERT_EQ(deque->size, sizeof(int) * 8);
 
     // realloc bigger success
