@@ -31,4 +31,20 @@ static const char *UDPC_ERR_MTXFAIL_STR = "Failed to create mutex";
 static const char *UDPC_ERR_CVFAIL_STR = "Failed to create condition variable";
 static const char *UDPC_ERR_THREADFAIL_STR = "Failed to create thread";
 
+#define UDPC_CD_AMOUNT 32
+
+#define UDPC_GOOD_MODE_SEND_INTERVAL (1.0f/30.0f)
+#define UDPC_BAD_MODE_SEND_INTERVAL (1.0f/10.0f)
+#define UDPC_TIMEOUT_SECONDS 10.0f
+#define UDPC_HEARTBEAT_PKT_INTERVAL (15.0f/100.0f)
+#define UDPC_PKT_PROTOCOL_ID 1357924680
+
+#define UDPC_ID_CONNECT        0x80000000
+#define UDPC_ID_PING           0x40000000
+#define UDPC_ID_NO_REC_CHK     0x20000000
+#define UDPC_ID_RESENDING      0x10000000
+
+#define UDPC_SENT_PKTS_MAX_SIZE 34
+#define UDPC_SENT_PKTS_ALLOC_SIZE 35
+
 #endif

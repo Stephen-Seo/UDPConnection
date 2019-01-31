@@ -24,7 +24,6 @@
   #define CleanupSocket(x) ((void)0)
 #endif
 
-#define UDPC_CD_AMOUNT 32
 
 /// This struct should not be used outside of this library
 typedef struct
@@ -33,11 +32,12 @@ typedef struct
     uint32_t id;
     /*
      * 0x1 - is resending
-     * 0x2 - is not received checked
+     * 0x2 - is check received packet
      * 0x4 - has been re-sent
      */
     uint32_t flags;
-    char *data;
+    char *data; // no-header in sendPktQueue, header in sentPkts
+    uint32_t size;
     struct timespec sent;
 } UDPC_INTERNAL_PacketInfo;
 
@@ -58,6 +58,7 @@ typedef struct
     float toggleT;
     float toggleTimer;
     float toggledTimer;
+    uint32_t addr;
     uint16_t port;
     UDPC_Deque *sentPkts;
     UDPC_Deque *sendPktQueue;
@@ -105,5 +106,19 @@ void UDPC_update(UDPC_Context *ctx);
 float UDPC_ts_diff_to_seconds(struct timespec *ts0, struct timespec *ts1);
 
 int UDPC_INTERNAL_threadfn(void *context); // internal usage only
+
+/*
+ * 0x1 - is ping
+ * 0x2 - is resending
+ * 0x4 - is checked received packet
+ */
+void UDPC_INTERNAL_prepare_pkt(
+    void *data,
+    uint32_t conID,
+    uint32_t rseq,
+    uint32_t ack,
+    uint32_t *seqID,
+    uint32_t addr,
+    int flags);
 
 #endif
