@@ -226,7 +226,7 @@ void TEST_ATOSTR()
     ASSERT_EQ_MEM(
         UDPC_INTERNAL_atostr(ctx, (0xAC << 24) | (0x1E << 16) | (0x1 << 8) | 0xFF),
         "172.30.1.255",
-        12);
+        13);
     free(ctx);
     UNITTEST_REPORT(ATOSTR);
 }
