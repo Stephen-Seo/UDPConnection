@@ -2,10 +2,11 @@
 
 #include <stdlib.h>
 #include <UDPC_Deque.h>
+#include <UDPConnection.h>
 
 static UnitTestState UDPC_uts = {0, 0};
 
-int main()
+void TEST_DEQUE()
 {
     int arr[32];
     char *temp = NULL;
@@ -216,6 +217,23 @@ int main()
     */
 
     UDPC_Deque_destroy(deque);
-    UNITTEST_REPORT(DEQUE_TEST)
+    UNITTEST_REPORT(DEQUE)
+}
+
+void TEST_ATOSTR()
+{
+    UDPC_Context *ctx = malloc(sizeof(UDPC_Context));
+    ASSERT_EQ_MEM(
+        UDPC_INTERNAL_atostr(ctx, (0xAC << 24) | (0x1E << 16) | (0x1 << 8) | 0xFF),
+        "172.30.1.255",
+        12);
+    free(ctx);
+    UNITTEST_REPORT(ATOSTR);
+}
+
+int main()
+{
+    TEST_DEQUE();
+    TEST_ATOSTR();
     return 0;
 }
