@@ -2,6 +2,8 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 UDPC_Context* UDPC_init(uint16_t listenPort, int isClient)
 {
@@ -9,6 +11,7 @@ UDPC_Context* UDPC_init(uint16_t listenPort, int isClient)
     context->error = UDPC_SUCCESS;
     context->flags = 0;
     context->threadFlags = 0;
+    context->atostrBuf[UDPC_ATOSTR_BUF_SIZE - 1] = 0;
     if(isClient != 0) context->flags |= 0x2;
 
     // create socket
@@ -64,6 +67,8 @@ UDPC_Context* UDPC_init(uint16_t listenPort, int isClient)
             * (isClient != 0 ? 1 : UDPC_CD_AMOUNT));
 
     timespec_get(&context->lastUpdated, TIME_UTC);
+
+    context->flags |= (0x8 | 0x4);
 
     return context;
 }
@@ -169,6 +174,31 @@ const char* UDPC_get_error_str(uint32_t error)
     }
 }
 
+void UDPC_set_logging_type(UDPC_Context *ctx, uint32_t logType)
+{
+    switch(logType)
+    {
+    case 0:
+        ctx->flags &= 0xFFFFFFC3;
+        break;
+    case 1:
+        ctx->flags &= 0xFFFFFFC7;
+        ctx->flags |= 0x4;
+        break;
+    case 2:
+        ctx->flags &= 0xFFFFFFCF;
+        ctx->flags |= (0x4 | 0x8);
+        break;
+    case 3:
+        ctx->flags &= 0xFFFFFFDF;
+        ctx->flags |= (0x4 | 0x8 | 0x10);
+        break;
+    default:
+        ctx->flags |= (0x4 | 0x8 | 0x10 | 0x20);
+        break;
+    }
+}
+
 void UDPC_update(UDPC_Context *ctx)
 {
     // get dt
@@ -189,7 +219,9 @@ void UDPC_update(UDPC_Context *ctx)
         if(UDPC_ts_diff_to_seconds(&tsNow, &cd->received) >= UDPC_TIMEOUT_SECONDS)
         {
             UDPC_Deque_push_back(removedQueue, &x, sizeof(int));
-            // TODO log timed out connection
+            UDPC_INTERNAL_log(ctx, 2, "Connection timed out with addr %s port %d",
+                UDPC_INTERNAL_atostr(ctx, cd->addr),
+                cd->port);
             continue;
         }
 
@@ -199,7 +231,9 @@ void UDPC_update(UDPC_Context *ctx)
         if((cd->flags & 0x2) != 0 && (cd->flags & 0x4) == 0)
         {
             // good mode, bad rtt
-            // TODO log switching to bad mode
+            UDPC_INTERNAL_log(ctx, 2, "Connection with %s switching to bad mode",
+                UDPC_INTERNAL_atostr(ctx, cd->addr));
+
             cd->flags = cd->flags & 0xFFFFFFFD;
             if(cd->toggledTimer >= 10.0f)
             {
@@ -231,7 +265,8 @@ void UDPC_update(UDPC_Context *ctx)
             {
                 cd->toggleTimer = 0.0f;
                 cd->toggledTimer = 0.0f;
-                // TODO log switching to good mode
+                UDPC_INTERNAL_log(ctx, 2, "Connection with %s switching to good mode",
+                    UDPC_INTERNAL_atostr(ctx, cd->addr));
                 cd->flags |= 0x2;
             }
         }
@@ -275,11 +310,11 @@ void UDPC_update(UDPC_Context *ctx)
                 }
 
                 char *data = malloc(20);
-                UDPC_INTERNAL_prepare_pkt(data, cd->id, cd->rseq, cd->ack, &cd->lseq, cd->addr, 0);
+                UDPC_INTERNAL_prepare_pkt(data, cd->id, cd->rseq, cd->ack, &cd->lseq, 0);
 
                 struct sockaddr_in destinationInfo;
                 destinationInfo.sin_family = AF_INET;
-                destinationInfo.sin_addr.s_addr = htonl(cd->addr);
+                destinationInfo.sin_addr.s_addr = cd->addr;
                 destinationInfo.sin_port = htons(cd->port);
                 long int sentBytes = sendto(
                     ctx->socketHandle,
@@ -290,7 +325,8 @@ void UDPC_update(UDPC_Context *ctx)
                     sizeof(struct sockaddr_in));
                 if(sentBytes != 20)
                 {
-                    // TODO log fail send packet
+                    UDPC_INTERNAL_log(ctx, 0, "Failed to send packet to %s port %s",
+                        UDPC_INTERNAL_atostr(ctx, cd->addr), cd->port);
                 }
                 else
                 {
@@ -322,12 +358,12 @@ void UDPC_update(UDPC_Context *ctx)
                 UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_get_front_ptr(
                     cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
                 char *data = malloc(20 + pinfo->size);
-                UDPC_INTERNAL_prepare_pkt(data, cd->id, cd->rseq, cd->ack, &cd->lseq, cd->addr, ((pinfo->flags & 0x3) << 1));
+                UDPC_INTERNAL_prepare_pkt(data, cd->id, cd->rseq, cd->ack, &cd->lseq, ((pinfo->flags & 0x3) << 1));
                 memcpy(&data[20], pinfo->data, pinfo->size);
 
                 struct sockaddr_in destinationInfo;
                 destinationInfo.sin_family = AF_INET;
-                destinationInfo.sin_addr.s_addr = htonl(cd->addr);
+                destinationInfo.sin_addr.s_addr = cd->addr;
                 destinationInfo.sin_port = htons(cd->port);
                 long int sentBytes = sendto(
                     ctx->socketHandle,
@@ -338,7 +374,8 @@ void UDPC_update(UDPC_Context *ctx)
                     sizeof(struct sockaddr_in));
                 if(sentBytes != 20 + pinfo->size)
                 {
-                    // TODO log fail sent packet
+                    UDPC_INTERNAL_log(ctx, 0, "Failed to send packet to %s port %s",
+                        UDPC_INTERNAL_atostr(ctx, cd->addr), cd->port);
                 }
                 else
                 {
@@ -347,7 +384,7 @@ void UDPC_update(UDPC_Context *ctx)
                         UDPC_INTERNAL_PacketInfo sentInfo = {
                             cd->addr,
                             cd->lseq - 1,
-                            pinfo->flags & 0x2,
+                            0x2,
                             data,
                             20 + pinfo->size,
                             tsNow
@@ -473,7 +510,6 @@ void UDPC_INTERNAL_prepare_pkt(
     uint32_t rseq,
     uint32_t ack,
     uint32_t *seqID,
-    uint32_t addr,
     int flags)
 {
     char *d = data;
@@ -503,4 +539,60 @@ void UDPC_INTERNAL_prepare_pkt(
     memcpy(&d[12], &temp, 4);
     temp = htonl(ack);
     memcpy(&d[16], &temp, 4);
+}
+
+void UDPC_INTERNAL_log(UDPC_Context *ctx, uint32_t level, const char *msg, ...)
+{
+    va_list args;
+    va_start(args, msg);
+    switch(level)
+    {
+    case 0:
+    default:
+        if((ctx->flags & 0x4) == 0) break;
+        fprintf(stderr, "ERR: ");
+        break;
+    case 1:
+        if((ctx->flags & 0x8) == 0) break;
+        fprintf(stderr, "WARN: ");
+        break;
+    case 2:
+        if((ctx->flags & 0x10) == 0) break;
+        fprintf(stderr, "INFO: ");
+        break;
+    case 3:
+        if((ctx->flags & 0x20) == 0) break;
+        fprintf(stderr, "VERBOSE: ");
+        break;
+    }
+    vfprintf(stderr, msg, args);
+    fprintf(stderr, "\n");
+    va_end(args);
+}
+
+char* UDPC_INTERNAL_atostr(UDPC_Context *ctx, uint32_t addr)
+{
+    int index = 0;
+    for(int x = 0; x < 4; ++x)
+    {
+        unsigned char temp = (addr >> (24 - x * 8)) & 0xFF;
+
+        if(temp >= 100)
+        {
+            ctx->atostrBuf[index++] = '0' + temp / 100;
+        }
+        if(temp >= 10)
+        {
+            ctx->atostrBuf[index++] = '0' + ((temp / 10) % 10);
+        }
+        ctx->atostrBuf[index++] = '0' + temp % 10;
+
+        if(x < 3)
+        {
+            ctx->atostrBuf[index++] = '.';
+        }
+    }
+    ctx->atostrBuf[index] = 0;
+
+    return ctx->atostrBuf;
 }

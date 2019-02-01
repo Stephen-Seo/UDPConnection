@@ -24,11 +24,12 @@
   #define CleanupSocket(x) ((void)0)
 #endif
 
+#define UDPC_ATOSTR_BUF_SIZE 16
 
 /// This struct should not be used outside of this library
 typedef struct
 {
-    uint32_t addr;
+    uint32_t addr; // in network order (big-endian)
     uint32_t id;
     /*
      * 0x1 - is resending
@@ -58,7 +59,7 @@ typedef struct
     float toggleT;
     float toggleTimer;
     float toggledTimer;
-    uint32_t addr;
+    uint32_t addr; // in network order (big-endian)
     uint16_t port;
     UDPC_Deque *sentPkts;
     UDPC_Deque *sendPktQueue;
@@ -73,6 +74,10 @@ typedef struct
     /*
      * 0x1 - is threaded
      * 0x2 - is client
+     * 0x4 - log errors
+     * 0x8 - log warnings
+     * 0x10 - log info
+     * 0x20 - log verbose
      */
     uint32_t flags;
     /*
@@ -88,6 +93,7 @@ typedef struct
     cnd_t threadCV;
     UDPC_Deque *connected;
     struct timespec lastUpdated;
+    char atostrBuf[UDPC_ATOSTR_BUF_SIZE];
 } UDPC_Context;
 
 UDPC_Context* UDPC_init(uint16_t listenPort, int isClient);
@@ -99,6 +105,17 @@ void UDPC_destroy(UDPC_Context *ctx);
 uint32_t UDPC_get_error(UDPC_Context *ctx);
 
 const char* UDPC_get_error_str(uint32_t error);
+
+/*!
+ * 0 - log nothing
+ * 1 - log only errors
+ * 2 - log only errors and warnings
+ * 3 - log errors, warnings, and info
+ * 4+ - log everything
+ *
+ * By default, erros and warnings are logged.
+ */
+void UDPC_set_logging_type(UDPC_Context *ctx, uint32_t logType);
 
 /// If threaded, this function is called automatically
 void UDPC_update(UDPC_Context *ctx);
@@ -118,7 +135,16 @@ void UDPC_INTERNAL_prepare_pkt(
     uint32_t rseq,
     uint32_t ack,
     uint32_t *seqID,
-    uint32_t addr,
     int flags);
+
+/*!
+ * 0 - error
+ * 1 - warning
+ * 2 - info
+ * 3 - verbose
+ */
+void UDPC_INTERNAL_log(UDPC_Context *ctx, uint32_t level, const char *msg, ...);
+
+char* UDPC_INTERNAL_atostr(UDPC_Context *ctx, uint32_t addr);
 
 #endif
