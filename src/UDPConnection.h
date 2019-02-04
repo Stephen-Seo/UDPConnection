@@ -27,8 +27,7 @@
 #define UDPC_ATOSTR_BUF_SIZE 16
 
 /// This struct should not be used outside of this library
-typedef struct
-{
+typedef struct {
     uint32_t addr; // in network order (big-endian)
     uint32_t id;
     /*
@@ -43,8 +42,7 @@ typedef struct
 } UDPC_INTERNAL_PacketInfo;
 
 /// This struct should not be used outside of this library
-typedef struct
-{
+typedef struct {
     /*
      * 0x1 - trigger send
      * 0x2 - is good mode
@@ -69,8 +67,7 @@ typedef struct
 } UDPC_INTERNAL_ConnectionData;
 
 /// This struct should not be modified, only passed to functions that require it
-typedef struct
-{
+typedef struct {
     /*
      * 0x1 - is threaded
      * 0x2 - is client
