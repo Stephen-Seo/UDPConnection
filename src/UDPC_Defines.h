@@ -49,18 +49,4 @@ static const char *UDPC_ERR_THREADFAIL_STR = "Failed to create thread";
 
 #define UDPC_PACKET_MAX_SIZE 8192
 
-// 5 8 2 7 3 6 1
-// 3 2 5 1 8 7 6
-#define UDPC_HASH32(x) ( \
-    ( \
-      ((x & 0xF8000000) >> 5) \
-      ((x & 0x07F80000) >> 6) \
-      ((x & 0x00060000) << 10) \
-      ((x & 0x0001FC00) >> 4) \
-      ((x & 0x00000380) << 22) \
-      ((x & 0x0000007E) >> 1) \
-      ((x & 0x00000001) << 21) \
-    ) ^ 0x96969696 \
-)
-
 #endif
