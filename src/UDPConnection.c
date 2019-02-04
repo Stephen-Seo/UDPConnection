@@ -133,6 +133,31 @@ UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, int isClient)
 void UDPC_destroy(UDPC_Context *ctx)
 {
     CleanupSocket(ctx->socketHandle);
+    for(int x = 0; x * sizeof(UDPC_INTERNAL_ConnectionData) < ctx->connected->size; ++x)
+    {
+        UDPC_INTERNAL_ConnectionData *cd = UDPC_Deque_index_ptr(
+            ctx->connected, sizeof(UDPC_INTERNAL_ConnectionData), x);
+        for(int y = 0; y * sizeof(UDPC_INTERNAL_PacketInfo) < cd->sentPkts->size; ++y)
+        {
+            UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_index_ptr(
+                cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo), y);
+            if(pinfo->data)
+            {
+                free(pinfo->data);
+            }
+        }
+        UDPC_Deque_destroy(cd->sentPkts);
+        for(int y = 0; y * sizeof(UDPC_INTERNAL_PacketInfo) < cd->sendPktQueue->size; ++y)
+        {
+            UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_index_ptr(
+                cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo), y);
+            if(pinfo->data)
+            {
+                free(pinfo->data);
+            }
+        }
+        UDPC_Deque_destroy(cd->sendPktQueue);
+    }
     UDPC_Deque_destroy(ctx->connected);
 
     if((ctx->flags & 0x1) != 0)
@@ -424,7 +449,50 @@ void UDPC_update(UDPC_Context *ctx)
     }
 
     // receive packet
-    // TODO
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+    typedef int socklen_t;
+#endif
+    struct sockaddr_in receivedData;
+    socklen_t receivedDataSize = sizeof(receivedData);
+    int bytes = recvfrom(
+        ctx->socketHandle,
+        ctx->recvBuf,
+        UDPC_PACKET_MAX_SIZE,
+        0,
+        (struct sockaddr*) &receivedData,
+        &receivedDataSize);
+    if(bytes < 20)
+    {
+        UDPC_INTERNAL_log(ctx, 2, "Got invalid packet from %s port %d (too small)",
+            UDPC_INTERNAL_atostr(ctx, receivedData.sin_addr.s_addr),
+            ntohs(receivedData.sin_port));
+        return;
+    }
+
+    uint32_t temp = ntohl(*((uint32_t*)ctx->recvBuf));
+    if(temp != UDPC_PKT_PROTOCOL_ID)
+    {
+        UDPC_INTERNAL_log(ctx, 2, "Got invalid packet from %s port %d (invalid protocol id)",
+            UDPC_INTERNAL_atostr(ctx, receivedData.sin_addr.s_addr),
+            ntohs(receivedData.sin_port));
+        return;
+    }
+
+    uint32_t conID = ntohl(*((uint32_t*)(ctx->recvBuf + 4)));
+    uint32_t seqID = ntohl(*((uint32_t*)(ctx->recvBuf + 8)));
+    uint32_t rseq = ntohl(*((uint32_t*)(ctx->recvBuf + 12)));
+    uint32_t ack = ntohl(*((uint32_t*)(ctx->recvBuf + 16)));
+
+    int isConnect = conID & UDPC_ID_CONNECT;
+    int isPing = conID & UDPC_ID_PING;
+    int isNotRecvCheck = conID & UDPC_ID_NO_REC_CHK;
+    int isResent = conID & UDPC_ID_RESENDING;
+    conID &= 0x0FFFFFFF;
+
+    if(isConnect != 0 && (ctx->flags & 0x40) != 0)
+    {
+        // TODO after impl hash map of connected
+    }
 }
 
 float UDPC_ts_diff_to_seconds(struct timespec *ts0, struct timespec *ts1)

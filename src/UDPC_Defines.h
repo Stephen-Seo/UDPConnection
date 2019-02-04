@@ -47,4 +47,6 @@ static const char *UDPC_ERR_THREADFAIL_STR = "Failed to create thread";
 #define UDPC_SENT_PKTS_MAX_SIZE 34
 #define UDPC_SENT_PKTS_ALLOC_SIZE 35
 
+#define UDPC_PACKET_MAX_SIZE 8192
+
 #endif

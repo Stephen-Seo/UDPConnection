@@ -78,6 +78,7 @@ typedef struct
      * 0x8 - log warnings
      * 0x10 - log info
      * 0x20 - log verbose
+     * 0x40 - accept new connections
      */
     uint32_t flags;
     /*
@@ -94,6 +95,7 @@ typedef struct
     UDPC_Deque *connected;
     struct timespec lastUpdated;
     char atostrBuf[UDPC_ATOSTR_BUF_SIZE];
+    char recvBuf[UDPC_PACKET_MAX_SIZE];
 } UDPC_Context;
 
 UDPC_Context* UDPC_init(uint16_t listenPort, int isClient);
