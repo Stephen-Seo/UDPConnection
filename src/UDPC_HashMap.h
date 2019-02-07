@@ -46,8 +46,16 @@ void UDPC_HashMap_destroy(UDPC_HashMap *hashMap);
  */
 void* UDPC_HashMap_insert(UDPC_HashMap *hm, uint32_t key, void *data);
 
+/*!
+ * \brief Removes data with the given key
+ * \return non-zero if data was successfully removed
+ */
 int UDPC_HashMap_remove(UDPC_HashMap *hm, uint32_t key);
 
+/*!
+ * \brief Returns a pointer to data with the given key
+ * \return non-NULL if data was found
+ */
 void* UDPC_HashMap_get(UDPC_HashMap *hm, uint32_t key);
 
 #endif
