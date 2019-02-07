@@ -15,13 +15,16 @@
     ) ^ 0x96969696 \
 )
 
+#define UDPC_HASHMAP_BUCKET_SIZE 4
+
 #include "UDPC_Deque.h"
 
 typedef struct {
     uint32_t size;
     uint32_t capacity;
     uint32_t unitSize;
-    UDPC_Deque *buckets;
+    UDPC_Deque **buckets;
+    UDPC_Deque *overflow;
 } UDPC_HashMap;
 
 /*!
