@@ -88,7 +88,7 @@ void* UDPC_HashMap_insert(UDPC_HashMap *hm, uint32_t key, void *data)
     memcpy(temp, &key, sizeof(uint32_t));
     memcpy(temp + sizeof(uint32_t), data, hm->unitSize);
 
-    if(UDPC_Deque_get_available(hm->buckets[hash]) == 0)
+    if(UDPC_Deque_get_available(hm->buckets[hash]) != 0)
     {
         if(UDPC_Deque_push_back(hm->overflow, temp, sizeof(uint32_t) + hm->unitSize) == 0)
         {
