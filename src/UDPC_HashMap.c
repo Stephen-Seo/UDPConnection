@@ -76,6 +76,7 @@ void UDPC_HashMap_destroy(UDPC_HashMap *hashMap)
         UDPC_Deque_destroy(hashMap->buckets[x]);
     }
     free(hashMap->buckets);
+    free(hashMap->overflow);
     free(hashMap);
 }
 
