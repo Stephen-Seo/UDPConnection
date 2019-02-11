@@ -94,7 +94,10 @@ void* UDPC_HashMap_insert(UDPC_HashMap *hm, uint32_t key, void *data)
 
     char *temp = malloc(sizeof(uint32_t) + hm->unitSize);
     memcpy(temp, &key, sizeof(uint32_t));
-    memcpy(temp + sizeof(uint32_t), data, hm->unitSize);
+    if(hm->unitSize > 0)
+    {
+        memcpy(temp + sizeof(uint32_t), data, hm->unitSize);
+    }
 
     if(UDPC_Deque_get_available(hm->buckets[hash]) != 0)
     {
@@ -185,7 +188,14 @@ void* UDPC_HashMap_get(UDPC_HashMap *hm, uint32_t key)
             &key,
             sizeof(uint32_t)) == 0)
         {
-            return ptr + sizeof(uint32_t);
+            if(hm->unitSize > 0)
+            {
+                return ptr + sizeof(uint32_t);
+            }
+            else
+            {
+                return ptr;
+            }
         }
     }
 
@@ -197,7 +207,14 @@ void* UDPC_HashMap_get(UDPC_HashMap *hm, uint32_t key)
             &key,
             sizeof(uint32_t)) == 0)
         {
-            return ptr + sizeof(uint32_t);
+            if(hm->unitSize > 0)
+            {
+                return ptr + sizeof(uint32_t);
+            }
+            else
+            {
+                return ptr;
+            }
         }
     }
 

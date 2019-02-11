@@ -58,6 +58,9 @@ int UDPC_HashMap_remove(UDPC_HashMap *hm, uint32_t key);
 
 /*!
  * \brief Returns a pointer to data with the given key
+ * Note if unitSize == 0, then the returned pointer will point to a copy of
+ * its integer key, which should not be changed manually (otherwise, the hash
+ * map would not be able to find it).
  * \return non-NULL if data was found
  */
 void* UDPC_HashMap_get(UDPC_HashMap *hm, uint32_t key);
