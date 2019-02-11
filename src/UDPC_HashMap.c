@@ -90,6 +90,8 @@ void* UDPC_HashMap_insert(UDPC_HashMap *hm, uint32_t key, void *data)
         }
     }
 
+    UDPC_HashMap_remove(hm, key);
+
     uint32_t hash = UDPC_HASH32(key) % hm->capacity;
 
     char *temp = malloc(sizeof(uint32_t) + hm->unitSize);
