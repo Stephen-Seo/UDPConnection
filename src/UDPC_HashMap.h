@@ -5,16 +5,17 @@
 // 3 2 5 1 8 7 6
 #define UDPC_HASH32(x) ( \
     ( \
-      ((x & 0xF8000000) >> 5) | \
-      ((x & 0x07F80000) >> 6) | \
-      ((x & 0x00060000) << 10) | \
-      ((x & 0x0001FC00) >> 4) | \
-      ((x & 0x00000380) << 22) | \
-      ((x & 0x0000007E) >> 1) | \
-      ((x & 0x00000001) << 21) \
+      (((x) & 0xF8000000) >> 5)  | \
+      (((x) & 0x07F80000) >> 6)  | \
+      (((x) & 0x00060000) << 10) | \
+      (((x) & 0x0001FC00) >> 4)  | \
+      (((x) & 0x00000380) << 22) | \
+      (((x) & 0x0000007E) >> 1)  | \
+      (((x) & 0x00000001) << 21) \
     ) ^ 0x96969696 \
 )
 
+#define UDPC_HASHMAP_INIT_CAPACITY 8
 #define UDPC_HASHMAP_BUCKET_SIZE 4
 
 #include "UDPC_Deque.h"
@@ -42,7 +43,10 @@ void UDPC_HashMap_destroy(UDPC_HashMap *hashMap);
 
 /*!
  * \brief Inserts a copy of data pointed to by given pointer
- * \return Internally managed pointer to inserted data
+ * Note if size already equals capacity, the hash map's capacity is doubled
+ * with UDPC_HashMap_realloc(). realloc requires rehashing of all items which
+ * may be costly.
+ * \return Internally managed pointer to inserted data, NULL on fail
  */
 void* UDPC_HashMap_insert(UDPC_HashMap *hm, uint32_t key, void *data);
 
@@ -57,5 +61,17 @@ int UDPC_HashMap_remove(UDPC_HashMap *hm, uint32_t key);
  * \return non-NULL if data was found
  */
 void* UDPC_HashMap_get(UDPC_HashMap *hm, uint32_t key);
+
+/*!
+ * \brief Resizes the maximum capacity of a hash map
+ * Note on fail, the hash map is unchanged.
+ * \return non-zero if resizing was successful
+ */
+int UDPC_HashMap_realloc(UDPC_HashMap *hm, uint32_t newCapacity);
+
+/*!
+ * \brief Empties the hash map
+ */
+void UDPC_HashMap_clear(UDPC_HashMap *hm);
 
 #endif
