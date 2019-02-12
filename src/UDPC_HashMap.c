@@ -6,10 +6,7 @@
 UDPC_HashMap* UDPC_HashMap_init(uint32_t capacity, uint32_t unitSize)
 {
     UDPC_HashMap *m = malloc(sizeof(UDPC_HashMap));
-    if(!m)
-    {
-        return NULL;
-    }
+    if(!m) { return NULL; }
 
     int fail = 0;
     m->size = 0;
@@ -31,20 +28,14 @@ UDPC_HashMap* UDPC_HashMap_init(uint32_t capacity, uint32_t unitSize)
             continue;
         }
         m->buckets[x] = UDPC_Deque_init(UDPC_HASHMAP_BUCKET_SIZE * (sizeof(uint32_t) + unitSize));
-        if(!m->buckets[x])
-        {
-            fail = 1;
-        }
+        if(!m->buckets[x]) { fail = 1; }
     }
 
     if(fail != 0)
     {
         for(int x = 0; x < m->capacity; ++x)
         {
-            if(m->buckets[x])
-            {
-                UDPC_Deque_destroy(m->buckets[x]);
-            }
+            if(m->buckets[x]) { UDPC_Deque_destroy(m->buckets[x]); }
         }
         free(m->buckets);
         free(m);
@@ -56,10 +47,7 @@ UDPC_HashMap* UDPC_HashMap_init(uint32_t capacity, uint32_t unitSize)
     {
         for(int x = 0; x < m->capacity; ++x)
         {
-            if(m->buckets[x])
-            {
-                UDPC_Deque_destroy(m->buckets[x]);
-            }
+            if(m->buckets[x]) { UDPC_Deque_destroy(m->buckets[x]); }
         }
         free(m->buckets);
         free(m);
@@ -84,10 +72,7 @@ void* UDPC_HashMap_insert(UDPC_HashMap *hm, uint32_t key, void *data)
 {
     if(hm->capacity <= hm->size)
     {
-        if(UDPC_HashMap_realloc(hm, hm->capacity * 2) == 0)
-        {
-            return NULL;
-        }
+        if(UDPC_HashMap_realloc(hm, hm->capacity * 2) == 0) { return NULL; }
     }
 
     UDPC_HashMap_remove(hm, key);
@@ -96,10 +81,7 @@ void* UDPC_HashMap_insert(UDPC_HashMap *hm, uint32_t key, void *data)
 
     char *temp = malloc(sizeof(uint32_t) + hm->unitSize);
     memcpy(temp, &key, sizeof(uint32_t));
-    if(hm->unitSize > 0)
-    {
-        memcpy(temp + sizeof(uint32_t), data, hm->unitSize);
-    }
+    if(hm->unitSize > 0) { memcpy(temp + sizeof(uint32_t), data, hm->unitSize); }
 
     if(UDPC_Deque_get_available(hm->buckets[hash]) != 0)
     {
@@ -123,10 +105,7 @@ void* UDPC_HashMap_insert(UDPC_HashMap *hm, uint32_t key, void *data)
 
 int UDPC_HashMap_remove(UDPC_HashMap *hm, uint32_t key)
 {
-    if(hm->size == 0)
-    {
-        return 0;
-    }
+    if(hm->size == 0) { return 0; }
 
     uint32_t hash = UDPC_HASH32(key) % hm->capacity;
 
@@ -138,15 +117,8 @@ int UDPC_HashMap_remove(UDPC_HashMap *hm, uint32_t key)
             sizeof(uint32_t)) == 0)
         {
             int result = UDPC_Deque_remove(hm->buckets[hash], sizeof(uint32_t) + hm->unitSize, x);
-            if(result != 0)
-            {
-                --hm->size;
-                return 1;
-            }
-            else
-            {
-                return 0;
-            }
+            if(result != 0) { --hm->size; return 1; }
+            else { return 0; }
         }
     }
 
@@ -158,15 +130,8 @@ int UDPC_HashMap_remove(UDPC_HashMap *hm, uint32_t key)
             sizeof(uint32_t)) == 0)
         {
             int result = UDPC_Deque_remove(hm->overflow, sizeof(uint32_t) + hm->unitSize, x);
-            if(result != 0)
-            {
-                --hm->size;
-                return 1;
-            }
-            else
-            {
-                return 0;
-            }
+            if(result != 0) { --hm->size; return 1; }
+            else { return 0; }
         }
     }
 
@@ -175,10 +140,7 @@ int UDPC_HashMap_remove(UDPC_HashMap *hm, uint32_t key)
 
 void* UDPC_HashMap_get(UDPC_HashMap *hm, uint32_t key)
 {
-    if(hm->size == 0)
-    {
-        return NULL;
-    }
+    if(hm->size == 0) { return NULL; }
 
     uint32_t hash = UDPC_HASH32(key) % hm->capacity;
 
@@ -190,14 +152,8 @@ void* UDPC_HashMap_get(UDPC_HashMap *hm, uint32_t key)
             &key,
             sizeof(uint32_t)) == 0)
         {
-            if(hm->unitSize > 0)
-            {
-                return ptr + sizeof(uint32_t);
-            }
-            else
-            {
-                return ptr;
-            }
+            if(hm->unitSize > 0) { return ptr + sizeof(uint32_t); }
+            else { return ptr; }
         }
     }
 
@@ -209,14 +165,8 @@ void* UDPC_HashMap_get(UDPC_HashMap *hm, uint32_t key)
             &key,
             sizeof(uint32_t)) == 0)
         {
-            if(hm->unitSize > 0)
-            {
-                return ptr + sizeof(uint32_t);
-            }
-            else
-            {
-                return ptr;
-            }
+            if(hm->unitSize > 0) { return ptr + sizeof(uint32_t); }
+            else { return ptr; }
         }
     }
 
@@ -225,10 +175,7 @@ void* UDPC_HashMap_get(UDPC_HashMap *hm, uint32_t key)
 
 int UDPC_HashMap_realloc(UDPC_HashMap *hm, uint32_t newCapacity)
 {
-    if(hm->size > newCapacity)
-    {
-        return 0;
-    }
+    if(hm->size > newCapacity) { return 0; }
 
     UDPC_Deque **newBuckets = malloc(sizeof(UDPC_Deque*) * newCapacity);
     UDPC_Deque *newOverflow = UDPC_Deque_init(UDPC_HASHMAP_BUCKET_SIZE
@@ -265,28 +212,19 @@ int UDPC_HashMap_realloc(UDPC_HashMap *hm, uint32_t newCapacity)
                 }
             }
         }
-        if(fail != 0)
-        {
-            break;
-        }
+        if(fail != 0) { break; }
     }
 
     if(fail != 0)
     {
-        for(int x = 0; x < newCapacity; ++x)
-        {
-            UDPC_Deque_destroy(newBuckets[x]);
-        }
+        for(int x = 0; x < newCapacity; ++x) { UDPC_Deque_destroy(newBuckets[x]); }
         free(newBuckets);
         UDPC_Deque_destroy(newOverflow);
         return 0;
     }
     else
     {
-        for(int x = 0; x < hm->capacity; ++x)
-        {
-            UDPC_Deque_destroy(hm->buckets[x]);
-        }
+        for(int x = 0; x < hm->capacity; ++x) { UDPC_Deque_destroy(hm->buckets[x]); }
         free(hm->buckets);
         UDPC_Deque_destroy(hm->overflow);
 
@@ -300,10 +238,7 @@ int UDPC_HashMap_realloc(UDPC_HashMap *hm, uint32_t newCapacity)
 
 void UDPC_HashMap_clear(UDPC_HashMap *hm)
 {
-    for(int x = 0; x < hm->capacity; ++x)
-    {
-        UDPC_Deque_clear(hm->buckets[x]);
-    }
+    for(int x = 0; x < hm->capacity; ++x) { UDPC_Deque_clear(hm->buckets[x]); }
     UDPC_Deque_clear(hm->overflow);
     hm->size = 0;
 }
