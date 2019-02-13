@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <UDPC_Deque.h>
+#include <UDPC_HashMap.h>
 #include <UDPConnection.h>
 
 static UnitTestState UDPC_uts = {0, 0};
@@ -231,9 +232,100 @@ void TEST_ATOSTR()
     UNITTEST_REPORT(ATOSTR);
 }
 
+void TEST_HASHMAP()
+{
+    UDPC_HashMap *hm = UDPC_HashMap_init(0, sizeof(int));
+    int temp;
+
+    temp = 1333;
+    ASSERT_NEQ(UDPC_HashMap_insert(hm, 0, &temp), NULL);
+    ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 0), &temp, sizeof(int));
+
+    temp = 9999;
+    ASSERT_NEQ(UDPC_HashMap_insert(hm, 1, &temp), NULL);
+    ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 1), &temp, sizeof(int));
+
+    temp = 1235987;
+    ASSERT_NEQ(UDPC_HashMap_insert(hm, 2, &temp), NULL);
+    ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 2), &temp, sizeof(int));
+
+    ASSERT_NEQ(UDPC_HashMap_remove(hm, 1), 0);
+    temp = 1333;
+    ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 0), &temp, sizeof(int));
+    temp = 1235987;
+    ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 2), &temp, sizeof(int));
+
+    ASSERT_EQ(UDPC_HashMap_realloc(hm, 0), 0);
+    ASSERT_NEQ(UDPC_HashMap_realloc(hm, 16), 0);
+
+    temp = 1333;
+    ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 0), &temp, sizeof(int));
+    temp = 1235987;
+    ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 2), &temp, sizeof(int));
+
+    UDPC_HashMap_clear(hm);
+    ASSERT_EQ(hm->size, 0);
+    ASSERT_EQ(hm->capacity, 16);
+
+    ASSERT_NEQ(UDPC_HashMap_realloc(hm, 8), 0);
+    ASSERT_EQ(hm->size, 0);
+    ASSERT_EQ(hm->capacity, 8);
+
+    for(int x = 0; x < 8; ++x)
+    {
+        temp = x * 100;
+        ASSERT_NEQ(UDPC_HashMap_insert(hm, x, &temp), NULL);
+    }
+    for(int x = 0; x < 8; ++x)
+    {
+        temp = x * 100;
+        ASSERT_EQ_MEM(UDPC_HashMap_get(hm, x), &temp, sizeof(int));
+    }
+    ASSERT_EQ(hm->capacity, 8);
+
+    temp = 800;
+    ASSERT_NEQ(UDPC_HashMap_insert(hm, 8, &temp), NULL);
+    for(int x = 0; x < 9; ++x)
+    {
+        temp = x * 100;
+        ASSERT_EQ_MEM(UDPC_HashMap_get(hm, x), &temp, sizeof(int));
+    }
+    ASSERT_EQ(hm->capacity, 16);
+
+    for(int x = 0; x < 9; ++x)
+    {
+        ASSERT_NEQ(UDPC_HashMap_remove(hm, x), 0);
+    }
+    ASSERT_EQ(hm->size, 0);
+    ASSERT_EQ(hm->capacity, 16);
+
+    // TODO DEBUG
+    /*
+    printf("Size = %d\n", hm->size);
+    printf("Capacity = %d\n", hm->capacity);
+    for(int x = 0; x < hm->capacity; ++x)
+    {
+        for(int y = 0; y * (4 + sizeof(int)) < hm->buckets[x]->size; ++y)
+        {
+            printf("Bucket%d[%d] = %d\n", x, y,
+                *((int*)&hm->buckets[x]->buf[y * (4 + sizeof(int)) + 4]));
+        }
+    }
+    for(int x = 0; x < hm->overflow->size; ++x)
+    {
+        printf("Overflow[%d] = %d\n", x,
+            *((int*)&hm->overflow->buf[x * (4 + sizeof(int)) + 4]));
+    }
+    */
+
+    UDPC_HashMap_destroy(hm);
+    UNITTEST_REPORT(HASHMAP);
+}
+
 int main()
 {
     TEST_DEQUE();
     TEST_ATOSTR();
+    TEST_HASHMAP();
     return 0;
 }
