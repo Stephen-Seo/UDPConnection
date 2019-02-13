@@ -15,8 +15,10 @@
     ) ^ 0x96969696 \
 )
 
-#define UDPC_HASHMAP_INIT_CAPACITY 8
+#define UDPC_HASHMAP_INIT_CAPACITY 13
 #define UDPC_HASHMAP_BUCKET_SIZE 4
+
+#define UDPC_HASHMAP_MOD(k, m) ((UDPC_HASH32(k) % (m * 2 + 1)) % m)
 
 #include "UDPC_Deque.h"
 
@@ -46,6 +48,9 @@ void UDPC_HashMap_destroy(UDPC_HashMap *hashMap);
  * Note if size already equals capacity, the hash map's capacity is doubled
  * with UDPC_HashMap_realloc(). realloc requires rehashing of all items which
  * may be costly.
+ * Also, if the hash map runs out of space for a specific key to insert, it will
+ * also invoke realloc() with double the previous capacity and will attempt to
+ * insert again afterwards.
  * It is possible to insert items with duplicate keys. In that case, the first
  * duplicate inserted will be the first returned with get() and first removed
  * with remove().
@@ -85,5 +90,10 @@ void UDPC_HashMap_clear(UDPC_HashMap *hm);
 uint32_t UDPC_HashMap_get_size(UDPC_HashMap *hm);
 
 uint32_t UDPC_HashMap_get_capacity(UDPC_HashMap *hm);
+
+/*!
+ * \brief A variant of insert that does not try to realloc() on no more space
+ */
+void* UDPC_HashMap_INTERNAL_reinsert(UDPC_HashMap *hm, uint32_t key, void *data);
 
 #endif

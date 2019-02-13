@@ -26,6 +26,18 @@
 #define ASSERT_NEQ_MEM(x, y, size) \
     if(memcmp(x, y, size) == 0) { printf("%d: ASSERT_NEQ_MEM(%s, %s, %s) FAILED\n", \
             __LINE__, #x, #y, #size); ++UDPC_uts.failed; } ++UDPC_uts.total;
+#define ASSERT_GT(x, y) \
+    if(x <= y) { printf("%d: ASSERT_GT(%s, %s) FAILED\n", __LINE__, #x, #y); \
+        ++UDPC_uts.failed; } ++UDPC_uts.total;
+#define ASSERT_GTE(x, y) \
+    if(x < y) { printf("%d: ASSERT_GTE(%s, %s) FAILED\n", __LINE__, #x, #y); \
+        ++UDPC_uts.failed; } ++UDPC_uts.total;
+#define ASSERT_LT(x, y) \
+    if(x >= y) { printf("%d: ASSERT_LT(%s, %s) FAILED\n", __LINE__, #x, #y); \
+        ++UDPC_uts.failed; } ++UDPC_uts.total;
+#define ASSERT_LTE(x, y) \
+    if(x > y) { printf("%d: ASSERT_LTE(%s, %s) FAILED\n", __LINE__, #x, #y); \
+        ++UDPC_uts.failed; } ++UDPC_uts.total;
 
 #define UNITTEST_REPORT(x) { \
     printf("%s: %d/%d tests failed\n", #x, UDPC_uts.failed, UDPC_uts.total); \

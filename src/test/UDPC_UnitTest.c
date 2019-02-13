@@ -281,7 +281,7 @@ void TEST_HASHMAP()
         temp = x * 100;
         ASSERT_EQ_MEM(UDPC_HashMap_get(hm, x), &temp, sizeof(int));
     }
-    ASSERT_EQ(hm->capacity, 8);
+    ASSERT_GTE(hm->capacity, 8);
 
     temp = 800;
     ASSERT_NEQ(UDPC_HashMap_insert(hm, 8, &temp), NULL);
@@ -290,14 +290,27 @@ void TEST_HASHMAP()
         temp = x * 100;
         ASSERT_EQ_MEM(UDPC_HashMap_get(hm, x), &temp, sizeof(int));
     }
-    ASSERT_EQ(hm->capacity, 16);
+    ASSERT_GTE(hm->capacity, 16);
 
     for(int x = 0; x < 9; ++x)
     {
         ASSERT_NEQ(UDPC_HashMap_remove(hm, x), 0);
     }
     ASSERT_EQ(hm->size, 0);
-    ASSERT_EQ(hm->capacity, 16);
+    ASSERT_GTE(hm->capacity, 16);
+
+    for(int x = 0; x < 32; ++x)
+    {
+        temp = x * 100;
+        ASSERT_NEQ(UDPC_HashMap_insert(hm, x, &temp), NULL);
+    }
+    ASSERT_EQ(hm->size, 32);
+
+    for(int x = 0; x < 32; ++x)
+    {
+        temp = x * 100;
+        ASSERT_EQ_MEM(UDPC_HashMap_get(hm, x), &temp, sizeof(int));
+    }
 
     // TODO DEBUG
     /*
