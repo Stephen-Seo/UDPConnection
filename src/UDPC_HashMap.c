@@ -305,3 +305,13 @@ void UDPC_HashMap_clear(UDPC_HashMap *hm)
     UDPC_Deque_clear(hm->overflow);
     hm->size = 0;
 }
+
+uint32_t UDPC_HashMap_get_size(UDPC_HashMap *hm)
+{
+    return hm->size;
+}
+
+uint32_t UDPC_HashMap_get_capacity(UDPC_HashMap *hm)
+{
+    return hm->capacity;
+}

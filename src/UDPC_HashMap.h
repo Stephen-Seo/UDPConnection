@@ -46,8 +46,9 @@ void UDPC_HashMap_destroy(UDPC_HashMap *hashMap);
  * Note if size already equals capacity, the hash map's capacity is doubled
  * with UDPC_HashMap_realloc(). realloc requires rehashing of all items which
  * may be costly.
- * If an item with the same key already exists in the hash map, it will be
- * replaced.
+ * It is possible to insert items with duplicate keys. In that case, the first
+ * duplicate inserted will be the first returned with get() and first removed
+ * with remove().
  * \return Internally managed pointer to inserted data, NULL on fail
  */
 void* UDPC_HashMap_insert(UDPC_HashMap *hm, uint32_t key, void *data);
@@ -70,6 +71,8 @@ void* UDPC_HashMap_get(UDPC_HashMap *hm, uint32_t key);
 /*!
  * \brief Resizes the maximum capacity of a hash map
  * Note on fail, the hash map is unchanged.
+ * If newCapacity is less than the current size of the hash map, this function
+ * will fail.
  * \return non-zero if resizing was successful
  */
 int UDPC_HashMap_realloc(UDPC_HashMap *hm, uint32_t newCapacity);
@@ -78,5 +81,9 @@ int UDPC_HashMap_realloc(UDPC_HashMap *hm, uint32_t newCapacity);
  * \brief Empties the hash map
  */
 void UDPC_HashMap_clear(UDPC_HashMap *hm);
+
+uint32_t UDPC_HashMap_get_size(UDPC_HashMap *hm);
+
+uint32_t UDPC_HashMap_get_capacity(UDPC_HashMap *hm);
 
 #endif
