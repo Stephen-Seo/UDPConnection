@@ -232,8 +232,9 @@ void TEST_ATOSTR()
     UNITTEST_REPORT(ATOSTR);
 }
 
-void TEST_HASHMAP_itercall_comp(void *unused, char *data)
+void TEST_HASHMAP_itercall_comp(void *userData, char *data)
 {
+    *((int*)userData) += 1;
     int temp = *((int*)(data)) / 100;
     ASSERT_EQ_MEM(&temp, data - 4, 4);
 }
@@ -318,7 +319,9 @@ void TEST_HASHMAP()
         ASSERT_EQ_MEM(UDPC_HashMap_get(hm, x), &temp, sizeof(int));
     }
 
-    UDPC_HashMap_itercall(hm, TEST_HASHMAP_itercall_comp, NULL);
+    temp = 0;
+    UDPC_HashMap_itercall(hm, TEST_HASHMAP_itercall_comp, &temp);
+    ASSERT_EQ(temp, 32);
 
     // TODO DEBUG
     /*
