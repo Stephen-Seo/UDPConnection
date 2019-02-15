@@ -349,14 +349,16 @@ void UDPC_HashMap_itercall(UDPC_HashMap *hm, void (*fn)(void*, char*), void *use
         {
             char *data = UDPC_Deque_index_ptr(
                 hm->buckets[x], 4 + hm->unitSize, y);
-            fn(userData, data + 4);
+            if(hm->unitSize > 0) { fn(userData, data + 4); }
+            else { fn(userData, data); }
         }
     }
     for(int x = 0; x * (4 + hm->unitSize) < hm->overflow->size; ++x)
     {
         char *data = UDPC_Deque_index_ptr(
             hm->overflow, 4 + hm->unitSize, x);
-        fn(userData, data + 4);
+        if(hm->unitSize > 0) { fn(userData, data + 4); }
+        else { fn(userData, data); }
     }
 }
 

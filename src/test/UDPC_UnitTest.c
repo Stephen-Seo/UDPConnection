@@ -232,6 +232,12 @@ void TEST_ATOSTR()
     UNITTEST_REPORT(ATOSTR);
 }
 
+void TEST_HASHMAP_itercall_comp(void *unused, char *data)
+{
+    int temp = *((int*)(data)) / 100;
+    ASSERT_EQ_MEM(&temp, data - 4, 4);
+}
+
 void TEST_HASHMAP()
 {
     UDPC_HashMap *hm = UDPC_HashMap_init(0, sizeof(int));
@@ -311,6 +317,8 @@ void TEST_HASHMAP()
         temp = x * 100;
         ASSERT_EQ_MEM(UDPC_HashMap_get(hm, x), &temp, sizeof(int));
     }
+
+    UDPC_HashMap_itercall(hm, TEST_HASHMAP_itercall_comp, NULL);
 
     // TODO DEBUG
     /*
