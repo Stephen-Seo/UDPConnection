@@ -63,8 +63,7 @@ UDPC_Context* UDPC_init(uint16_t listenPort, int isClient)
         return context;
     }
 
-    context->connected = UDPC_Deque_init(sizeof(UDPC_INTERNAL_ConnectionData)
-            * (isClient != 0 ? 1 : UDPC_CD_AMOUNT));
+    context->conMap = UDPC_HashMap_init(13, sizeof(UDPC_INTERNAL_ConnectionData));
 
     timespec_get(&context->lastUpdated, TIME_UTC);
 
@@ -133,32 +132,8 @@ UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, int isClient)
 void UDPC_destroy(UDPC_Context *ctx)
 {
     CleanupSocket(ctx->socketHandle);
-    for(int x = 0; x * sizeof(UDPC_INTERNAL_ConnectionData) < ctx->connected->size; ++x)
-    {
-        UDPC_INTERNAL_ConnectionData *cd = UDPC_Deque_index_ptr(
-            ctx->connected, sizeof(UDPC_INTERNAL_ConnectionData), x);
-        for(int y = 0; y * sizeof(UDPC_INTERNAL_PacketInfo) < cd->sentPkts->size; ++y)
-        {
-            UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_index_ptr(
-                cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo), y);
-            if(pinfo->data)
-            {
-                free(pinfo->data);
-            }
-        }
-        UDPC_Deque_destroy(cd->sentPkts);
-        for(int y = 0; y * sizeof(UDPC_INTERNAL_PacketInfo) < cd->sendPktQueue->size; ++y)
-        {
-            UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_index_ptr(
-                cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo), y);
-            if(pinfo->data)
-            {
-                free(pinfo->data);
-            }
-        }
-        UDPC_Deque_destroy(cd->sendPktQueue);
-    }
-    UDPC_Deque_destroy(ctx->connected);
+    UDPC_HashMap_itercall(ctx->conMap, UDPC_INTERNAL_destroy_conMap, NULL);
+    UDPC_HashMap_destroy(ctx->conMap);
 
     if((ctx->flags & 0x1) != 0)
     {
@@ -175,6 +150,31 @@ void UDPC_destroy(UDPC_Context *ctx)
     }
 
     free(ctx);
+}
+
+void UDPC_INTERNAL_destroy_conMap(void *unused, char *data)
+{
+    UDPC_INTERNAL_ConnectionData *cd = (UDPC_INTERNAL_ConnectionData*)data;
+    for(int x = 0; x * sizeof(UDPC_INTERNAL_PacketInfo) < cd->sentPkts->size; ++x)
+    {
+        UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_index_ptr(
+            cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo), x);
+        if(pinfo->data)
+        {
+            free(pinfo->data);
+        }
+    }
+    UDPC_Deque_destroy(cd->sentPkts);
+    for(int x = 0; x * sizeof(UDPC_INTERNAL_PacketInfo) < cd->sendPktQueue->size; ++x)
+    {
+        UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_index_ptr(
+            cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo), x);
+        if(pinfo->data)
+        {
+            free(pinfo->data);
+        }
+    }
+    UDPC_Deque_destroy(cd->sendPktQueue);
 }
 
 uint32_t UDPC_get_error(UDPC_Context *ctx)
@@ -226,227 +226,30 @@ void UDPC_set_logging_type(UDPC_Context *ctx, uint32_t logType)
 
 void UDPC_update(UDPC_Context *ctx)
 {
-    // get dt
-    struct timespec tsNow;
-    timespec_get(&tsNow, TIME_UTC);
-    float dt = UDPC_ts_diff_to_seconds(&tsNow, &ctx->lastUpdated);
-    ctx->lastUpdated = tsNow;
+    UDPC_INTERNAL_update_struct us = {
+        {0, 0},
+        0.0f,
+        NULL,
+        ctx
+    };
+    timespec_get(&us.tsNow, TIME_UTC);
+    us.dt = UDPC_ts_diff_to_seconds(&us.tsNow, &ctx->lastUpdated);
+    ctx->lastUpdated = us.tsNow;
+    us.removedQueue = UDPC_Deque_init(4 * (ctx->conMap->size));
 
-    // check timed-out/rtt/send-interval
-    UDPC_INTERNAL_ConnectionData *cd;
-    UDPC_Deque *removedQueue = UDPC_Deque_init(
-        ctx->connected->alloc_size / sizeof(UDPC_INTERNAL_ConnectionData) * sizeof(int));
-    for(int x = 0; x * sizeof(UDPC_INTERNAL_ConnectionData) < ctx->connected->size; ++x)
-    {
-        cd = UDPC_Deque_index_ptr(ctx->connected, sizeof(UDPC_INTERNAL_ConnectionData), x);
+    UDPC_HashMap_itercall(ctx->conMap, UDPC_INTERNAL_update_to_rtt_si, &us);
 
-        // check if connected timed out
-        if(UDPC_ts_diff_to_seconds(&tsNow, &cd->received) >= UDPC_TIMEOUT_SECONDS)
-        {
-            UDPC_Deque_push_back(removedQueue, &x, sizeof(int));
-            UDPC_INTERNAL_log(ctx, 2, "Connection timed out with addr %s port %d",
-                UDPC_INTERNAL_atostr(ctx, cd->addr),
-                cd->port);
-            continue;
-        }
-
-        // check good/bad mode
-        cd->toggleTimer += dt;
-        cd->toggledTimer += dt;
-        if((cd->flags & 0x2) != 0 && (cd->flags & 0x4) == 0)
-        {
-            // good mode, bad rtt
-            UDPC_INTERNAL_log(ctx, 2, "Connection with %s switching to bad mode",
-                UDPC_INTERNAL_atostr(ctx, cd->addr));
-
-            cd->flags = cd->flags & 0xFFFFFFFD;
-            if(cd->toggledTimer >= 10.0f)
-            {
-                cd->toggleT *= 2.0f;
-                if(cd->toggleT > 60.0f)
-                {
-                    cd->toggleT = 60.0f;
-                }
-            }
-            cd->toggledTimer = 0.0f;
-        }
-        else if((cd->flags & 0x2) != 0)
-        {
-            // good mode, good rtt
-            if(cd->toggleTimer >= 10.0f)
-            {
-                cd->toggleTimer = 0.0f;
-                cd->toggleT /= 2.0f;
-                if(cd->toggleT < 1.0f)
-                {
-                    cd->toggleT = 1.0f;
-                }
-            }
-        }
-        else if((cd->flags & 0x2) == 0 && (cd->flags & 0x4) != 0)
-        {
-            // bad mode, good rtt
-            if(cd->toggledTimer >= cd->toggleT)
-            {
-                cd->toggleTimer = 0.0f;
-                cd->toggledTimer = 0.0f;
-                UDPC_INTERNAL_log(ctx, 2, "Connection with %s switching to good mode",
-                    UDPC_INTERNAL_atostr(ctx, cd->addr));
-                cd->flags |= 0x2;
-            }
-        }
-        else
-        {
-            // bad mode, bad rtt
-            cd->toggledTimer = 0.0f;
-        }
-
-        // check send interval
-        cd->timer += dt;
-        if(cd->timer >= ((cd->flags & 0x2) != 0
-            ? UDPC_GOOD_MODE_SEND_INTERVAL : UDPC_BAD_MODE_SEND_INTERVAL))
-        {
-            cd->timer = 0.0f;
-            cd->flags |= 0x1;
-        }
-
-    }
     // remove timed out
-    for(int x = 0; x * sizeof(int) < removedQueue->size; ++x)
+    for(int x = 0; x * 4 < us.removedQueue->size; ++x)
     {
-        UDPC_Deque_remove(ctx->connected, sizeof(UDPC_INTERNAL_ConnectionData),
-            *((int*)UDPC_Deque_index_rev_ptr(removedQueue, sizeof(int), x)));
+        uint32_t *key = UDPC_Deque_index_ptr(us.removedQueue, 4, x);
+        UDPC_HashMap_remove(ctx->conMap, *key);
     }
-    UDPC_Deque_destroy(removedQueue);
+    UDPC_Deque_destroy(us.removedQueue);
+    us.removedQueue = NULL;
 
     // check triggerSend to send packets to connected
-    for(int x = 0; x * sizeof(UDPC_INTERNAL_ConnectionData) < ctx->connected->size; ++x)
-    {
-        cd = UDPC_Deque_index_ptr(ctx->connected, sizeof(UDPC_INTERNAL_ConnectionData), x);
-        if((cd->flags & 0x1) != 0)
-        {
-            cd->flags &= 0xFFFFFFFE;
-            if(cd->sendPktQueue->size == 0)
-            {
-                // send packet queue is empty, send heartbeat packet
-                if(UDPC_ts_diff_to_seconds(&tsNow, &cd->sent) < UDPC_HEARTBEAT_PKT_INTERVAL)
-                {
-                    continue;
-                }
-
-                char *data = malloc(20);
-                UDPC_INTERNAL_prepare_pkt(data, cd->id, cd->rseq, cd->ack, &cd->lseq, 0);
-
-                struct sockaddr_in destinationInfo;
-                destinationInfo.sin_family = AF_INET;
-                destinationInfo.sin_addr.s_addr = cd->addr;
-                destinationInfo.sin_port = htons(cd->port);
-                long int sentBytes = sendto(
-                    ctx->socketHandle,
-                    data,
-                    20,
-                    0,
-                    (struct sockaddr*) &destinationInfo,
-                    sizeof(struct sockaddr_in));
-                if(sentBytes != 20)
-                {
-                    UDPC_INTERNAL_log(ctx, 0, "Failed to send packet to %s port %s",
-                        UDPC_INTERNAL_atostr(ctx, cd->addr), cd->port);
-                }
-                else
-                {
-                    UDPC_INTERNAL_PacketInfo sentInfo = {
-                        cd->addr,
-                        cd->lseq - 1,
-                        0,
-                        NULL,
-                        0,
-                        tsNow
-                    };
-                    UDPC_Deque_push_back(
-                        cd->sentPkts, &sentInfo, sizeof(UDPC_INTERNAL_PacketInfo));
-                    while(cd->sentPkts->size / sizeof(UDPC_INTERNAL_PacketInfo)
-                        > UDPC_SENT_PKTS_MAX_SIZE)
-                    {
-                        UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_get_front_ptr(cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo));
-                        if(pinfo->data && pinfo->size != 0)
-                        {
-                            free(pinfo->data);
-                        }
-                        UDPC_Deque_pop_front(cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo));
-                    }
-                }
-                free(data);
-            }
-            else // sendPktQueue not empty
-            {
-                UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_get_front_ptr(
-                    cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
-                char *data = malloc(20 + pinfo->size);
-                UDPC_INTERNAL_prepare_pkt(data, cd->id, cd->rseq, cd->ack, &cd->lseq, ((pinfo->flags & 0x3) << 1));
-                memcpy(&data[20], pinfo->data, pinfo->size);
-
-                struct sockaddr_in destinationInfo;
-                destinationInfo.sin_family = AF_INET;
-                destinationInfo.sin_addr.s_addr = cd->addr;
-                destinationInfo.sin_port = htons(cd->port);
-                long int sentBytes = sendto(
-                    ctx->socketHandle,
-                    data,
-                    20 + pinfo->size,
-                    0,
-                    (struct sockaddr*) &destinationInfo,
-                    sizeof(struct sockaddr_in));
-                if(sentBytes != 20 + pinfo->size)
-                {
-                    UDPC_INTERNAL_log(ctx, 0, "Failed to send packet to %s port %s",
-                        UDPC_INTERNAL_atostr(ctx, cd->addr), cd->port);
-                }
-                else
-                {
-                    if((pinfo->flags & 0x2) != 0)
-                    {
-                        UDPC_INTERNAL_PacketInfo sentInfo = {
-                            cd->addr,
-                            cd->lseq - 1,
-                            0x2,
-                            data,
-                            20 + pinfo->size,
-                            tsNow
-                        };
-                        UDPC_Deque_push_back(
-                            cd->sentPkts, &sentInfo, sizeof(UDPC_INTERNAL_PacketInfo));
-                    }
-                    else
-                    {
-                        UDPC_INTERNAL_PacketInfo sentInfo = {
-                            cd->addr,
-                            cd->lseq - 1,
-                            0,
-                            NULL,
-                            0,
-                            tsNow
-                        };
-                        UDPC_Deque_push_back(
-                            cd->sentPkts, &sentInfo, sizeof(UDPC_INTERNAL_PacketInfo));
-                    }
-
-                    while(cd->sentPkts->size / sizeof(UDPC_INTERNAL_PacketInfo)
-                        > UDPC_SENT_PKTS_MAX_SIZE)
-                    {
-                        UDPC_INTERNAL_PacketInfo *pinfoCached = UDPC_Deque_get_front_ptr(cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo));
-                        if(pinfoCached->data && pinfoCached->size != 0)
-                        {
-                            free(pinfoCached->data);
-                        }
-                        UDPC_Deque_pop_front(cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo));
-                    }
-                }
-                free(pinfo->data);
-                UDPC_Deque_pop_front(cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
-            }
-        }
-    }
+    UDPC_HashMap_itercall(ctx->conMap, UDPC_INTERNAL_update_send, &us);
 
     // receive packet
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
@@ -491,7 +294,282 @@ void UDPC_update(UDPC_Context *ctx)
 
     if(isConnect != 0 && (ctx->flags & 0x40) != 0)
     {
-        // TODO after impl hash map of connected
+        if(!UDPC_HashMap_get(ctx->conMap, receivedData.sin_addr.s_addr))
+        {
+            UDPC_INTERNAL_log(ctx, 2, "Establishing connection with %s port %d",
+                UDPC_INTERNAL_atostr(ctx, receivedData.sin_addr.s_addr),
+                ntohs(receivedData.sin_port));
+            UDPC_INTERNAL_ConnectionData newCD = {
+                1,
+                0,
+                0,
+                0,
+                0xFFFFFFFF,
+                0.0f,
+                30.0f,
+                0.0f,
+                0.0f,
+                receivedData.sin_addr.s_addr,
+                ntohs(receivedData.sin_port),
+                UDPC_Deque_init(sizeof(UDPC_INTERNAL_PacketInfo) * UDPC_SENT_PKTS_ALLOC_SIZE),
+                UDPC_Deque_init(sizeof(UDPC_INTERNAL_PacketInfo) * UDPC_SENT_PKTS_ALLOC_SIZE),
+                {0, 0},
+                {0, 0},
+                {1, 0}
+            };
+            timespec_get(&newCD.received, TIME_UTC);
+            timespec_get(&newCD.sent, TIME_UTC);
+            UDPC_HashMap_insert(ctx->conMap, newCD.addr, &newCD);
+        }
+        return;
+    }
+    else if(isPing != 0)
+    {
+        UDPC_INTERNAL_ConnectionData *cd = UDPC_HashMap_get(ctx->conMap, receivedData.sin_addr.s_addr);
+        if(cd)
+        {
+            cd->flags |= 0x1;
+        }
+    }
+
+    UDPC_INTERNAL_ConnectionData *cd = UDPC_HashMap_get(ctx->conMap, receivedData.sin_addr.s_addr);
+    if(!cd)
+    {
+        // Received packet from unknown, ignoring
+        return;
+    }
+    else if(conID != cd->id)
+    {
+        // Received packet id and known id does not match, ignoring
+        return;
+    }
+
+    // packet is valid
+    UDPC_INTERNAL_log(ctx, 2, "Valid packet %d from %s", seqID,
+        UDPC_INTERNAL_atostr(ctx, receivedData.sin_addr.s_addr));
+
+    int isOutOfOrder = 0;
+    // TODO rest of received packet actions
+}
+
+void UDPC_INTERNAL_update_to_rtt_si(void *userData, char *data)
+{
+    UDPC_INTERNAL_update_struct *us =
+        (UDPC_INTERNAL_update_struct*)userData;
+    UDPC_INTERNAL_ConnectionData *cd = (UDPC_INTERNAL_ConnectionData*)data;
+
+    // check for timed out connection
+    if(UDPC_ts_diff_to_seconds(&us->tsNow, &cd->received) >= UDPC_TIMEOUT_SECONDS)
+    {
+        UDPC_Deque_push_back(us->removedQueue, &cd->addr, 4);
+        UDPC_INTERNAL_log(us->ctx, 2, "Connection timed out with addr %s port %d",
+            UDPC_INTERNAL_atostr(us->ctx, cd->addr),
+            cd->port);
+        return;
+    }
+
+    // check good/bad mode
+    cd->toggleTimer += us->dt;
+    cd->toggledTimer += us->dt;
+    if((cd->flags & 0x2) != 0 && (cd->flags & 0x4) == 0)
+    {
+        // good mode, bad rtt
+        UDPC_INTERNAL_log(us->ctx, 2, "Connection with %s switching to bad mode",
+            UDPC_INTERNAL_atostr(us->ctx, cd->addr));
+
+        cd->flags = cd->flags & 0xFFFFFFFD;
+        if(cd->toggledTimer <= 10.0f)
+        {
+            cd->toggleT *= 2.0f;
+            if(cd->toggleT > 60.0f)
+            {
+                cd->toggleT = 60.0f;
+            }
+        }
+        cd->toggledTimer = 0.0f;
+    }
+    else if((cd->flags & 0x2) != 0)
+    {
+        // good mode, good rtt
+        if(cd->toggleTimer >= 10.0f)
+        {
+            cd->toggleTimer = 0.0f;
+            cd->toggleT /= 2.0f;
+            if(cd->toggleT < 1.0f)
+            {
+                cd->toggleT = 1.0f;
+            }
+        }
+    }
+    else if((cd->flags & 0x2) == 0 && (cd->flags & 0x4) != 0)
+    {
+        // bad mode, good rtt
+        if(cd->toggledTimer >= cd->toggleT)
+        {
+            cd->toggleTimer = 0.0f;
+            cd->toggledTimer = 0.0f;
+            UDPC_INTERNAL_log(us->ctx, 2, "Connection with %s switching to good mode",
+                UDPC_INTERNAL_atostr(us->ctx, cd->addr));
+            cd->flags |= 0x2;
+        }
+    }
+    else
+    {
+        // bad mode, bad rtt
+        cd->toggledTimer = 0.0f;
+    }
+
+    // check send interval
+    cd->timer += us->dt;
+    if(cd->timer >= ((cd->flags & 0x2) != 0
+        ? UDPC_GOOD_MODE_SEND_INTERVAL : UDPC_BAD_MODE_SEND_INTERVAL))
+    {
+        cd->timer = 0.0f;
+        cd->flags |= 0x1;
+    }
+}
+
+void UDPC_INTERNAL_update_send(void *userData, char *data)
+{
+    UDPC_INTERNAL_update_struct *us =
+        (UDPC_INTERNAL_update_struct*)userData;
+    UDPC_INTERNAL_ConnectionData *cd = (UDPC_INTERNAL_ConnectionData*)data;
+
+    if((cd->flags & 0x1) == 0)
+    {
+        return;
+    }
+
+    cd->flags = cd->flags & 0xFFFFFFFE;
+    if(cd->sendPktQueue->size == 0)
+    {
+        // send packet queue is empty, send heartbeat packet
+        if(UDPC_ts_diff_to_seconds(&us->tsNow, &cd->sent) < UDPC_HEARTBEAT_PKT_INTERVAL)
+        {
+            return;
+        }
+
+        char *data = malloc(20);
+        UDPC_INTERNAL_prepare_pkt(data, cd->id, cd->rseq, cd->ack, &cd->lseq, 0);
+
+        struct sockaddr_in destinationInfo;
+        destinationInfo.sin_family = AF_INET;
+        destinationInfo.sin_addr.s_addr = cd->addr;
+        destinationInfo.sin_port = htons(cd->port);
+        long int sentBytes = sendto(
+            us->ctx->socketHandle,
+            data,
+            20,
+            0,
+            (struct sockaddr*) &destinationInfo,
+            sizeof(struct sockaddr_in));
+        if(sentBytes != 20)
+        {
+            UDPC_INTERNAL_log(us->ctx, 0, "Failed to send packet to %s port %d",
+                UDPC_INTERNAL_atostr(us->ctx, cd->addr), cd->port);
+            free(data);
+            return;
+        }
+
+        UDPC_INTERNAL_PacketInfo sentInfo = {
+            cd->addr,
+            cd->lseq - 1,
+            0,
+            NULL,
+            0,
+            us->tsNow
+        };
+        UDPC_Deque_push_back(
+            cd->sentPkts, &sentInfo, sizeof(UDPC_INTERNAL_PacketInfo));
+        while(cd->sentPkts->size / sizeof(UDPC_INTERNAL_PacketInfo) > UDPC_SENT_PKTS_MAX_SIZE)
+        {
+            UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_get_front_ptr(
+                cd->sentPkts,
+                sizeof(UDPC_INTERNAL_PacketInfo));
+            if(pinfo->data && pinfo->size != 0)
+            {
+                free(pinfo->data);
+            }
+            UDPC_Deque_pop_front(cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo));
+        }
+        free(data);
+    }
+    else // sendPktQueue not empty
+    {
+        UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_get_front_ptr(
+            cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+        char *data = malloc(20 + pinfo->size);
+        UDPC_INTERNAL_prepare_pkt(
+            data,
+            cd->id,
+            cd->rseq,
+            cd->ack,
+            &cd->lseq,
+            ((pinfo->flags & 0x3) << 1));
+        memcpy(&data[20], pinfo->data, pinfo->size);
+
+        struct sockaddr_in destinationInfo;
+        destinationInfo.sin_family = AF_INET;
+        destinationInfo.sin_addr.s_addr = cd->addr;
+        destinationInfo.sin_port = htons(cd->port);
+        long int sentBytes = sendto(
+            us->ctx->socketHandle,
+            data,
+            20 + pinfo->size,
+            0,
+            (struct sockaddr*) &destinationInfo,
+            sizeof(struct sockaddr_in));
+        if(sentBytes != 20 + pinfo->size)
+        {
+            UDPC_INTERNAL_log(us->ctx, 0, "Failed to send packet to %s port %d",
+                UDPC_INTERNAL_atostr(us->ctx, cd->addr), cd->port);
+            free(data);
+            free(pinfo->data);
+            UDPC_Deque_pop_front(cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+            return;
+        }
+
+        if((pinfo->flags & 0x2) != 0)
+        {
+            UDPC_INTERNAL_PacketInfo sentInfo = {
+                cd->addr,
+                cd->lseq - 1,
+                0x2,
+                data,
+                20 + pinfo->size,
+                us->tsNow
+            };
+            UDPC_Deque_push_back(
+                cd->sentPkts, &sentInfo, sizeof(UDPC_INTERNAL_PacketInfo));
+        }
+        else
+        {
+            UDPC_INTERNAL_PacketInfo sentInfo = {
+                cd->addr,
+                cd->lseq - 1,
+                0,
+                NULL,
+                0,
+                us->tsNow
+            };
+            UDPC_Deque_push_back(
+                cd->sentPkts, &sentInfo, sizeof(UDPC_INTERNAL_PacketInfo));
+            free(data);
+        }
+
+        while(cd->sentPkts->size / sizeof(UDPC_INTERNAL_PacketInfo) > UDPC_SENT_PKTS_MAX_SIZE)
+        {
+            UDPC_INTERNAL_PacketInfo *pinfoCached = UDPC_Deque_get_front_ptr(
+                cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo));
+            if(pinfoCached->data && pinfoCached->size != 0)
+            {
+                free(pinfoCached->data);
+            }
+            UDPC_Deque_pop_front(cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo));
+        }
+
+        free(pinfo->data);
+        UDPC_Deque_pop_front(cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
     }
 }
 

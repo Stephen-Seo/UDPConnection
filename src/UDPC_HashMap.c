@@ -341,6 +341,25 @@ uint32_t UDPC_HashMap_get_capacity(UDPC_HashMap *hm)
     return hm->capacity;
 }
 
+void UDPC_HashMap_itercall(UDPC_HashMap *hm, void (*fn)(void*, char*), void *userData)
+{
+    for(int x = 0; x < hm->capacity; ++x)
+    {
+        for(int y = 0; y * (4 + hm->unitSize) < hm->buckets[x]->size; ++y)
+        {
+            char *data = UDPC_Deque_index_ptr(
+                hm->buckets[x], 4 + hm->unitSize, y);
+            fn(userData, data + 4);
+        }
+    }
+    for(int x = 0; x * (4 + hm->unitSize) < hm->overflow->size; ++x)
+    {
+        char *data = UDPC_Deque_index_ptr(
+            hm->overflow, 4 + hm->unitSize, x);
+        fn(userData, data + 4);
+    }
+}
+
 void* UDPC_HashMap_INTERNAL_reinsert(UDPC_HashMap *hm, uint32_t key, void *data)
 {
     if(hm->capacity <= hm->size)

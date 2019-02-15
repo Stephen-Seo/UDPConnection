@@ -8,6 +8,7 @@
 
 #include "UDPC_Defines.h"
 #include "UDPC_Deque.h"
+#include "UDPC_HashMap.h"
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
   #include <winsock2.h>
@@ -89,17 +90,26 @@ typedef struct {
     mtx_t tCVMtx;
     mtx_t tflagsMtx;
     cnd_t threadCV;
-    UDPC_Deque *connected;
+    UDPC_HashMap *conMap;
     struct timespec lastUpdated;
     char atostrBuf[UDPC_ATOSTR_BUF_SIZE];
     char recvBuf[UDPC_PACKET_MAX_SIZE];
 } UDPC_Context;
+
+typedef struct {
+    struct timespec tsNow;
+    float dt;
+    UDPC_Deque *removedQueue;
+    UDPC_Context *ctx;
+} UDPC_INTERNAL_update_struct;
 
 UDPC_Context* UDPC_init(uint16_t listenPort, int isClient);
 
 UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, int isClient);
 
 void UDPC_destroy(UDPC_Context *ctx);
+
+void UDPC_INTERNAL_destroy_conMap(void *unused, char *data);
 
 uint32_t UDPC_get_error(UDPC_Context *ctx);
 
@@ -118,6 +128,10 @@ void UDPC_set_logging_type(UDPC_Context *ctx, uint32_t logType);
 
 /// If threaded, this function is called automatically
 void UDPC_update(UDPC_Context *ctx);
+
+void UDPC_INTERNAL_update_to_rtt_si(void *userData, char *data);
+
+void UDPC_INTERNAL_update_send(void *userData, char *data);
 
 float UDPC_ts_diff_to_seconds(struct timespec *ts0, struct timespec *ts1);
 

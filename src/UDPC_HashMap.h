@@ -92,6 +92,11 @@ uint32_t UDPC_HashMap_get_size(UDPC_HashMap *hm);
 uint32_t UDPC_HashMap_get_capacity(UDPC_HashMap *hm);
 
 /*!
+ * \brief Calls a fn with a ptr to each entry in the hash map
+ */
+void UDPC_HashMap_itercall(UDPC_HashMap *hm, void (*fn)(void*, char*), void *userData);
+
+/*!
  * \brief A variant of insert that does not try to realloc() on no more space
  */
 void* UDPC_HashMap_INTERNAL_reinsert(UDPC_HashMap *hm, uint32_t key, void *data);
