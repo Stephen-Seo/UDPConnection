@@ -315,7 +315,7 @@ void UDPC_update(UDPC_Context *ctx)
                 UDPC_Deque_init(sizeof(UDPC_INTERNAL_PacketInfo) * UDPC_SENT_PKTS_ALLOC_SIZE),
                 {0, 0},
                 {0, 0},
-                {1, 0}
+                0.0f
             };
             timespec_get(&newCD.received, TIME_UTC);
             timespec_get(&newCD.sent, TIME_UTC);
@@ -348,8 +348,77 @@ void UDPC_update(UDPC_Context *ctx)
     UDPC_INTERNAL_log(ctx, 2, "Valid packet %d from %s", seqID,
         UDPC_INTERNAL_atostr(ctx, receivedData.sin_addr.s_addr));
 
+    UDPC_INTERNAL_update_rtt(ctx, cd, rseq, &us.tsNow);
+    cd->received = us.tsNow;
+    UDPC_INTERNAL_check_pkt_timeout(cd, rseq, ack, &us.tsNow);
+
     int isOutOfOrder = 0;
-    // TODO rest of received packet actions
+    uint32_t diff = 0;
+    if(seqID > cd->rseq)
+    {
+        diff = seqID - cd->rseq;
+        if(diff <= 0x7FFFFFFF)
+        {
+            // seqeuence is more recent
+            cd->rseq = seqID;
+            cd->ack = (cd->ack >> diff) | 0x80000000;
+        }
+        else
+        {
+            // sequence is older id, diff requires recalc
+            diff = 0xFFFFFFFF - seqID + 1 + cd->rseq;
+            if((cd->ack & (0x80000000 >> (diff - 1))) != 0)
+            {
+                // already received packet
+                UDPC_INTERNAL_log(ctx, 2, "Ignoring already received pkt from %s",
+                    UDPC_INTERNAL_atostr(ctx, cd->addr));
+                return;
+            }
+            cd->ack |= (0x80000000 >> (diff - 1));
+
+            isOutOfOrder = 1;
+        }
+    }
+    else if(seqID < cd->rseq)
+    {
+        diff = cd->rseq - seqID;
+        if(diff <= 0x7FFFFFFF)
+        {
+            // sequence is older
+            if((cd->ack & (0x80000000 >> (diff - 1))) != 0)
+            {
+                // already received packet
+                UDPC_INTERNAL_log(ctx, 2, "Ignoring already received pkt from %s",
+                    UDPC_INTERNAL_atostr(ctx, cd->addr));
+                return;
+            }
+            cd->ack |= (0x80000000 >> (diff - 1));
+
+            isOutOfOrder = 1;
+        }
+        else
+        {
+            // sequence is more recent, diff requires recalc
+            diff = 0xFFFFFFFF - cd->rseq + 1 + seqID;
+            cd->rseq = seqID;
+            cd->ack = (cd->ack >> diff) | 0x80000000;
+        }
+    }
+    else
+    {
+        // already received packet
+        UDPC_INTERNAL_log(ctx, 2, "Ignoring already received (duplicate) pkt from %s",
+            UDPC_INTERNAL_atostr(ctx, cd->addr));
+        return;
+    }
+
+    if(isOutOfOrder != 0)
+    {
+        UDPC_INTERNAL_log(ctx, 2, "Received valid packet from %s is out of order",
+            UDPC_INTERNAL_atostr(ctx, cd->addr));
+    }
+
+    // TODO received packet callback here
 }
 
 void UDPC_INTERNAL_update_to_rtt_si(void *userData, uint32_t addr, char *data)
@@ -570,6 +639,96 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
 
         free(pinfo->data);
         UDPC_Deque_pop_front(cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+    }
+}
+
+void UDPC_INTERNAL_update_rtt(
+    UDPC_Context *ctx,
+    UDPC_INTERNAL_ConnectionData *cd,
+    uint32_t rseq,
+    struct timespec *tsNow)
+{
+    for(int x = 0; x * sizeof(UDPC_INTERNAL_PacketInfo) < cd->sentPkts->size; ++x)
+    {
+        UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_index_ptr(cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo), x);
+        if(pinfo->id == rseq)
+        {
+            float diff = UDPC_ts_diff_to_seconds(tsNow, &pinfo->sent);
+            if(diff > cd->rtt)
+            {
+                cd->rtt += (diff - cd->rtt) / 10.0f;
+            }
+            else
+            {
+                cd->rtt -= (cd->rtt - diff) / 10.0f;
+            }
+
+            if(cd->rtt > UDPC_GOOD_RTT_LIMIT_SEC)
+            {
+                cd->flags &= 0xFFFFFFFB;
+            }
+            else
+            {
+                cd->flags |= 0x4;
+            }
+
+            UDPC_INTERNAL_log(ctx, 2, "%d RTT (%s) %.3fs from %s",
+                rseq,
+                cd->rtt > UDPC_GOOD_RTT_LIMIT_SEC ? "B" : "G",
+                cd->rtt,
+                UDPC_INTERNAL_atostr(ctx, cd->addr));
+            break;
+        }
+    }
+}
+
+void UDPC_INTERNAL_check_pkt_timeout(
+    UDPC_INTERNAL_ConnectionData *cd,
+    uint32_t rseq,
+    uint32_t ack,
+    struct timespec *tsNow)
+{
+    --rseq;
+    for(; ack != 0; ack = ack << 1)
+    {
+        if((ack & 0x80000000) != 0) { --rseq; continue; }
+
+        // not received by peer yet, check if packet timed out
+        for(int x = 0; x * sizeof(UDPC_INTERNAL_PacketInfo) < cd->sentPkts->size; ++x)
+        {
+            UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_index_rev_ptr(cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo), x);
+            if(pinfo->id == rseq)
+            {
+                if((pinfo->flags & 0x2) == 0 || (pinfo->flags & 0x4) != 0)
+                {
+                    // is not received checked or already resent
+                    break;
+                }
+                float seconds = UDPC_ts_diff_to_seconds(tsNow, &pinfo->sent);
+                if(seconds >= UDPC_PACKET_TIMEOUT_SEC)
+                {
+                    // packet timed out, resending
+                    UDPC_INTERNAL_PacketInfo newPkt = {
+                        cd->addr,
+                        0,
+                        0,
+                        pinfo->data,
+                        pinfo->size,
+                        {0, 0}
+                    };
+                    pinfo->flags |= 0x4;
+                    pinfo->data = NULL;
+                    pinfo->size = 0;
+                    UDPC_Deque_push_back(
+                        cd->sendPktQueue,
+                        &newPkt,
+                        sizeof(UDPC_INTERNAL_PacketInfo));
+                }
+                break;
+            }
+        }
+
+        --rseq;
     }
 }
 

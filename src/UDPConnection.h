@@ -64,7 +64,7 @@ typedef struct {
     UDPC_Deque *sendPktQueue;
     struct timespec received;
     struct timespec sent;
-    struct timespec rtt;
+    float rtt;
 } UDPC_INTERNAL_ConnectionData;
 
 /// This struct should not be modified, only passed to functions that require it
@@ -132,6 +132,18 @@ void UDPC_update(UDPC_Context *ctx);
 void UDPC_INTERNAL_update_to_rtt_si(void *userData, uint32_t addr, char *data);
 
 void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data);
+
+void UDPC_INTERNAL_update_rtt(
+    UDPC_Context *ctx,
+    UDPC_INTERNAL_ConnectionData *cd,
+    uint32_t rseq,
+    struct timespec *tsNow);
+
+void UDPC_INTERNAL_check_pkt_timeout(
+    UDPC_INTERNAL_ConnectionData *cd,
+    uint32_t rseq,
+    uint32_t ack,
+    struct timespec *tsNow);
 
 float UDPC_ts_diff_to_seconds(struct timespec *ts0, struct timespec *ts1);
 
