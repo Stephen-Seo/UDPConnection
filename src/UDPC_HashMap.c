@@ -172,7 +172,6 @@ int UDPC_HashMap_has(UDPC_HashMap *hm, uint32_t key)
     return current != NULL ? 1 : 0;
 }
 
-// TODO change to linkedList buckets up to this point
 int UDPC_HashMap_realloc(UDPC_HashMap *hm, uint32_t newCapacity)
 {
     if(hm->size > newCapacity)
@@ -180,100 +179,112 @@ int UDPC_HashMap_realloc(UDPC_HashMap *hm, uint32_t newCapacity)
         return 0;
     }
 
-    UDPC_Deque **newBuckets = malloc(sizeof(UDPC_Deque*) * newCapacity);
-    UDPC_Deque *newOverflow = UDPC_Deque_init(UDPC_HASHMAP_BUCKET_SIZE
-        * (4 + hm->unitSize));
+    // allocate newBuckets
+    int fail = 0;
+    UDPC_HashMap_Node **newBuckets = malloc(sizeof(UDPC_HashMap_Node*) * newCapacity);
+    if(!newBuckets) { return 0; }
     for(int x = 0; x < newCapacity; ++x)
     {
-        newBuckets[x] = UDPC_Deque_init(UDPC_HASHMAP_BUCKET_SIZE
-            * (4 + hm->unitSize));
+        if(fail != 0) { newBuckets[x] = NULL; continue; }
+        newBuckets[x] = calloc(1, sizeof(UDPC_HashMap_Node));
+        if(!newBuckets[x]) { fail = 1; }
+    }
+    if(fail != 0)
+    {
+        for(int x = 0; x < newCapacity; ++x)
+        {
+            if(newBuckets[x]) { free(newBuckets[x]); }
+        }
+        free(newBuckets);
+        return 0;
     }
 
+    // rehash entries from hm->buckets to newBuckets
     uint32_t hash;
-    char *data;
-    int fail = 0;
+    UDPC_HashMap_Node *current;
+    UDPC_HashMap_Node *next;
+    UDPC_HashMap_Node *newCurrent;
     for(int x = 0; x < hm->capacity; ++x)
     {
-        for(int y = 0; y * (4 + hm->unitSize) < hm->buckets[x]->size; ++y)
+        current = hm->buckets[x]->next;
+        while(current)
         {
-            data = UDPC_Deque_index_ptr(hm->buckets[x], 4 + hm->unitSize, y);
-            hash = UDPC_HASHMAP_MOD(*((uint32_t*)data), newCapacity);
-            if(newBuckets[hash]->size < newBuckets[hash]->alloc_size)
+            next = current->next;
+            hash = UDPC_HASHMAP_MOD(current->key, newCapacity);
+            newCurrent = newBuckets[hash];
+            while(newCurrent->next)
             {
-                if(UDPC_Deque_push_back(newBuckets[hash], data, 4 + hm->unitSize) == 0)
-                {
-                    fail = 1;
-                    break;
-                }
+                newCurrent = newCurrent->next;
             }
-            else if(UDPC_Deque_push_back(newOverflow, data, 4 + hm->unitSize) == 0)
+            newCurrent->next = malloc(sizeof(UDPC_HashMap_Node));
+            if(!newCurrent->next)
             {
                 fail = 1;
                 break;
             }
+            newCurrent->next->key = current->key;
+            newCurrent->next->data = current->data;
+            newCurrent->next->next = NULL;
+            newCurrent->next->prev = newCurrent;
+            current = next;
         }
         if(fail != 0)
         {
             break;
         }
     }
-
-    if(fail == 0)
-    {
-        for(int x = 0; x * (4 + hm->unitSize) < hm->overflow->size; ++x)
-        {
-            data = UDPC_Deque_index_ptr(hm->overflow, 4 + hm->unitSize, x);
-            hash = UDPC_HASHMAP_MOD(*((uint32_t*)data), newCapacity);
-            if(newBuckets[hash]->size < newBuckets[hash]->alloc_size)
-            {
-                if(UDPC_Deque_push_back(newBuckets[hash], data, 4 + hm->unitSize) == 0)
-                {
-                    fail = 1;
-                    break;
-                }
-            }
-            else if(UDPC_Deque_push_back(newOverflow, data, 4 + hm->unitSize) == 0)
-            {
-                fail = 1;
-                break;
-            }
-        }
-    }
-
     if(fail != 0)
     {
         for(int x = 0; x < newCapacity; ++x)
         {
-            UDPC_Deque_destroy(newBuckets[x]);
+            current = newBuckets[x];
+            while(current)
+            {
+                next = current->next;
+                free(current);
+                current = next;
+            }
         }
         free(newBuckets);
-        UDPC_Deque_destroy(newOverflow);
         return 0;
     }
-    else
+
+    // cleanup hm->buckets to be replaced by newBuckets
+    for(int x = 0; x < hm->capacity; ++x)
     {
-        for(int x = 0; x < hm->capacity; ++x)
+        current = hm->buckets[x];
+        while(current)
         {
-            UDPC_Deque_destroy(hm->buckets[x]);
+            next = current->next;
+            // do not free current->data as it is now being pointed to by entries in newBuckets
+            free(current);
+            current = next;
         }
-        free(hm->buckets);
-        UDPC_Deque_destroy(hm->overflow);
-
-        hm->buckets = newBuckets;
-        hm->overflow = newOverflow;
-
-        hm->capacity = newCapacity;
-        return 1;
     }
+    free(hm->buckets);
+
+    hm->capacity = newCapacity;
+    hm->buckets = newBuckets;
+
+    return 1;
 }
 
 void UDPC_HashMap_clear(UDPC_HashMap *hm)
 {
+    UDPC_HashMap_Node *current;
+    UDPC_HashMap_Node *next;
     for(int x = 0; x < hm->capacity; ++x)
     {
-        UDPC_Deque_clear(hm->buckets[x]);
+        current = hm->buckets[x]->next;
+        while(current)
+        {
+            next = current->next;
+            if(current->data) { free(current->data); }
+            free(current);
+            current = next;
+        }
+        hm->buckets[x]->next = NULL;
     }
-    UDPC_Deque_clear(hm->overflow);
     hm->size = 0;
 }
 
@@ -287,64 +298,16 @@ uint32_t UDPC_HashMap_get_capacity(UDPC_HashMap *hm)
     return hm->capacity;
 }
 
-void UDPC_HashMap_itercall(UDPC_HashMap *hm, void (*fn)(void*, char*), void *userData)
+void UDPC_HashMap_itercall(UDPC_HashMap *hm, void (*fn)(void*, uint32_t, char*), void *userData)
 {
+    UDPC_HashMap_Node *current;
     for(int x = 0; x < hm->capacity; ++x)
     {
-        for(int y = 0; y * (4 + hm->unitSize) < hm->buckets[x]->size; ++y)
+        current = hm->buckets[x]->next;
+        while(current)
         {
-            char *data = UDPC_Deque_index_ptr(
-                hm->buckets[x], 4 + hm->unitSize, y);
-            if(hm->unitSize > 0) { fn(userData, data + 4); }
-            else { fn(userData, data); }
+            fn(userData, current->key, current->data);
+            current = current->next;
         }
     }
-    for(int x = 0; x * (4 + hm->unitSize) < hm->overflow->size; ++x)
-    {
-        char *data = UDPC_Deque_index_ptr(
-            hm->overflow, 4 + hm->unitSize, x);
-        if(hm->unitSize > 0) { fn(userData, data + 4); }
-        else { fn(userData, data); }
-    }
-}
-
-void* UDPC_HashMap_INTERNAL_reinsert(UDPC_HashMap *hm, uint32_t key, void *data)
-{
-    if(hm->capacity <= hm->size)
-    {
-        return NULL;
-    }
-
-    uint32_t hash = UDPC_HASHMAP_MOD(key, hm->capacity);
-
-    char *temp = malloc(4 + hm->unitSize);
-    memcpy(temp, &key, 4);
-    if(hm->unitSize > 0)
-    {
-        memcpy(temp + 4, data, hm->unitSize);
-    }
-
-    if(UDPC_Deque_get_available(hm->buckets[hash]) == 0)
-    {
-        if(UDPC_Deque_get_available(hm->overflow) == 0)
-        {
-            free(temp);
-            return NULL;
-        }
-        else if(UDPC_Deque_push_back(hm->overflow, temp, 4 + hm->unitSize) == 0)
-        {
-            free(temp);
-            return NULL;
-        }
-    }
-    else if(UDPC_Deque_push_back(hm->buckets[hash], temp, 4 + hm->unitSize) == 0)
-    {
-        free(temp);
-        return NULL;
-    }
-
-    free(temp);
-    ++hm->size;
-    temp = UDPC_Deque_get_back_ptr(hm->buckets[hash], 4 + hm->unitSize);
-    return temp + 4;
 }
