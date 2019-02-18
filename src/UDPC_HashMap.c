@@ -117,8 +117,8 @@ int UDPC_HashMap_remove(UDPC_HashMap *hm, uint32_t key)
 
     uint32_t hash = UDPC_HASHMAP_MOD(key, hm->capacity);
 
-    UDPC_HashMap_Node *current = hm->buckets[hash];
-    while(current && (current == hm->buckets[hash] || current->key != key))
+    UDPC_HashMap_Node *current = hm->buckets[hash]->next;
+    while(current && current->key != key)
     {
         current = current->next;
     }
@@ -130,6 +130,8 @@ int UDPC_HashMap_remove(UDPC_HashMap *hm, uint32_t key)
 
     if(current->data) { free(current->data); }
     free(current);
+
+    --hm->size;
 
     return 1;
 }

@@ -232,11 +232,11 @@ void TEST_ATOSTR()
     UNITTEST_REPORT(ATOSTR);
 }
 
-void TEST_HASHMAP_itercall_comp(void *userData, char *data)
+void TEST_HASHMAP_itercall_comp(void *userData, uint32_t key, char *data)
 {
     *((int*)userData) += 1;
     int temp = *((int*)(data)) / 100;
-    ASSERT_EQ_MEM(&temp, data - 4, 4);
+    ASSERT_EQ(temp, key);
 }
 
 void TEST_HASHMAP()
@@ -247,20 +247,32 @@ void TEST_HASHMAP()
     temp = 1333;
     ASSERT_NEQ(UDPC_HashMap_insert(hm, 0, &temp), NULL);
     ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 0), &temp, sizeof(int));
+    ASSERT_NEQ(UDPC_HashMap_has(hm, 0), 0);
+    ASSERT_EQ(UDPC_HashMap_has(hm, 1), 0);
 
     temp = 9999;
     ASSERT_NEQ(UDPC_HashMap_insert(hm, 1, &temp), NULL);
     ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 1), &temp, sizeof(int));
+    ASSERT_NEQ(UDPC_HashMap_has(hm, 0), 0);
+    ASSERT_NEQ(UDPC_HashMap_has(hm, 1), 0);
+    ASSERT_EQ(UDPC_HashMap_has(hm, 2), 0);
 
     temp = 1235987;
     ASSERT_NEQ(UDPC_HashMap_insert(hm, 2, &temp), NULL);
     ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 2), &temp, sizeof(int));
+    ASSERT_NEQ(UDPC_HashMap_has(hm, 0), 0);
+    ASSERT_NEQ(UDPC_HashMap_has(hm, 1), 0);
+    ASSERT_NEQ(UDPC_HashMap_has(hm, 2), 0);
+    ASSERT_EQ(UDPC_HashMap_has(hm, 3), 0);
 
     ASSERT_NEQ(UDPC_HashMap_remove(hm, 1), 0);
     temp = 1333;
     ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 0), &temp, sizeof(int));
     temp = 1235987;
     ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 2), &temp, sizeof(int));
+    ASSERT_NEQ(UDPC_HashMap_has(hm, 0), 0);
+    ASSERT_EQ(UDPC_HashMap_has(hm, 1), 0);
+    ASSERT_NEQ(UDPC_HashMap_has(hm, 2), 0);
 
     ASSERT_EQ(UDPC_HashMap_realloc(hm, 0), 0);
     ASSERT_NEQ(UDPC_HashMap_realloc(hm, 16), 0);
@@ -269,6 +281,9 @@ void TEST_HASHMAP()
     ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 0), &temp, sizeof(int));
     temp = 1235987;
     ASSERT_EQ_MEM(UDPC_HashMap_get(hm, 2), &temp, sizeof(int));
+    ASSERT_NEQ(UDPC_HashMap_has(hm, 0), 0);
+    ASSERT_EQ(UDPC_HashMap_has(hm, 1), 0);
+    ASSERT_NEQ(UDPC_HashMap_has(hm, 2), 0);
 
     UDPC_HashMap_clear(hm);
     ASSERT_EQ(hm->size, 0);
@@ -287,6 +302,7 @@ void TEST_HASHMAP()
     {
         temp = x * 100;
         ASSERT_EQ_MEM(UDPC_HashMap_get(hm, x), &temp, sizeof(int));
+        ASSERT_NEQ(UDPC_HashMap_has(hm, x), 0);
     }
     ASSERT_GTE(hm->capacity, 8);
 
@@ -296,12 +312,14 @@ void TEST_HASHMAP()
     {
         temp = x * 100;
         ASSERT_EQ_MEM(UDPC_HashMap_get(hm, x), &temp, sizeof(int));
+        ASSERT_NEQ(UDPC_HashMap_has(hm, x), 0);
     }
     ASSERT_GTE(hm->capacity, 16);
 
     for(int x = 0; x < 9; ++x)
     {
         ASSERT_NEQ(UDPC_HashMap_remove(hm, x), 0);
+        ASSERT_EQ(UDPC_HashMap_has(hm, x), 0);
     }
     ASSERT_EQ(hm->size, 0);
     ASSERT_GTE(hm->capacity, 16);
@@ -317,6 +335,7 @@ void TEST_HASHMAP()
     {
         temp = x * 100;
         ASSERT_EQ_MEM(UDPC_HashMap_get(hm, x), &temp, sizeof(int));
+        ASSERT_NEQ(UDPC_HashMap_has(hm, x), 0);
     }
 
     temp = 0;
