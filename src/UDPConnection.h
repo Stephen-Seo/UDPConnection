@@ -109,7 +109,7 @@ UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, int isClient);
 
 void UDPC_destroy(UDPC_Context *ctx);
 
-void UDPC_INTERNAL_destroy_conMap(void *unused, char *data);
+void UDPC_INTERNAL_destroy_conMap(void *unused, uint32_t addr, char *data);
 
 uint32_t UDPC_get_error(UDPC_Context *ctx);
 
@@ -129,9 +129,9 @@ void UDPC_set_logging_type(UDPC_Context *ctx, uint32_t logType);
 /// If threaded, this function is called automatically
 void UDPC_update(UDPC_Context *ctx);
 
-void UDPC_INTERNAL_update_to_rtt_si(void *userData, char *data);
+void UDPC_INTERNAL_update_to_rtt_si(void *userData, uint32_t addr, char *data);
 
-void UDPC_INTERNAL_update_send(void *userData, char *data);
+void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data);
 
 float UDPC_ts_diff_to_seconds(struct timespec *ts0, struct timespec *ts1);
 
