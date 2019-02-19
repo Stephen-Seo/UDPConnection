@@ -350,7 +350,7 @@ void UDPC_update(UDPC_Context *ctx)
 
     UDPC_INTERNAL_update_rtt(ctx, cd, rseq, &us.tsNow);
     cd->received = us.tsNow;
-    UDPC_INTERNAL_check_pkt_timeout(cd, rseq, ack, &us.tsNow);
+    UDPC_INTERNAL_check_pkt_timeout(ctx, cd, rseq, ack, &us.tsNow);
 
     int isOutOfOrder = 0;
     uint32_t diff = 0;
@@ -683,6 +683,7 @@ void UDPC_INTERNAL_update_rtt(
 }
 
 void UDPC_INTERNAL_check_pkt_timeout(
+    UDPC_Context *ctx,
     UDPC_INTERNAL_ConnectionData *cd,
     uint32_t rseq,
     uint32_t ack,
@@ -707,15 +708,29 @@ void UDPC_INTERNAL_check_pkt_timeout(
                 float seconds = UDPC_ts_diff_to_seconds(tsNow, &pinfo->sent);
                 if(seconds >= UDPC_PACKET_TIMEOUT_SEC)
                 {
+                    if(pinfo->size <= 20)
+                    {
+                        UDPC_INTERNAL_log(ctx, 0,
+                            "ERROR: Timed out sentPkt (%d) to %s has size at most 20",
+                            rseq,
+                            UDPC_INTERNAL_atostr(ctx, cd->addr));
+                        pinfo->flags |= 0x4; // treat as resent to avoid reprinting error
+                        break;
+                    }
                     // packet timed out, resending
                     UDPC_INTERNAL_PacketInfo newPkt = {
                         cd->addr,
                         0,
                         0,
-                        pinfo->data,
-                        pinfo->size,
+                        NULL,
+                        0,
                         {0, 0}
                     };
+                    newPkt.size = pinfo->size - 20;
+                    newPkt.data = malloc(newPkt.size);
+                    memcpy(newPkt.data, pinfo->data + 20, newPkt.size);
+                    free(pinfo->data);
+
                     pinfo->flags |= 0x4;
                     pinfo->data = NULL;
                     pinfo->size = 0;

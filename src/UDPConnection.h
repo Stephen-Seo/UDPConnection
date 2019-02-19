@@ -67,7 +67,7 @@ typedef struct {
     float rtt;
 } UDPC_INTERNAL_ConnectionData;
 
-/// This struct should not be modified, only passed to functions that require it
+/// This struct should not be used externally, only passed to functions that require it
 typedef struct {
     /*
      * 0x1 - is threaded
@@ -140,6 +140,7 @@ void UDPC_INTERNAL_update_rtt(
     struct timespec *tsNow);
 
 void UDPC_INTERNAL_check_pkt_timeout(
+    UDPC_Context *ctx,
     UDPC_INTERNAL_ConnectionData *cd,
     uint32_t rseq,
     uint32_t ack,
