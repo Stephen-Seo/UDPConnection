@@ -711,7 +711,7 @@ void UDPC_INTERNAL_check_pkt_timeout(
                     if(pinfo->size <= 20)
                     {
                         UDPC_INTERNAL_log(ctx, 0,
-                            "ERROR: Timed out sentPkt (%d) to %s has size at most 20",
+                            "Timed out sentPkt (%d) to %s has size at most 20",
                             rseq,
                             UDPC_INTERNAL_atostr(ctx, cd->addr));
                         pinfo->flags |= 0x4; // treat as resent to avoid reprinting error
