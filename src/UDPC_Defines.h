@@ -52,4 +52,6 @@ static const char *UDPC_ERR_THREADFAIL_STR = "Failed to create thread";
 #define UDPC_PACKET_TIMEOUT_SEC 1.0f
 #define UDPC_GOOD_RTT_LIMIT_SEC 0.25f
 
+#define UDPC_REC_PKTS_ALLOC_SIZE 64
+
 #endif

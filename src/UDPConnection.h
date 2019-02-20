@@ -27,6 +27,27 @@
 
 #define UDPC_ATOSTR_BUF_SIZE 16
 
+/// (void *userData, uint32_t address)
+/*!
+ * Note address is in network byte order (usually big-endian)
+ */
+typedef void (*UDPC_callback_connected)(void*, uint32_t);
+
+/// (void *userData, uint32_t address)
+/*!
+ * Note address is in network byte order (usually big-endian)
+ */
+typedef void (*UDPC_callback_disconnected)(void*, uint32_t);
+
+/// (void *userData, char *packetData, uint32_t packetSize)
+/*!
+ * The data pointed to by the packetData argument is to data internally managed
+ * by the UDPC_Context. It will change every time this callback is called so do
+ * not depend on it persisting. This means you should copy the data out of it
+ * when the callback is invoked and work with the copied data.
+ */
+typedef void (*UDPC_callback_received)(void*, char*, uint32_t);
+
 /// This struct should not be used outside of this library
 typedef struct {
     uint32_t addr; // in network order (big-endian)
@@ -37,7 +58,7 @@ typedef struct {
      * 0x4 - has been re-sent
      */
     uint32_t flags;
-    char *data; // no-header in sendPktQueue, header in sentPkts
+    char *data; // no-header in sendPktQueue and receivedPackets, header in sentPkts
     uint32_t size;
     struct timespec sent;
 } UDPC_INTERNAL_PacketInfo;
@@ -94,6 +115,14 @@ typedef struct {
     struct timespec lastUpdated;
     char atostrBuf[UDPC_ATOSTR_BUF_SIZE];
     char recvBuf[UDPC_PACKET_MAX_SIZE];
+    UDPC_Deque *receivedPackets;
+
+    UDPC_callback_connected callbackConnected;
+    void *callbackConnectedUserData;
+    UDPC_callback_disconnected callbackDisconnected;
+    void *callbackDisconnectedUserData;
+    UDPC_callback_received callbackReceived;
+    void *callbackReceivedUserData;
 } UDPC_Context;
 
 typedef struct {
@@ -110,6 +139,27 @@ UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, int isClient);
 void UDPC_destroy(UDPC_Context *ctx);
 
 void UDPC_INTERNAL_destroy_conMap(void *unused, uint32_t addr, char *data);
+
+void UDPC_set_callback_connected(
+    UDPC_Context *ctx, UDPC_callback_connected fptr, void *userData);
+
+void UDPC_set_callback_disconnected(
+    UDPC_Context *ctx, UDPC_callback_disconnected fptr, void *userData);
+
+void UDPC_set_callback_received(
+    UDPC_Context *ctx, UDPC_callback_received fptr, void *userData);
+
+void UDPC_check_received(UDPC_Context *ctx);
+
+/*!
+ * \brief Queues a packet to send to a connected peer
+ * Note addr is expected to be in network-byte-order (big-endian).
+ * If isChecked is non-zero, UDPC will attempt to resend the packet if peer has
+ * not received it within UDPC_PACKET_TIMEOUT_SEC seconds.
+ * \return non-zero on success
+ */
+int UDPC_queue_send(
+    UDPC_Context *ctx, uint32_t addr, uint32_t isChecked, void *data, uint32_t size);
 
 uint32_t UDPC_get_error(UDPC_Context *ctx);
 
@@ -146,9 +196,9 @@ void UDPC_INTERNAL_check_pkt_timeout(
     uint32_t ack,
     struct timespec *tsNow);
 
-float UDPC_ts_diff_to_seconds(struct timespec *ts0, struct timespec *ts1);
+float UDPC_INTERNAL_ts_diff(struct timespec *ts0, struct timespec *ts1);
 
-int UDPC_INTERNAL_threadfn(void *context); // internal usage only
+int UDPC_INTERNAL_threadfn(void *context);
 
 /*
  * 0x1 - is ping
@@ -172,5 +222,9 @@ void UDPC_INTERNAL_prepare_pkt(
 void UDPC_INTERNAL_log(UDPC_Context *ctx, uint32_t level, const char *msg, ...);
 
 char* UDPC_INTERNAL_atostr(UDPC_Context *ctx, uint32_t addr);
+
+uint32_t UDPC_INTERNAL_generate_id(UDPC_Context *ctx);
+
+void UDPC_INTERNAL_check_ids(void *userData, uint32_t addr, char *data);
 
 #endif

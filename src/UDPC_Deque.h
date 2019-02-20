@@ -40,6 +40,8 @@ int UDPC_Deque_push_back(UDPC_Deque *deque, const void *data, uint32_t size);
  */
 int UDPC_Deque_push_front(UDPC_Deque *deque, const void *data, uint32_t size);
 
+// TODO add push_back/push_front variants that realloc on not enough free space
+
 /*!
  * \return size in bytes of available data
  */
