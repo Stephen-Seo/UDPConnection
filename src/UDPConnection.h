@@ -115,6 +115,8 @@ typedef struct {
     struct timespec lastUpdated;
     char atostrBuf[UDPC_ATOSTR_BUF_SIZE];
     char recvBuf[UDPC_PACKET_MAX_SIZE];
+    UDPC_Deque *connectedEvents;
+    UDPC_Deque *disconnectedEvents;
     UDPC_Deque *receivedPackets;
 
     UDPC_callback_connected callbackConnected;
@@ -149,7 +151,7 @@ void UDPC_set_callback_disconnected(
 void UDPC_set_callback_received(
     UDPC_Context *ctx, UDPC_callback_received fptr, void *userData);
 
-void UDPC_check_received(UDPC_Context *ctx);
+void UDPC_check_events(UDPC_Context *ctx);
 
 /*!
  * \brief Queues a packet to send to a connected peer
@@ -160,6 +162,12 @@ void UDPC_check_received(UDPC_Context *ctx);
  */
 int UDPC_queue_send(
     UDPC_Context *ctx, uint32_t addr, uint32_t isChecked, void *data, uint32_t size);
+
+/*!
+ * \brief get the number of packets that can be queued to the addr
+ * \return number of queueable packets or 0 if connection has not been established
+ */
+int UDPC_get_queue_send_available(UDPC_Context *ctx, uint32_t addr);
 
 uint32_t UDPC_get_error(UDPC_Context *ctx);
 
