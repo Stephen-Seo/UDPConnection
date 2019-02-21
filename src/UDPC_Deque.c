@@ -140,6 +140,30 @@ int UDPC_Deque_push_front(UDPC_Deque *deque, const void *data, uint32_t size)
     return 1;
 }
 
+int UDPC_Deque_push_back_realloc(UDPC_Deque *deque, const void *data, uint32_t size)
+{
+    if(UDPC_Deque_push_back(deque, data, size) == 0)
+    {
+        if(UDPC_Deque_realloc(deque, deque->alloc_size * 2) != 0)
+        {
+            return UDPC_Deque_push_back(deque, data, size);
+        }
+    }
+    return 0;
+}
+
+int UDPC_Deque_push_front_realloc(UDPC_Deque *deque, const void *data, uint32_t size)
+{
+    if(UDPC_Deque_push_front(deque, data, size) == 0)
+    {
+        if(UDPC_Deque_realloc(deque, deque->alloc_size * 2) != 0)
+        {
+            return UDPC_Deque_push_front(deque, data, size);
+        }
+    }
+    return 0;
+}
+
 uint32_t UDPC_Deque_get_available(UDPC_Deque *deque)
 {
     return deque->alloc_size - deque->size;

@@ -206,6 +206,27 @@ void TEST_DEQUE()
     }
     ASSERT_EQ(deque->size, 0);
 
+    // test push_back_realloc
+    ASSERT_EQ(deque->alloc_size, 16 * sizeof(int));
+    for(int x = 0; x < 16; ++x)
+    {
+        ASSERT_NEQ(UDPC_Deque_push_back(deque, &x, sizeof(int)), 0);
+    }
+    int tempInt = 20;
+    ASSERT_EQ(UDPC_Deque_push_back(deque, &tempInt, sizeof(int)), 0);
+    ASSERT_NEQ(UDPC_Deque_push_back_realloc(deque, &tempInt, sizeof(int)), 0);
+    ASSERT_EQ(deque->alloc_size, 32 * sizeof(int));
+    ASSERT_EQ_MEM(UDPC_Deque_get_back_ptr(deque, sizeof(int)), &tempInt, sizeof(int));
+
+    UDPC_Deque_pop_back(deque, sizeof(int));
+    ASSERT_NEQ(UDPC_Deque_realloc(deque, 16 * sizeof(int)), 0);
+
+    // test push_front_realloc
+    ASSERT_EQ(UDPC_Deque_push_front(deque, &tempInt, sizeof(int)), 0);
+    ASSERT_NEQ(UDPC_Deque_push_front_realloc(deque, &tempInt, sizeof(int)), 0);
+    ASSERT_EQ(deque->alloc_size, 32 * sizeof(int));
+    ASSERT_EQ_MEM(UDPC_Deque_get_front_ptr(deque, sizeof(int)), &tempInt, sizeof(int));
+
     /*
     for(int x = 0; x < deque->tail / sizeof(int); ++x)
     {

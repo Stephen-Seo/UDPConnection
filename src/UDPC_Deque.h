@@ -40,7 +40,19 @@ int UDPC_Deque_push_back(UDPC_Deque *deque, const void *data, uint32_t size);
  */
 int UDPC_Deque_push_front(UDPC_Deque *deque, const void *data, uint32_t size);
 
-// TODO add push_back/push_front variants that realloc on not enough free space
+/*!
+ * \brief Same as push_back, but realloc if not enough free space
+ * Note when realloc occurs, the allocated space is doubled.
+ * \return non-zero on data pushed into Deque success
+ */
+int UDPC_Deque_push_back_realloc(UDPC_Deque *deque, const void *data, uint32_t size);
+
+/*!
+ * \brief Same as push_front, but realloc if not enough free space
+ * Note when realloc occurs, the allocated space is doubled.
+ * \return non-zero on data pushed into Deque success
+ */
+int UDPC_Deque_push_front_realloc(UDPC_Deque *deque, const void *data, uint32_t size);
 
 /*!
  * \return size in bytes of available data
