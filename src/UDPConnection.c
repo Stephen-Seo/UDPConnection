@@ -506,8 +506,8 @@ void UDPC_update(UDPC_Context *ctx)
                 UDPC_INTERNAL_atostr(ctx, receivedData.sin_addr.s_addr),
                 ntohs(receivedData.sin_port));
             UDPC_INTERNAL_ConnectionData newCD = {
-                1,
-                (ctx->flags & 0x2) != 0 ? conID : UDPC_INTERNAL_generate_id(ctx),
+                0x9,
+                UDPC_INTERNAL_generate_id(ctx),
                 0,
                 0,
                 0xFFFFFFFF,
@@ -778,39 +778,76 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
 
     if((cd->flags & 0x8) != 0)
     {
-        // initiate connection to server
-        if(UDPC_INTERNAL_ts_diff(&us->tsNow, &cd->sent) < UDPC_INIT_PKT_INTERVAL_F)
+        if((us->ctx->flags & 0x2) != 0)
         {
-            return;
+            // initiate connection to server
+            if(UDPC_INTERNAL_ts_diff(&us->tsNow, &cd->sent) < UDPC_INIT_PKT_INTERVAL_F)
+            {
+                return;
+            }
+            cd->sent = us->tsNow;
+
+            char *data = malloc(20);
+            UDPC_INTERNAL_prepare_pkt(
+                data,
+                UDPC_ID_CONNECT,
+                0,
+                0xFFFFFFFF,
+                NULL,
+                0);
+
+            struct sockaddr_in destinationInfo;
+            destinationInfo.sin_family = AF_INET;
+            destinationInfo.sin_addr.s_addr = addr;
+            destinationInfo.sin_port = htons(cd->port);
+            long int sentBytes = sendto(
+                us->ctx->socketHandle,
+                data,
+                20,
+                0,
+                (struct sockaddr*) &destinationInfo,
+                sizeof(struct sockaddr_in));
+            if(sentBytes != 20)
+            {
+                UDPC_INTERNAL_log(us->ctx, 0, "Failed to send init packet to %s "
+                    "port %d", UDPC_INTERNAL_atostr(us->ctx, addr), cd->port);
+                free(data);
+                return;
+            }
         }
-        cd->sent = us->tsNow;
-
-        char *data = malloc(20);
-        UDPC_INTERNAL_prepare_pkt(
-            data,
-            UDPC_ID_CONNECT,
-            0,
-            0xFFFFFFFF,
-            NULL,
-            0);
-
-        struct sockaddr_in destinationInfo;
-        destinationInfo.sin_family = AF_INET;
-        destinationInfo.sin_addr.s_addr = addr;
-        destinationInfo.sin_port = htons(cd->port);
-        long int sentBytes = sendto(
-            us->ctx->socketHandle,
-            data,
-            20,
-            0,
-            (struct sockaddr*) &destinationInfo,
-            sizeof(struct sockaddr_in));
-        if(sentBytes != 20)
+        else
         {
-            UDPC_INTERNAL_log(us->ctx, 0, "Failed to send init packet to %s "
-                "port %d", UDPC_INTERNAL_atostr(us->ctx, addr), cd->port);
-            free(data);
-            return;
+            // initiate connection to client
+            cd->flags &= 0xFFFFFFF7;
+            cd->sent = us->tsNow;
+
+            char *data = malloc(20);
+            UDPC_INTERNAL_prepare_pkt(
+                data,
+                UDPC_ID_CONNECT | cd->id,
+                cd->rseq,
+                cd->ack,
+                &cd->lseq,
+                0);
+
+            struct sockaddr_in destinationInfo;
+            destinationInfo.sin_family = AF_INET;
+            destinationInfo.sin_addr.s_addr = addr;
+            destinationInfo.sin_port = htons(cd->port);
+            long int sentBytes = sendto(
+                us->ctx->socketHandle,
+                data,
+                20,
+                0,
+                (struct sockaddr*) &destinationInfo,
+                sizeof(struct sockaddr_in));
+            if(sentBytes != 20)
+            {
+                UDPC_INTERNAL_log(us->ctx, 0, "Failed to send init packet to %s "
+                    "port %d", UDPC_INTERNAL_atostr(us->ctx, addr), cd->port);
+                free(data);
+                return;
+            }
         }
         return;
     }
