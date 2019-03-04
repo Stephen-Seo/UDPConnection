@@ -71,7 +71,7 @@ int main(int argc, char** argv)
         UDPC_set_callback_received(ctx, recCallback, NULL);
         while(UDPC_get_error(ctx) == UDPC_SUCCESS)
         {
-            if(isClient)
+            if(isClient && isConnected == 0)
             {
                 UDPC_client_initiate_connection(ctx, targetAddress, targetPort);
             }
