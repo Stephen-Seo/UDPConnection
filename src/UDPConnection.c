@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <errno.h>
 
 UDPC_Context* UDPC_init(uint16_t listenPort, int isClient)
 {
@@ -460,6 +461,13 @@ void UDPC_update(UDPC_Context *ctx)
         0,
         (struct sockaddr*) &receivedData,
         &receivedDataSize);
+
+    if(bytes == 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+    {
+        // expected result for non-blocking socket
+        return;
+    }
+
     if(bytes < 20)
     {
         UDPC_INTERNAL_log(ctx, 2, "Got invalid packet from %s port %d (too small)",
