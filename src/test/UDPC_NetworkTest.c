@@ -63,6 +63,13 @@ int main(int argc, char** argv)
     }
 
     UDPC_Context *ctx = UDPC_init(listenPort, isClient);
+
+    printf("isClient: %s, targetAddr: %s, targetPort: %u, listenPort: %u\n",
+        isClient == 0 ? "false" : "true",
+        UDPC_INTERNAL_atostr(ctx, targetAddress),
+        targetPort,
+        listenPort);
+
     if(UDPC_get_error(ctx) == UDPC_SUCCESS)
     {
         UDPC_set_logging_type(ctx, 4);

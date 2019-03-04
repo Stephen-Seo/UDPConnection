@@ -46,7 +46,7 @@ UDPC_Context* UDPC_init(uint16_t listenPort, int isClient)
     context->socketInfo.sin_family = AF_INET;
     // TODO specify what addr to listen on
     context->socketInfo.sin_addr.s_addr = INADDR_ANY;
-    context->socketInfo.sin_port = listenPort;
+    context->socketInfo.sin_port = htons(listenPort);
     if(bind(
             context->socketHandle,
             (const struct sockaddr*) &context->socketInfo,
