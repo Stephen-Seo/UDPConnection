@@ -10,12 +10,27 @@ void printUsage()
     printf("Usage: [-c] -a <addr> -p <target_port> -l <listen_port>\n");
 }
 
+void conCallback(void *userdata, uint32_t addr)
+{
+    *((int*)userdata) = 1;
+}
+
+void discCallback(void *userdata, uint32_t addr)
+{
+    *((int*)userdata) = 0;
+}
+
+void recCallback(void *userdata, char *data, uint32_t size)
+{
+}
+
 int main(int argc, char** argv)
 {
     int isClient = 0;
     uint32_t targetAddress = 0;
     uint16_t targetPort = 0;
     uint16_t listenPort = 0;
+    int isConnected = 0;
 
     --argc; ++argv;
     while(argc > 0)
@@ -51,6 +66,9 @@ int main(int argc, char** argv)
     if(UDPC_get_error(ctx) == UDPC_SUCCESS)
     {
         UDPC_set_logging_type(ctx, 4);
+        UDPC_set_callback_connected(ctx, conCallback, &isConnected);
+        UDPC_set_callback_disconnected(ctx, discCallback, &isConnected);
+        UDPC_set_callback_received(ctx, recCallback, NULL);
         while(UDPC_get_error(ctx) == UDPC_SUCCESS)
         {
             if(isClient)

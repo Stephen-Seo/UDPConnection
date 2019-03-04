@@ -462,7 +462,7 @@ void UDPC_update(UDPC_Context *ctx)
         (struct sockaddr*) &receivedData,
         &receivedDataSize);
 
-    if(bytes == 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+    if(bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
     {
         // expected result for non-blocking socket
         return;
