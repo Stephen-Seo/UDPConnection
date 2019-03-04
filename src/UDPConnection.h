@@ -56,6 +56,7 @@ typedef struct {
      * 0x1 - is resending
      * 0x2 - is check received packet
      * 0x4 - has been re-sent
+     * 0x8 - initiate connection packet
      */
     uint32_t flags;
     char *data; // no-header in sendPktQueue and receivedPackets, header in sentPkts
@@ -69,6 +70,7 @@ typedef struct {
      * 0x1 - trigger send
      * 0x2 - is good mode
      * 0x4 - is good rtt
+     * 0x8 - is id not set yet / initiating connection to server
      */
     uint32_t flags;
     uint32_t id;
@@ -83,7 +85,7 @@ typedef struct {
     uint16_t port;
     UDPC_Deque *sentPkts;
     UDPC_Deque *sendPktQueue;
-    UDPC_Deque *resendPktQueue;
+    UDPC_Deque *priorityPktQueue;
     struct timespec received;
     struct timespec sent;
     float rtt;
@@ -153,6 +155,8 @@ void UDPC_set_callback_received(
     UDPC_Context *ctx, UDPC_callback_received fptr, void *userData);
 
 void UDPC_check_events(UDPC_Context *ctx);
+
+void UDPC_client_initiate_connection(UDPC_Context *ctx, uint32_t addr, uint16_t port);
 
 /*!
  * \brief Queues a packet to send to a connected peer
