@@ -225,7 +225,11 @@ void UDPC_set_callback_received(
 
 void UDPC_check_events(UDPC_Context *ctx)
 {
-    // TODO use a lock on receivedPackets
+    if((ctx->flags & 0x1) != 0)
+    {
+        mtx_lock(&ctx->tCVMtx);
+    }
+
     if(ctx->callbackConnected)
     {
         for(int x = 0; x * 4 < ctx->connectedEvents->size; ++x)
@@ -277,6 +281,11 @@ void UDPC_check_events(UDPC_Context *ctx)
             free(pinfo->data);
         }
         UDPC_Deque_clear(ctx->receivedPackets);
+    }
+
+    if((ctx->flags & 0x1) != 0)
+    {
+        mtx_unlock(&ctx->tCVMtx);
     }
 }
 
