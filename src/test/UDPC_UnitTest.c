@@ -246,7 +246,7 @@ void TEST_ATOSTR()
 {
     UDPC_Context ctx;
     ASSERT_EQ_MEM(
-        UDPC_INTERNAL_atostr(&ctx, (0xAC << 24) | (0x1E << 16) | (0x1 << 8) | 0xFF),
+        UDPC_INTERNAL_atostr(&ctx, (0xFF << 24) | (0x1 << 16) | (0x1E << 8) | 0xAC),
         "172.30.1.255",
         13);
     UNITTEST_REPORT(ATOSTR);
@@ -387,9 +387,9 @@ void TEST_HASHMAP()
 
 void TEST_STRTOA()
 {
-    ASSERT_EQ(0x01020304, UDPC_strtoa("1.2.3.4"));
-    ASSERT_EQ(0x7F000001, UDPC_strtoa("127.0.0.1"));
-    ASSERT_EQ(0xC0A801FF, UDPC_strtoa("192.168.1.255"));
+    ASSERT_EQ(0x04030201, UDPC_strtoa("1.2.3.4"));
+    ASSERT_EQ(0x0100007F, UDPC_strtoa("127.0.0.1"));
+    ASSERT_EQ(0xFF01A8C0, UDPC_strtoa("192.168.1.255"));
     ASSERT_EQ(0, UDPC_strtoa("1.2.3.4.5"));
     ASSERT_EQ(0, UDPC_strtoa("100.20.30"));
     ASSERT_EQ(0, UDPC_strtoa("200.400.30.50"));

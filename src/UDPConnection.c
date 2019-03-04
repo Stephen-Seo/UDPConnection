@@ -320,7 +320,8 @@ void UDPC_client_initiate_connection(UDPC_Context *ctx, uint32_t addr, uint16_t 
     };
 
     timespec_get(&cd.received, TIME_UTC);
-    // only set "received" to now, since "sent" will be set after sending packet
+    cd.sent = cd.received;
+    cd.sent.tv_sec -= UDPC_INIT_PKT_INTERVAL + 1;
 
     UDPC_HashMap_insert(ctx->conMap, addr, &cd);
 }
@@ -778,7 +779,7 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
     if((cd->flags & 0x8) != 0)
     {
         // initiate connection to server
-        if(UDPC_INTERNAL_ts_diff(&us->tsNow, &cd->sent) < UDPC_INIT_PKT_INTERVAL)
+        if(UDPC_INTERNAL_ts_diff(&us->tsNow, &cd->sent) < UDPC_INIT_PKT_INTERVAL_F)
         {
             return;
         }
@@ -1235,7 +1236,7 @@ char* UDPC_INTERNAL_atostr(UDPC_Context *ctx, uint32_t addr)
     int index = 0;
     for(int x = 0; x < 4; ++x)
     {
-        unsigned char temp = (addr >> (24 - x * 8)) & 0xFF;
+        unsigned char temp = (addr >> (x * 8)) & 0xFF;
 
         if(temp >= 100)
         {
@@ -1293,7 +1294,7 @@ uint32_t UDPC_strtoa(const char *addrStr)
         }
         else if(*addrStr == '.' && temp <= 0xFF && index < 3)
         {
-            addr |= (temp << (24 - 8 * index++));
+            addr |= (temp << (8 * index++));
             temp = 0;
         }
         else
@@ -1305,7 +1306,7 @@ uint32_t UDPC_strtoa(const char *addrStr)
 
     if(index == 3 && temp <= 0xFF)
     {
-        addr |= temp;
+        addr |= temp << 24;
         return addr;
     }
     else
