@@ -240,4 +240,6 @@ uint32_t UDPC_INTERNAL_generate_id(UDPC_Context *ctx);
 
 void UDPC_INTERNAL_check_ids(void *userData, uint32_t addr, char *data);
 
+uint32_t UDPC_strtoa(const char *addrStr);
+
 #endif

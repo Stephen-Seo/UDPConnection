@@ -244,12 +244,11 @@ void TEST_DEQUE()
 
 void TEST_ATOSTR()
 {
-    UDPC_Context *ctx = malloc(sizeof(UDPC_Context));
+    UDPC_Context ctx;
     ASSERT_EQ_MEM(
-        UDPC_INTERNAL_atostr(ctx, (0xAC << 24) | (0x1E << 16) | (0x1 << 8) | 0xFF),
+        UDPC_INTERNAL_atostr(&ctx, (0xAC << 24) | (0x1E << 16) | (0x1 << 8) | 0xFF),
         "172.30.1.255",
         13);
-    free(ctx);
     UNITTEST_REPORT(ATOSTR);
 }
 
@@ -386,10 +385,35 @@ void TEST_HASHMAP()
     UNITTEST_REPORT(HASHMAP);
 }
 
+void TEST_STRTOA()
+{
+    ASSERT_EQ(0x01020304, UDPC_strtoa("1.2.3.4"));
+    ASSERT_EQ(0x7F000001, UDPC_strtoa("127.0.0.1"));
+    ASSERT_EQ(0xC0A801FF, UDPC_strtoa("192.168.1.255"));
+    ASSERT_EQ(0, UDPC_strtoa("1.2.3.4.5"));
+    ASSERT_EQ(0, UDPC_strtoa("100.20.30"));
+    ASSERT_EQ(0, UDPC_strtoa("200.400.30.50"));
+    UNITTEST_REPORT(STRTOA);
+}
+
+void TEST_ATOSTRTOA()
+{
+    UDPC_Context ctx;
+
+    ASSERT_EQ(0x01020304, UDPC_strtoa(UDPC_INTERNAL_atostr(&ctx, 0x01020304)));
+    ASSERT_EQ(0x7F000001, UDPC_strtoa(UDPC_INTERNAL_atostr(&ctx, 0x7F000001)));
+    ASSERT_EQ(0xC0A801FF, UDPC_strtoa(UDPC_INTERNAL_atostr(&ctx, 0xC0A801FF)));
+    ASSERT_EQ(0xFFFEFDFC, UDPC_strtoa(UDPC_INTERNAL_atostr(&ctx, 0xFFFEFDFC)));
+
+    UNITTEST_REPORT(ATOSTRTOA);
+}
+
 int main()
 {
     TEST_DEQUE();
     TEST_ATOSTR();
+    TEST_STRTOA();
+    TEST_ATOSTRTOA();
     TEST_HASHMAP();
     return 0;
 }

@@ -1269,3 +1269,38 @@ void UDPC_INTERNAL_check_ids(void *userData, uint32_t addr, char *data)
         *((uint32_t*)userData) = 0x10000000;
     }
 }
+
+uint32_t UDPC_strtoa(const char *addrStr)
+{
+    uint32_t addr = 0;
+    uint32_t temp = 0;
+    uint32_t index = 0;
+    while(*addrStr != 0)
+    {
+        if(*addrStr >= '0' && *addrStr <= '9')
+        {
+            temp *= 10;
+            temp += *addrStr - '0';
+        }
+        else if(*addrStr == '.' && temp <= 0xFF && index < 3)
+        {
+            addr |= (temp << (24 - 8 * index++));
+            temp = 0;
+        }
+        else
+        {
+            return 0;
+        }
+        ++addrStr;
+    }
+
+    if(index == 3 && temp <= 0xFF)
+    {
+        addr |= temp;
+        return addr;
+    }
+    else
+    {
+        return 0;
+    }
+}
