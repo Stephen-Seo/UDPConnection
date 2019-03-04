@@ -28,4 +28,10 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
     add_executable(UnitTest ${UDPC_UnitTest_SOURCES})
     target_link_libraries(UnitTest PUBLIC UDPConnection)
     target_include_directories(UnitTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+    set(UDPC_NetworkTest_SOURCES
+        src/test/UDPC_NetworkTest.c)
+    add_executable(NetworkTest ${UDPC_NetworkTest_SOURCES})
+    target_link_libraries(NetworkTest PUBLIC UDPConnection)
+    target_include_directories(NetworkTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 endif()
