@@ -10,7 +10,7 @@ UDPC_Context* UDPC_init(uint16_t listenPort, int isClient)
 {
     UDPC_Context *context = malloc(sizeof(UDPC_Context));
     context->error = UDPC_SUCCESS;
-    context->flags = 0xC;
+    context->flags = 0x4C;
     if(isClient != 0) context->flags |= 0x2;
     context->threadFlags = 0;
     context->conMap = UDPC_HashMap_init(13, sizeof(UDPC_INTERNAL_ConnectionData));
