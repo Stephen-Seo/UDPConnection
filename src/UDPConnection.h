@@ -83,6 +83,7 @@ typedef struct {
     uint16_t port;
     UDPC_Deque *sentPkts;
     UDPC_Deque *sendPktQueue;
+    UDPC_Deque *resendPktQueue;
     struct timespec received;
     struct timespec sent;
     float rtt;

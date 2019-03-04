@@ -167,6 +167,7 @@ void UDPC_destroy(UDPC_Context *ctx)
 void UDPC_INTERNAL_destroy_conMap(void *unused, uint32_t addr, char *data)
 {
     UDPC_INTERNAL_ConnectionData *cd = (UDPC_INTERNAL_ConnectionData*)data;
+
     for(int x = 0; x * sizeof(UDPC_INTERNAL_PacketInfo) < cd->sentPkts->size; ++x)
     {
         UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_index_ptr(
@@ -177,6 +178,7 @@ void UDPC_INTERNAL_destroy_conMap(void *unused, uint32_t addr, char *data)
         }
     }
     UDPC_Deque_destroy(cd->sentPkts);
+
     for(int x = 0; x * sizeof(UDPC_INTERNAL_PacketInfo) < cd->sendPktQueue->size; ++x)
     {
         UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_index_ptr(
@@ -187,6 +189,17 @@ void UDPC_INTERNAL_destroy_conMap(void *unused, uint32_t addr, char *data)
         }
     }
     UDPC_Deque_destroy(cd->sendPktQueue);
+
+    for(int x = 0; x * sizeof(UDPC_INTERNAL_PacketInfo) < cd->resendPktQueue->size; ++x)
+    {
+        UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_index_ptr(
+            cd->resendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo), x);
+        if(pinfo->data)
+        {
+            free(pinfo->data);
+        }
+    }
+    UDPC_Deque_destroy(cd->resendPktQueue);
 }
 
 void UDPC_set_callback_connected(
@@ -452,6 +465,7 @@ void UDPC_update(UDPC_Context *ctx)
                 ntohs(receivedData.sin_port),
                 UDPC_Deque_init(sizeof(UDPC_INTERNAL_PacketInfo) * UDPC_SENT_PKTS_ALLOC_SIZE),
                 UDPC_Deque_init(sizeof(UDPC_INTERNAL_PacketInfo) * UDPC_SEND_PKTS_ALLOC_SIZE),
+                UDPC_Deque_init(sizeof(UDPC_INTERNAL_PacketInfo) * UDPC_RESEND_PKTS_ALLOC_SIZE),
                 {0, 0},
                 {0, 0},
                 0.0f
@@ -699,9 +713,9 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
     }
 
     cd->flags = cd->flags & 0xFFFFFFFE;
-    if(cd->sendPktQueue->size == 0)
+    if(cd->sendPktQueue->size == 0 && cd->resendPktQueue->size == 0)
     {
-        // send packet queue is empty, send heartbeat packet
+        // send and resend packet queue is empty, send heartbeat packet
         if(UDPC_INTERNAL_ts_diff(&us->tsNow, &cd->sent) < UDPC_HEARTBEAT_PKT_INTERVAL)
         {
             return;
@@ -752,10 +766,22 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
         }
         free(data);
     }
-    else // sendPktQueue not empty
+    else // sendPktQueue or resendPktQueue not empty
     {
-        UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_get_front_ptr(
-            cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+        UDPC_INTERNAL_PacketInfo *pinfo;
+        int isResendingPkt = 0;
+
+        if(cd->resendPktQueue->size != 0)
+        {
+            pinfo = UDPC_Deque_get_front_ptr(
+                cd->resendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+            isResendingPkt = 1;
+        }
+        else
+        {
+            pinfo = UDPC_Deque_get_front_ptr(
+                cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+        }
         char *data = malloc(20 + pinfo->size);
         UDPC_INTERNAL_prepare_pkt(
             data,
@@ -783,7 +809,14 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
                 UDPC_INTERNAL_atostr(us->ctx, addr), cd->port);
             free(data);
             free(pinfo->data);
-            UDPC_Deque_pop_front(cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+            if(isResendingPkt != 0)
+            {
+                UDPC_Deque_pop_front(cd->resendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+            }
+            else
+            {
+                UDPC_Deque_pop_front(cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+            }
             return;
         }
 
@@ -827,7 +860,14 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
         }
 
         free(pinfo->data);
-        UDPC_Deque_pop_front(cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+        if(isResendingPkt != 0)
+        {
+            UDPC_Deque_pop_front(cd->resendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+        }
+        else
+        {
+            UDPC_Deque_pop_front(cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+        }
     }
 }
 
@@ -923,9 +963,8 @@ void UDPC_INTERNAL_check_pkt_timeout(
                     pinfo->flags |= 0x4;
                     pinfo->data = NULL;
                     pinfo->size = 0;
-                    // TODO use separate queue for resending packets
                     UDPC_Deque_push_back(
-                        cd->sendPktQueue,
+                        cd->resendPktQueue,
                         &newPkt,
                         sizeof(UDPC_INTERNAL_PacketInfo));
                 }
