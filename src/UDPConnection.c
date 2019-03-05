@@ -126,7 +126,7 @@ UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, int isClient)
     context->error = UDPC_SUCCESS;
 
     context->error = thrd_create(
-        &context->threadHandle, UDPC_INTERNAL_threadfn, &context);
+        &context->threadHandle, UDPC_INTERNAL_threadfn, context);
     if(context->error != thrd_success)
     {
         CleanupSocket(context->socketHandle);
@@ -304,6 +304,11 @@ void UDPC_check_events(UDPC_Context *ctx)
 
 void UDPC_client_initiate_connection(UDPC_Context *ctx, uint32_t addr, uint16_t port)
 {
+    if((ctx->flags & 0x1) != 0)
+    {
+        mtx_lock(&ctx->tCVMtx);
+    }
+
     if((ctx->flags & 0x2) == 0 || UDPC_HashMap_has(ctx->conMap, addr) != 0)
     {
         // must be client or no already-existing connection to same address
@@ -335,6 +340,11 @@ void UDPC_client_initiate_connection(UDPC_Context *ctx, uint32_t addr, uint16_t 
     cd.sent.tv_sec -= UDPC_INIT_PKT_INTERVAL + 1;
 
     UDPC_HashMap_insert(ctx->conMap, addr, &cd);
+
+    if((ctx->flags & 0x1) != 0)
+    {
+        mtx_unlock(&ctx->tCVMtx);
+    }
 }
 
 int UDPC_queue_send(UDPC_Context *ctx, uint32_t addr, uint32_t isChecked, void *data, uint32_t size)

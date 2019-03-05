@@ -13,7 +13,7 @@ typedef struct
 
 void printUsage()
 {
-    printf("Usage: [-c] -a <addr> -p <target_port> -l <listen_port>\n");
+    printf("Usage: [-c] [-t] -a <addr> -p <target_port> -l <listen_port>\n");
 }
 
 void conCallback(void *userdata, uint32_t addr)
@@ -38,6 +38,7 @@ void recCallback(void *userdata, char *data, uint32_t size)
 int main(int argc, char** argv)
 {
     int isClient = 0;
+    int isThreaded = 0;
     uint32_t targetAddress = 0;
     uint16_t targetPort = 0;
     uint16_t listenPort = 0;
@@ -49,6 +50,10 @@ int main(int argc, char** argv)
         if(strcmp("-c", argv[0]) == 0)
         {
             isClient = 1;
+        }
+        else if(strcmp("-t", argv[0]) == 0)
+        {
+            isThreaded = 1;
         }
         else if(strcmp("-a", argv[0]) == 0 && argc > 1)
         {
@@ -73,7 +78,15 @@ int main(int argc, char** argv)
         --argc; ++argv;
     }
 
-    UDPC_Context *ctx = UDPC_init(listenPort, isClient);
+    UDPC_Context *ctx;
+    if(isThreaded == 0)
+    {
+        ctx = UDPC_init(listenPort, isClient);
+    }
+    else
+    {
+        ctx = UDPC_init_threaded_update(listenPort, isClient);
+    }
 
     printf("isClient: %s, targetAddr: %s, targetPort: %u, listenPort: %u\n",
         isClient == 0 ? "false" : "true",
@@ -93,7 +106,7 @@ int main(int argc, char** argv)
             {
                 UDPC_client_initiate_connection(ctx, targetAddress, targetPort);
             }
-            UDPC_update(ctx);
+            if(isThreaded == 0) { UDPC_update(ctx); }
             UDPC_check_events(ctx);
             thrd_sleep(&(struct timespec){0, 16666666}, NULL);
             if(testCtx.hasConnectedOnce != 0 && testCtx.isConnected == 0)
