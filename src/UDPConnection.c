@@ -149,6 +149,17 @@ void UDPC_destroy(UDPC_Context *ctx)
     UDPC_HashMap_itercall(ctx->conMap, UDPC_INTERNAL_destroy_conMap, NULL);
     UDPC_HashMap_destroy(ctx->conMap);
 
+    UDPC_Deque_destroy(ctx->connectedEvents);
+    UDPC_Deque_destroy(ctx->disconnectedEvents);
+
+    while(ctx->receivedPackets->size != 0)
+    {
+        UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_get_front_ptr(ctx->receivedPackets, sizeof(UDPC_INTERNAL_PacketInfo));
+        if(pinfo->data) { free(pinfo->data); }
+        UDPC_Deque_pop_front(ctx->receivedPackets, sizeof(UDPC_INTERNAL_PacketInfo));
+    }
+    UDPC_Deque_destroy(ctx->receivedPackets);
+
     if((ctx->flags & 0x1) != 0)
     {
         mtx_lock(&ctx->tflagsMtx);
@@ -441,6 +452,32 @@ void UDPC_update(UDPC_Context *ctx)
     for(int x = 0; x * 4 < us.removedQueue->size; ++x)
     {
         uint32_t *key = UDPC_Deque_index_ptr(us.removedQueue, 4, x);
+        UDPC_INTERNAL_ConnectionData *cd = UDPC_HashMap_get(ctx->conMap, *key);
+
+        while(cd->sentPkts->size != 0)
+        {
+            UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_get_front_ptr(cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo));
+            if(pinfo->data) { free(pinfo->data); }
+            UDPC_Deque_pop_front(cd->sentPkts, sizeof(UDPC_INTERNAL_PacketInfo));
+        }
+        UDPC_Deque_destroy(cd->sentPkts);
+
+        while(cd->sendPktQueue->size != 0)
+        {
+            UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_get_front_ptr(cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+            if(pinfo->data) { free(pinfo->data); }
+            UDPC_Deque_pop_front(cd->sendPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+        }
+        UDPC_Deque_destroy(cd->sendPktQueue);
+
+        while(cd->priorityPktQueue->size != 0)
+        {
+            UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_get_front_ptr(cd->priorityPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+            if(pinfo->data) { free(pinfo->data); }
+            UDPC_Deque_pop_front(cd->priorityPktQueue, sizeof(UDPC_INTERNAL_PacketInfo));
+        }
+        UDPC_Deque_destroy(cd->priorityPktQueue);
+
         UDPC_HashMap_remove(ctx->conMap, *key);
     }
     UDPC_Deque_destroy(us.removedQueue);
@@ -546,6 +583,17 @@ void UDPC_update(UDPC_Context *ctx)
             cd->id = conID;
             UDPC_INTERNAL_log(ctx, 2, "Got id %u from server %s", conID,
                 UDPC_INTERNAL_atostr(ctx, receivedData.sin_addr.s_addr));
+            if(UDPC_Deque_get_available(ctx->connectedEvents) == 0)
+            {
+                UDPC_Deque_pop_front(ctx->connectedEvents, 4);
+                UDPC_Deque_push_back(ctx->connectedEvents, &receivedData.sin_addr.s_addr, 4);
+                UDPC_INTERNAL_log(ctx, 1, "Not enough free space in connected "
+                    "events queue, removing oldest to make room");
+            }
+            else
+            {
+                UDPC_Deque_push_back(ctx->connectedEvents, &receivedData.sin_addr.s_addr, 4);
+            }
         }
         return;
     }
@@ -814,6 +862,7 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
                 free(data);
                 return;
             }
+            free(data);
         }
         else
         {
@@ -848,6 +897,7 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
                 free(data);
                 return;
             }
+            free(data);
         }
         return;
     }
