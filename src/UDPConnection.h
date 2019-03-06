@@ -39,14 +39,14 @@ typedef void (*UDPC_callback_connected)(void*, uint32_t);
  */
 typedef void (*UDPC_callback_disconnected)(void*, uint32_t);
 
-/// (void *userData, char *packetData, uint32_t packetSize)
+/// (void *userData, uint32_t address, char *packetData, uint32_t packetSize)
 /*!
  * The data pointed to by the packetData argument is to data internally managed
  * by the UDPC_Context. It will change every time this callback is called so do
  * not depend on it persisting. This means you should copy the data out of it
  * when the callback is invoked and work with the copied data.
  */
-typedef void (*UDPC_callback_received)(void*, char*, uint32_t);
+typedef void (*UDPC_callback_received)(void*, uint32_t, char*, uint32_t);
 
 /// This struct should not be used outside of this library
 typedef struct {

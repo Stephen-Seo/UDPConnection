@@ -279,7 +279,11 @@ void UDPC_check_events(UDPC_Context *ctx)
         {
             UDPC_INTERNAL_PacketInfo *pinfo = UDPC_Deque_index_ptr(
                 ctx->receivedPackets, sizeof(UDPC_INTERNAL_PacketInfo), x);
-            ctx->callbackReceived(ctx->callbackReceivedUserData, pinfo->data, pinfo->size);
+            ctx->callbackReceived(
+                ctx->callbackReceivedUserData,
+                pinfo->addr,
+                pinfo->data,
+                pinfo->size);
             free(pinfo->data);
         }
         UDPC_Deque_clear(ctx->receivedPackets);
