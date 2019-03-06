@@ -1,6 +1,11 @@
 #ifndef UDPCONNECTION_H
 #define UDPCONNECTION_H
 
+/*!
+ * Any function or struct starting with "UDPC_INTERNAL" should never be used,
+ * as they are used internally by this library.
+ */
+
 #include <stdio.h>
 #include <threads.h>
 #include <time.h>
@@ -130,6 +135,7 @@ typedef struct {
     void *callbackReceivedUserData;
 } UDPC_Context;
 
+/// This struct should not be used outside of this library
 typedef struct {
     struct timespec tsNow;
     float dt;
@@ -137,8 +143,36 @@ typedef struct {
     UDPC_Context *ctx;
 } UDPC_INTERNAL_update_struct;
 
+/// Creates a new UDPC_Context, for establishing a connection via UDP
+/*!
+ * Callbacks must be set to use UDPC effectively, using the following functions:
+ * - UDPC_set_callback_connected()
+ * - UDPC_set_callback_disconnected()
+ * - UDPC_set_callback_received()
+ *
+ * Clients should also use UDPC_client_initiate_connection() to let UDPC know
+ * what server to connect to.
+ *
+ * UDPC_update() must be called periodically (ideally at 30 updates per second
+ * or faster), to send and receive UDP packets, and establish new connections
+ * when enabled. An init variant "UDPC_init_threaded_update()" is available
+ * which will call update periodically on a separate thread.
+ *
+ * UDPC_check_events() must also be called to call the set callbacks for
+ * connected, disconnected, and received events.
+ *
+ * When finished using UDPC, UDPC_destroy must be called on the context to free
+ * resources.
+ */
 UDPC_Context* UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient);
 
+/// Creates a new UDPC_Context, where a thread is created to update UDPC on its own
+/*!
+ * If using a UDPC_Context created by this init variant, UDPC_update() must not
+ * be manually called, as it is called automatically by a separate thread.
+ *
+ * See the documentation for UDPC_init() for more details.
+ */
 UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, uint32_t listenAddr, int isClient);
 
 void UDPC_destroy(UDPC_Context *ctx);
@@ -178,6 +212,9 @@ int UDPC_get_queue_send_available(UDPC_Context *ctx, uint32_t addr);
 int UDPC_get_accept_new_connections(UDPC_Context *ctx);
 
 /// Set isAccepting to non-zero to let UDPC accept new connections
+/*!
+ * Set isAccepting to zero to prevent UDPC from accepting new connections.
+ */
 void UDPC_set_accept_new_connections(UDPC_Context *ctx, int isAccepting);
 
 /*!
