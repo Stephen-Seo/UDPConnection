@@ -1,4 +1,12 @@
+#include "UDPC_Defines.h"
 #include "UDPConnection.h"
+
+const char *UDPC_ERR_SOCKETFAIL_STR = "Failed to create socket";
+const char *UDPC_ERR_SOCKETBINDF_STR = "Failed to bind socket";
+const char *UDPC_ERR_SOCKETNONBF_STR = "Failed to set non-blocking on socket";
+const char *UDPC_ERR_MTXFAIL_STR = "Failed to create mutex";
+const char *UDPC_ERR_CVFAIL_STR = "Failed to create condition variable";
+const char *UDPC_ERR_THREADFAIL_STR = "Failed to create thread";
 
 #include <stdlib.h>
 #include <string.h>
