@@ -14,7 +14,8 @@ typedef struct
 
 void printUsage()
 {
-    printf("Usage: [-c] [-t] -a <addr> -p <target_port> -l <listen_port>\n");
+    printf("Usage: [-c] [-t] -a <addr> -p <target_port> -l <listen_port>"
+        " [-d <listen_address>]\n");
 }
 
 void conCallback(void *userdata, uint32_t addr)
@@ -64,6 +65,7 @@ int main(int argc, char** argv)
     int isThreaded = 0;
     uint32_t targetAddress = 0;
     uint16_t targetPort = 0;
+    uint32_t listenAddress = 0;
     uint16_t listenPort = 0;
     TestContext testCtx = {0, 0};
 
@@ -100,6 +102,11 @@ int main(int argc, char** argv)
             listenPort = strtoul(argv[1], NULL, 10);
             --argc; ++argv;
         }
+        else if(strcmp("-d", argv[0]) == 0 && argc > 1)
+        {
+            listenAddress = UDPC_strtoa(argv[1]);
+            --argc; ++argv;
+        }
         else if(strcmp("-h", argv[0]) == 0 || strcmp("--help", argv[0]) == 0)
         {
             printUsage();
@@ -111,11 +118,11 @@ int main(int argc, char** argv)
     UDPC_Context *ctx;
     if(isThreaded == 0)
     {
-        ctx = UDPC_init(listenPort, isClient);
+        ctx = UDPC_init(listenPort, listenAddress, isClient);
     }
     else
     {
-        ctx = UDPC_init_threaded_update(listenPort, isClient);
+        ctx = UDPC_init_threaded_update(listenPort, listenAddress, isClient);
     }
 
     printf("isClient: %s, targetAddr: %s, targetPort: %u, listenPort: %u\n",

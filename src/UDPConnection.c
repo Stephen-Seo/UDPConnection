@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-UDPC_Context* UDPC_init(uint16_t listenPort, int isClient)
+UDPC_Context* UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient)
 {
     UDPC_Context *context = malloc(sizeof(UDPC_Context));
     context->error = UDPC_SUCCESS;
@@ -44,8 +44,8 @@ UDPC_Context* UDPC_init(uint16_t listenPort, int isClient)
 
     // bind socket
     context->socketInfo.sin_family = AF_INET;
-    // TODO specify what addr to listen on
-    context->socketInfo.sin_addr.s_addr = INADDR_ANY;
+    context->socketInfo.sin_addr.s_addr =
+        (listenAddr == 0 ? INADDR_ANY : listenAddr);
     context->socketInfo.sin_port = htons(listenPort);
     if(bind(
             context->socketHandle,
@@ -85,9 +85,9 @@ UDPC_Context* UDPC_init(uint16_t listenPort, int isClient)
     return context;
 }
 
-UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, int isClient)
+UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, uint32_t listenAddr, int isClient)
 {
-    UDPC_Context *context = UDPC_init(listenPort, isClient);
+    UDPC_Context *context = UDPC_init(listenPort, listenAddr, isClient);
 
     context->error = mtx_init(&context->tCVMtx, mtx_timed);
     if(context->error != thrd_success)

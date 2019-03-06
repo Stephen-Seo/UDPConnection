@@ -137,9 +137,9 @@ typedef struct {
     UDPC_Context *ctx;
 } UDPC_INTERNAL_update_struct;
 
-UDPC_Context* UDPC_init(uint16_t listenPort, int isClient);
+UDPC_Context* UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient);
 
-UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, int isClient);
+UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, uint32_t listenAddr, int isClient);
 
 void UDPC_destroy(UDPC_Context *ctx);
 
@@ -240,6 +240,10 @@ uint32_t UDPC_INTERNAL_generate_id(UDPC_Context *ctx);
 
 void UDPC_INTERNAL_check_ids(void *userData, uint32_t addr, char *data);
 
+/*1
+ * \brief Converts a IPV4 string to a 32-bit unsigned integer address in big-endian
+ * \return 0 if string is invalid, address in big-endian format otherwise
+ */
 uint32_t UDPC_strtoa(const char *addrStr);
 
 #endif
