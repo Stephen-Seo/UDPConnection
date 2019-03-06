@@ -50,15 +50,11 @@ void updateSendBuffer(uint32_t *index, char *buffer)
         *index = 0;
     }
 
-    uint32_t temp;
+    uint32_t temp = 1;
     for(int x = 0; x < 6; ++x)
     {
-        temp = 1;
-        for(int y = 0; y < x; ++y)
-        {
-            temp *= 26;
-        }
         buffer[x] = (*index / temp) % 26 + 'a';
+        temp *= 26;
     }
 }
 
