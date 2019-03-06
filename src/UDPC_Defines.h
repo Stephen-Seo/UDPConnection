@@ -24,6 +24,7 @@
 #define UDPC_ERR_CVFAIL 5 // failed to create condition variable
 #define UDPC_ERR_THREADFAIL 6 // failed to create thread
 
+// Error strings are defined in UDPConnection.c
 extern const char *UDPC_ERR_SOCKETFAIL_STR;
 extern const char *UDPC_ERR_SOCKETBINDF_STR;
 extern const char *UDPC_ERR_SOCKETNONBF_STR;
