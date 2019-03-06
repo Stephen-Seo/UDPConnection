@@ -174,8 +174,20 @@ int UDPC_queue_send(
  */
 int UDPC_get_queue_send_available(UDPC_Context *ctx, uint32_t addr);
 
+/// Returns non-zero if UDPC is accepting new connections
+int UDPC_get_accept_new_connections(UDPC_Context *ctx);
+
+/// Set isAccepting to non-zero to let UDPC accept new connections
+void UDPC_set_accept_new_connections(UDPC_Context *ctx, int isAccepting);
+
+/*!
+ * \brief Get the currently set error code, and clear it internally
+ * Error codes and their meanings are defined in UDPC_Defines.h .
+ * Use UDPC_get_error_str() to get a string describing the error.
+ */
 uint32_t UDPC_get_error(UDPC_Context *ctx);
 
+/// Returns a string describing the error code for UDPC
 const char* UDPC_get_error_str(uint32_t error);
 
 /*!
