@@ -175,21 +175,27 @@ UDPC_Context* UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient);
  */
 UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, uint32_t listenAddr, int isClient);
 
+/// This fn must be called on a UDPC_Context to free resources
 void UDPC_destroy(UDPC_Context *ctx);
 
 void UDPC_INTERNAL_destroy_conMap(void *unused, uint32_t addr, char *data);
 
+/// Sets the callback for connected events
 void UDPC_set_callback_connected(
     UDPC_Context *ctx, UDPC_callback_connected fptr, void *userData);
 
+/// Sets the callback for disconnected events
 void UDPC_set_callback_disconnected(
     UDPC_Context *ctx, UDPC_callback_disconnected fptr, void *userData);
 
+/// Sets the callback for received packet events
 void UDPC_set_callback_received(
     UDPC_Context *ctx, UDPC_callback_received fptr, void *userData);
 
+/// Invokes callbacks based on events that have ocurred during UDPC_update()
 void UDPC_check_events(UDPC_Context *ctx);
 
+/// Tells UDPC to initiate a connection to a server
 void UDPC_client_initiate_connection(UDPC_Context *ctx, uint32_t addr, uint16_t port);
 
 /*!
