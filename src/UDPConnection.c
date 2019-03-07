@@ -17,6 +17,7 @@ const char *UDPC_ERR_THREADFAIL_STR = "Failed to create thread";
 UDPC_Context* UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient)
 {
     UDPC_Context *context = malloc(sizeof(UDPC_Context));
+    context->isThreaded = 0;
     context->protocolID = UDPC_PKT_DEFAULT_PROTOCOL_ID;
     context->error = UDPC_SUCCESS;
     context->flags = 0x4C;
@@ -98,6 +99,8 @@ UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, uint32_t listenAddr
 {
     UDPC_Context *context = UDPC_init(listenPort, listenAddr, isClient);
 
+    context->isThreaded = 1;
+
     context->error = mtx_init(&context->tCVMtx, mtx_timed);
     if(context->error != thrd_success)
     {
@@ -169,7 +172,7 @@ void UDPC_destroy(UDPC_Context *ctx)
     }
     UDPC_Deque_destroy(ctx->receivedPackets);
 
-    if((ctx->flags & 0x1) != 0)
+    if(ctx->isThreaded != 0)
     {
         mtx_lock(&ctx->tflagsMtx);
         ctx->threadFlags |= 0x1;
@@ -227,39 +230,39 @@ void UDPC_INTERNAL_destroy_conMap(void *unused, uint32_t addr, char *data)
 void UDPC_set_callback_connected(
     UDPC_Context *ctx, UDPC_callback_connected fptr, void *userData)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     ctx->callbackConnected = fptr;
     ctx->callbackConnectedUserData = userData;
 
-    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 }
 
 void UDPC_set_callback_disconnected(
     UDPC_Context *ctx, UDPC_callback_disconnected fptr, void *userData)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     ctx->callbackDisconnected = fptr;
     ctx->callbackDisconnectedUserData = userData;
 
-    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 }
 
 void UDPC_set_callback_received(
     UDPC_Context *ctx, UDPC_callback_received fptr, void *userData)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     ctx->callbackReceived = fptr;
     ctx->callbackReceivedUserData = userData;
 
-    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 }
 
 void UDPC_check_events(UDPC_Context *ctx)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     if(ctx->callbackConnected)
     {
@@ -318,12 +321,12 @@ void UDPC_check_events(UDPC_Context *ctx)
         UDPC_Deque_clear(ctx->receivedPackets);
     }
 
-    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 }
 
 void UDPC_client_initiate_connection(UDPC_Context *ctx, uint32_t addr, uint16_t port)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     if((ctx->flags & 0x2) == 0 || UDPC_HashMap_has(ctx->conMap, addr) != 0)
     {
@@ -357,12 +360,12 @@ void UDPC_client_initiate_connection(UDPC_Context *ctx, uint32_t addr, uint16_t 
 
     UDPC_HashMap_insert(ctx->conMap, addr, &cd);
 
-    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 }
 
 int UDPC_queue_send(UDPC_Context *ctx, uint32_t addr, uint32_t isChecked, void *data, uint32_t size)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     UDPC_INTERNAL_ConnectionData *cd = UDPC_HashMap_get(ctx->conMap, addr);
     if(cd)
@@ -382,19 +385,19 @@ int UDPC_queue_send(UDPC_Context *ctx, uint32_t addr, uint32_t isChecked, void *
             {
                 UDPC_INTERNAL_log(ctx, 1, "Not enough free space in send "
                     "packet queue, failed to queue packet for sending");
-                if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+                if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
                 return 0;
             }
             else
             {
-                if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+                if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
                 return 1;
             }
         }
         else
         {
             UDPC_INTERNAL_log(ctx, 0, "Failed to allocate memory to new send-packet queue entry");
-            if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+            if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
             return 0;
         }
     }
@@ -402,78 +405,78 @@ int UDPC_queue_send(UDPC_Context *ctx, uint32_t addr, uint32_t isChecked, void *
     {
         UDPC_INTERNAL_log(ctx, 0, "Cannot send to %s when connection has not been esablished",
             UDPC_INTERNAL_atostr(ctx, addr));
-        if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+        if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
         return 0;
     }
 }
 
 int UDPC_get_queue_send_available(UDPC_Context *ctx, uint32_t addr)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     UDPC_INTERNAL_ConnectionData *cd = UDPC_HashMap_get(ctx->conMap, addr);
     if(!cd)
     {
-        if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+        if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
         return 0;
     }
 
     int available = UDPC_Deque_get_available(cd->sendPktQueue) / sizeof(UDPC_INTERNAL_PacketInfo);
 
-    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 
     return available;
 }
 
 int UDPC_get_accept_new_connections(UDPC_Context *ctx)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     int result = (ctx->flags & 0x40) != 0 ? 1 : 0;
 
-    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 
     return result;
 }
 
 void UDPC_set_accept_new_connections(UDPC_Context *ctx, int isAccepting)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     if(isAccepting != 0) { ctx->flags |= 0x40; }
     else { ctx->flags &= 0xFFFFFFBF; }
 
-    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 }
 
 uint32_t UDPC_get_protocol_id(UDPC_Context *ctx)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     uint32_t id = ctx->protocolID;
 
-    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 
     return id;
 }
 
 void UDPC_set_protocol_id(UDPC_Context *ctx, uint32_t id)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     ctx->protocolID = id;
 
-    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 }
 
 uint32_t UDPC_get_error(UDPC_Context *ctx)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     uint32_t error = ctx->error;
     ctx->error = 0;
 
-    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 
     return error;
 }
@@ -495,7 +498,7 @@ const char* UDPC_get_error_str(uint32_t error)
 
 void UDPC_set_logging_type(UDPC_Context *ctx, uint32_t logType)
 {
-    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
 
     switch(logType)
     {
@@ -519,7 +522,7 @@ void UDPC_set_logging_type(UDPC_Context *ctx, uint32_t logType)
         break;
     }
 
-    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 }
 
 void UDPC_update(UDPC_Context *ctx)

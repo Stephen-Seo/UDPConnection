@@ -98,8 +98,9 @@ typedef struct {
 
 /// This struct should not be used externally, only passed to functions that require it
 typedef struct {
+    int isThreaded;
     /*
-     * 0x1 - is threaded
+     * 0x1 - unused
      * 0x2 - is client
      * 0x4 - log errors
      * 0x8 - log warnings
