@@ -331,6 +331,7 @@ void UDPC_client_initiate_connection(UDPC_Context *ctx, uint32_t addr, uint16_t 
     if((ctx->flags & 0x2) == 0 || UDPC_HashMap_has(ctx->conMap, addr) != 0)
     {
         // must be client or no already-existing connection to same address
+        if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
         return;
     }
 
