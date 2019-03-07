@@ -112,6 +112,7 @@ typedef struct {
      * 0x1 - thread should stop
      */
     uint32_t threadFlags;
+    uint32_t protocolID;
     uint32_t error;
     int socketHandle;
     struct sockaddr_in socketInfo;
@@ -223,6 +224,16 @@ int UDPC_get_accept_new_connections(UDPC_Context *ctx);
  */
 void UDPC_set_accept_new_connections(UDPC_Context *ctx, int isAccepting);
 
+/// Gets the currently set protocol id
+uint32_t UDPC_get_protocol_id(UDPC_Context *ctx);
+
+/// Sets the protocol id
+/*!
+ * Note that UDPC can only connect to other UDPC instances that use the same
+ * protocol id.
+ */
+void UDPC_set_protocol_id(UDPC_Context *ctx, uint32_t id);
+
 /*!
  * \brief Get the currently set error code, and clear it internally
  * Error codes and their meanings are defined in UDPC_Defines.h .
@@ -275,6 +286,7 @@ int UDPC_INTERNAL_threadfn(void *context);
  */
 void UDPC_INTERNAL_prepare_pkt(
     void *data,
+    uint32_t protocolID,
     uint32_t conID,
     uint32_t rseq,
     uint32_t ack,

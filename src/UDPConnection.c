@@ -17,6 +17,7 @@ const char *UDPC_ERR_THREADFAIL_STR = "Failed to create thread";
 UDPC_Context* UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient)
 {
     UDPC_Context *context = malloc(sizeof(UDPC_Context));
+    context->protocolID = UDPC_PKT_DEFAULT_PROTOCOL_ID;
     context->error = UDPC_SUCCESS;
     context->flags = 0x4C;
     if(isClient != 0) context->flags |= 0x2;
@@ -445,6 +446,26 @@ void UDPC_set_accept_new_connections(UDPC_Context *ctx, int isAccepting)
     if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
 }
 
+uint32_t UDPC_get_protocol_id(UDPC_Context *ctx)
+{
+    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+
+    uint32_t id = ctx->protocolID;
+
+    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+
+    return id;
+}
+
+void UDPC_set_protocol_id(UDPC_Context *ctx, uint32_t id)
+{
+    if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
+
+    ctx->protocolID = id;
+
+    if((ctx->flags & 0x1) != 0) { mtx_unlock(&ctx->tCVMtx); }
+}
+
 uint32_t UDPC_get_error(UDPC_Context *ctx)
 {
     if((ctx->flags & 0x1) != 0) { mtx_lock(&ctx->tCVMtx); }
@@ -583,7 +604,7 @@ void UDPC_update(UDPC_Context *ctx)
     }
 
     uint32_t temp = ntohl(*((uint32_t*)ctx->recvBuf));
-    if(temp != UDPC_PKT_PROTOCOL_ID)
+    if(temp != ctx->protocolID)
     {
         UDPC_INTERNAL_log(ctx, 2, "Got invalid packet from %s port %d (invalid protocol id)",
             UDPC_INTERNAL_atostr(ctx, receivedData.sin_addr.s_addr),
@@ -906,6 +927,7 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
             char *data = malloc(20);
             UDPC_INTERNAL_prepare_pkt(
                 data,
+                us->ctx->protocolID,
                 UDPC_ID_CONNECT,
                 0,
                 0xFFFFFFFF,
@@ -941,6 +963,7 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
             char *data = malloc(20);
             UDPC_INTERNAL_prepare_pkt(
                 data,
+                us->ctx->protocolID,
                 UDPC_ID_CONNECT | cd->id,
                 cd->rseq,
                 cd->ack,
@@ -979,7 +1002,8 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
         }
 
         char *data = malloc(20);
-        UDPC_INTERNAL_prepare_pkt(data, cd->id, cd->rseq, cd->ack, &cd->lseq, 0);
+        UDPC_INTERNAL_prepare_pkt(
+            data, us->ctx->protocolID, cd->id, cd->rseq, cd->ack, &cd->lseq, 0);
 
         struct sockaddr_in destinationInfo;
         destinationInfo.sin_family = AF_INET;
@@ -1042,6 +1066,7 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
         char *data = malloc(20 + pinfo->size);
         UDPC_INTERNAL_prepare_pkt(
             data,
+            us->ctx->protocolID,
             cd->id,
             cd->rseq,
             cd->ack,
@@ -1313,6 +1338,7 @@ int UDPC_INTERNAL_threadfn(void *context)
 
 void UDPC_INTERNAL_prepare_pkt(
     void *data,
+    uint32_t protocolID,
     uint32_t conID,
     uint32_t rseq,
     uint32_t ack,
@@ -1322,7 +1348,7 @@ void UDPC_INTERNAL_prepare_pkt(
     char *d = data;
     uint32_t temp;
 
-    temp = htonl(UDPC_PKT_PROTOCOL_ID);
+    temp = htonl(protocolID);
     memcpy(d, &temp, 4);
     if((flags & 0x4) == 0)
     {
