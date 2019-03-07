@@ -157,6 +157,20 @@ UDPC_Context* UDPC_init_threaded_update(uint16_t listenPort, uint32_t listenAddr
 
 void UDPC_destroy(UDPC_Context *ctx)
 {
+    if(ctx->isThreaded != 0)
+    {
+        mtx_lock(&ctx->tflagsMtx);
+        ctx->threadFlags |= 0x1;
+        mtx_unlock(&ctx->tflagsMtx);
+        cnd_broadcast(&ctx->threadCV);
+
+        thrd_join(ctx->threadHandle, NULL);
+
+        mtx_destroy(&ctx->tCVMtx);
+        mtx_destroy(&ctx->tflagsMtx);
+        cnd_destroy(&ctx->threadCV);
+    }
+
     CleanupSocket(ctx->socketHandle);
     UDPC_HashMap_itercall(ctx->conMap, UDPC_INTERNAL_destroy_conMap, NULL);
     UDPC_HashMap_destroy(ctx->conMap);
@@ -171,20 +185,6 @@ void UDPC_destroy(UDPC_Context *ctx)
         UDPC_Deque_pop_front(ctx->receivedPackets, sizeof(UDPC_INTERNAL_PacketInfo));
     }
     UDPC_Deque_destroy(ctx->receivedPackets);
-
-    if(ctx->isThreaded != 0)
-    {
-        mtx_lock(&ctx->tflagsMtx);
-        ctx->threadFlags |= 0x1;
-        mtx_unlock(&ctx->tflagsMtx);
-        cnd_broadcast(&ctx->threadCV);
-
-        thrd_join(ctx->threadHandle, NULL);
-
-        mtx_destroy(&ctx->tCVMtx);
-        mtx_destroy(&ctx->tflagsMtx);
-        cnd_destroy(&ctx->threadCV);
-    }
 
     free(ctx);
 }
