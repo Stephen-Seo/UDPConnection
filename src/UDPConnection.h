@@ -75,7 +75,8 @@ typedef struct {
      * 0x1 - trigger send
      * 0x2 - is good mode
      * 0x4 - is good rtt
-     * 0x8 - is id not set yet / initiating connection to server
+     * 0x8 - initiating connection to server
+     * 0x10 - is id set
      */
     uint32_t flags;
     uint32_t id;
@@ -122,6 +123,7 @@ typedef struct {
     mtx_t tflagsMtx;
     cnd_t threadCV;
     UDPC_HashMap *conMap;
+    UDPC_HashMap *idMap;
     struct timespec lastUpdated;
     char atostrBuf[UDPC_ATOSTR_BUF_SIZE];
     char recvBuf[UDPC_PACKET_MAX_SIZE];
@@ -305,8 +307,6 @@ void UDPC_INTERNAL_log(UDPC_Context *ctx, uint32_t level, const char *msg, ...);
 char* UDPC_INTERNAL_atostr(UDPC_Context *ctx, uint32_t addr);
 
 uint32_t UDPC_INTERNAL_generate_id(UDPC_Context *ctx);
-
-void UDPC_INTERNAL_check_ids(void *userData, uint32_t addr, char *data);
 
 /*1
  * \brief Converts a IPV4 string to a 32-bit unsigned integer address in big-endian

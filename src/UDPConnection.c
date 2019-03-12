@@ -24,6 +24,7 @@ UDPC_Context* UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient)
     if(isClient != 0) context->flags |= 0x2;
     context->threadFlags = 0;
     context->conMap = UDPC_HashMap_init(13, sizeof(UDPC_INTERNAL_ConnectionData));
+    context->idMap = UDPC_HashMap_init(13, sizeof(UDPC_INTERNAL_ConnectionData*));
     timespec_get(&context->lastUpdated, TIME_UTC);
     context->atostrBuf[UDPC_ATOSTR_BUF_SIZE - 1] = 0;
     context->connectedEvents = UDPC_Deque_init(
@@ -174,6 +175,7 @@ void UDPC_destroy(UDPC_Context *ctx)
     CleanupSocket(ctx->socketHandle);
     UDPC_HashMap_itercall(ctx->conMap, UDPC_INTERNAL_destroy_conMap, NULL);
     UDPC_HashMap_destroy(ctx->conMap);
+    UDPC_HashMap_destroy(ctx->idMap);
 
     UDPC_Deque_destroy(ctx->connectedEvents);
     UDPC_Deque_destroy(ctx->disconnectedEvents);
@@ -571,6 +573,10 @@ void UDPC_update(UDPC_Context *ctx)
         }
         UDPC_Deque_destroy(cd->priorityPktQueue);
 
+        if((cd->flags & 0x10) != 0)
+        {
+            UDPC_HashMap_remove(ctx->idMap, cd->id);
+        }
         UDPC_HashMap_remove(ctx->conMap, *key);
     }
     UDPC_Deque_destroy(us.removedQueue);
@@ -636,7 +642,7 @@ void UDPC_update(UDPC_Context *ctx)
                 UDPC_INTERNAL_atostr(ctx, receivedData.sin_addr.s_addr),
                 ntohs(receivedData.sin_port));
             UDPC_INTERNAL_ConnectionData newCD = {
-                0x9,
+                0x19,
                 UDPC_INTERNAL_generate_id(ctx),
                 0,
                 0,
@@ -655,6 +661,7 @@ void UDPC_update(UDPC_Context *ctx)
                 0.0f
             };
             UDPC_HashMap_insert(ctx->conMap, newCD.addr, &newCD);
+            UDPC_HashMap_insert(ctx->idMap, newCD.id, UDPC_HashMap_get(ctx->conMap, newCD.addr));
             if(UDPC_Deque_get_available(ctx->connectedEvents) == 0)
             {
                 UDPC_Deque_pop_front(ctx->connectedEvents, 4);
@@ -673,6 +680,7 @@ void UDPC_update(UDPC_Context *ctx)
             if(!cd) { return; }
 
             cd->flags &= 0xFFFFFFF7;
+            cd->flags |= 0x10;
             cd->id = conID;
             UDPC_INTERNAL_log(ctx, 2, "Got id %u from server %s", conID,
                 UDPC_INTERNAL_atostr(ctx, receivedData.sin_addr.s_addr));
@@ -1450,19 +1458,13 @@ uint32_t UDPC_INTERNAL_generate_id(UDPC_Context *ctx)
     while(newID == 0x10000000)
     {
         newID = rand() % 0x10000000;
-        UDPC_HashMap_itercall(ctx->conMap, UDPC_INTERNAL_check_ids, &newID);
+        if(UDPC_HashMap_has(ctx->idMap, newID) != 0)
+        {
+            newID = 0x10000000;
+        }
     }
 
     return newID;
-}
-
-void UDPC_INTERNAL_check_ids(void *userData, uint32_t addr, char *data)
-{
-    UDPC_INTERNAL_ConnectionData *cd = (UDPC_INTERNAL_ConnectionData*)data;
-    if(cd->id == *((uint32_t*)userData))
-    {
-        *((uint32_t*)userData) = 0x10000000;
-    }
 }
 
 uint32_t UDPC_strtoa(const char *addrStr)
