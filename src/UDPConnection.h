@@ -286,6 +286,7 @@ int UDPC_INTERNAL_threadfn(void *context);
  * 0x1 - is ping
  * 0x2 - is resending
  * 0x4 - is checked received packet
+ * 0x8 - is init connection packet
  */
 void UDPC_INTERNAL_prepare_pkt(
     void *data,

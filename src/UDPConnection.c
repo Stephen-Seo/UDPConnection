@@ -940,11 +940,11 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
             UDPC_INTERNAL_prepare_pkt(
                 data,
                 us->ctx->protocolID,
-                UDPC_ID_CONNECT,
+                0,
                 0,
                 0xFFFFFFFF,
                 NULL,
-                0);
+                0x8);
 
             struct sockaddr_in destinationInfo;
             destinationInfo.sin_family = AF_INET;
@@ -976,11 +976,11 @@ void UDPC_INTERNAL_update_send(void *userData, uint32_t addr, char *data)
             UDPC_INTERNAL_prepare_pkt(
                 data,
                 us->ctx->protocolID,
-                UDPC_ID_CONNECT | cd->id,
+                cd->id,
                 cd->rseq,
                 cd->ack,
                 &cd->lseq,
-                0);
+                0x8);
 
             struct sockaddr_in destinationInfo;
             destinationInfo.sin_family = AF_INET;
@@ -1362,21 +1362,13 @@ void UDPC_INTERNAL_prepare_pkt(
 
     temp = htonl(protocolID);
     memcpy(d, &temp, 4);
-    if((flags & 0x4) == 0)
-    {
-        temp = htonl(conID | UDPC_ID_NO_REC_CHK);
-        memcpy(&d[4], &temp, 4);
-    }
-    else if((flags & 0x1) != 0)
-    {
-        temp = htonl(conID | UDPC_ID_PING);
-        memcpy(&d[4], &temp, 4);
-    }
-    else
-    {
-        temp = htonl(conID | ((flags & 0x2) != 0 ? UDPC_ID_RESENDING : 0));
-        memcpy(&d[4], &temp, 4);
-    }
+
+    temp = htonl(conID
+        | ((flags & 0x1) != 0 ? UDPC_ID_PING : 0)
+        | ((flags & 0x2) != 0 ? UDPC_ID_RESENDING : 0)
+        | ((flags & 0x4) == 0 ? UDPC_ID_NO_REC_CHK : 0)
+        | ((flags & 0x8) != 0 ? UDPC_ID_CONNECT : 0));
+    memcpy(&d[4], &temp, 4);
 
     if(seqID)
     {
