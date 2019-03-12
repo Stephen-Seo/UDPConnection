@@ -340,7 +340,7 @@ void UDPC_client_initiate_connection(UDPC_Context *ctx, uint32_t addr, uint16_t 
     UDPC_INTERNAL_ConnectionData cd = {
         0x9,
         0,
-        0,
+        1,
         0,
         0xFFFFFFFF,
         0.0f,
