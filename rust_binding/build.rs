@@ -24,6 +24,7 @@ fn main() {
         .whitelist_function("UDPC_get_queue_send_available")
         .whitelist_function("UDPC_get_accept_new_connections")
         .whitelist_function("UDPC_set_accept_new_connections")
+        .whitelist_function("UDPC_drop_connection")
         .whitelist_function("UDPC_get_protocol_id")
         .whitelist_function("UDPC_set_protocol_id")
         .whitelist_function("UDPC_get_error")
