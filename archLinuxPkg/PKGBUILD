@@ -1,0 +1,43 @@
+# Maintainer: Your Name <youremail@domain.com>
+pkgname=UDPConnection
+pkgver=1.0
+pkgrel=1
+epoch=
+pkgdesc="A C library that provides a UDP connection"
+arch=('x86_64')
+url=""
+license=('MIT')
+groups=()
+depends=()
+makedepends=()
+checkdepends=()
+optdepends=()
+provides=()
+conflicts=()
+replaces=()
+backup=()
+options=()
+install=
+changelog=
+source=()
+noextract=()
+md5sums=()
+validpgpkeys=()
+
+prepare() {
+    echo >&/dev/null
+}
+
+build() {
+    cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DBUILD_SHARED_LIBS=True \
+        -G Ninja \
+        ../../c_impl/
+    ninja
+}
+
+package() {
+    DESTDIR="$pkgdir/" ninja install
+}

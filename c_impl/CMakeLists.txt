@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.7)
 project(UDPConnection)
 
+set(UDPConnection_VERSION 1.0)
+
 set(UDPConnection_SOURCES
     src/UDPConnection.c
     src/UDPC_Deque.c
@@ -19,6 +21,8 @@ endif()
 
 add_library(UDPConnection ${UDPConnection_SOURCES})
 
+set_target_properties(UDPConnection PROPERTIES VERSION ${UDPConnection_VERSION})
+
 target_compile_features(UDPConnection PUBLIC c_std_11)
 target_link_libraries(UDPConnection PUBLIC pthread)
 
@@ -35,3 +39,11 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
     target_link_libraries(NetworkTest PUBLIC UDPConnection)
     target_include_directories(NetworkTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 endif()
+
+install(TARGETS UDPConnection CONFIGURATIONS Release DESTINATION lib)
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UDPConnection.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UDPC_Defines.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UDPC_Deque.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UDPC_HashMap.h
+    DESTINATION include)
