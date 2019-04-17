@@ -123,6 +123,7 @@ typedef struct {
     mtx_t tflagsMtx;
     cnd_t threadCV;
     UDPC_HashMap *conMap;
+    // Clients intentionally do not use idMap at all
     UDPC_HashMap *idMap;
     struct timespec lastUpdated;
     char atostrBuf[UDPC_ATOSTR_BUF_SIZE];
@@ -226,6 +227,12 @@ int UDPC_get_accept_new_connections(UDPC_Context *ctx);
  * Set isAccepting to zero to prevent UDPC from accepting new connections.
  */
 void UDPC_set_accept_new_connections(UDPC_Context *ctx, int isAccepting);
+
+/// Drops a connection specified by addr
+/*!
+ * \return non-zero if the connection existed and was dropped
+ */
+int UDPC_drop_connection(UDPC_Context *ctx, uint32_t addr);
 
 /// Gets the currently set protocol id
 uint32_t UDPC_get_protocol_id(UDPC_Context *ctx);

@@ -452,6 +452,28 @@ void UDPC_set_accept_new_connections(UDPC_Context *ctx, int isAccepting)
     if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
 }
 
+int UDPC_drop_connection(UDPC_Context *ctx, uint32_t addr)
+{
+    int wasDropped = 0;
+
+    if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
+
+    UDPC_INTERNAL_ConnectionData *cd = UDPC_HashMap_get(ctx->conMap, addr);
+    if(cd)
+    {
+        if((cd->flags & 0x10) != 0)
+        {
+            UDPC_HashMap_remove(ctx->idMap, cd->id);
+        }
+        UDPC_HashMap_remove(ctx->conMap, addr);
+        wasDropped = 1;
+    }
+
+    if(ctx->isThreaded != 0) { mtx_unlock(&ctx->tCVMtx); }
+
+    return wasDropped;
+}
+
 uint32_t UDPC_get_protocol_id(UDPC_Context *ctx)
 {
     if(ctx->isThreaded != 0) { mtx_lock(&ctx->tCVMtx); }
