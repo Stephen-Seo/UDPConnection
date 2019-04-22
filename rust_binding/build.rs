@@ -5,11 +5,17 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let mut dst = Config::new("../c_impl")
-        .define("NDEBUG", "true")
-        .cflag("-O3")
-        .build();
-    dst.push("build");
+    let mut config = Config::new("../c_impl");
+    let mut dst: PathBuf;
+    if env::var("PROFILE").unwrap().eq("release") {
+        config.define("CMAKE_BUILD_TYPE", "Release");
+        dst = config.build();
+        dst.push("lib");
+    } else {
+        config.define("CMAKE_BUILD_TYPE", "Debug");
+        dst = config.build();
+        dst.push("build");
+    }
 
     println!("cargo:rustc-link-search=native={}", dst.display());
     println!("cargo:rustc-link-lib=static=UDPConnection");
