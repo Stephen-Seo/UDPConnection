@@ -1,10 +1,18 @@
+use cmake::Config;
 use bindgen;
 
 use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    println!("cargo:rustc-link-lib=UDPConnection");
+    let mut dst = Config::new("../c_impl")
+        .define("NDEBUG", "true")
+        .cflag("-O3")
+        .build();
+    dst.push("build");
+
+    println!("cargo:rustc-link-search=native={}", dst.display());
+    println!("cargo:rustc-link-lib=static=UDPConnection");
 
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
