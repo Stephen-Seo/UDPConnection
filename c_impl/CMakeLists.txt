@@ -40,7 +40,7 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
     target_include_directories(NetworkTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 endif()
 
-install(TARGETS UDPConnection CONFIGURATIONS Release DESTINATION lib)
+install(TARGETS UDPConnection DESTINATION lib)
 install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UDPConnection.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UDPC_Defines.h

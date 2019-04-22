@@ -6,16 +6,13 @@ use std::path::PathBuf;
 
 fn main() {
     let mut config = Config::new("../c_impl");
-    let mut dst: PathBuf;
     if env::var("PROFILE").unwrap().eq("release") {
         config.define("CMAKE_BUILD_TYPE", "Release");
-        dst = config.build();
-        dst.push("lib");
     } else {
         config.define("CMAKE_BUILD_TYPE", "Debug");
-        dst = config.build();
-        dst.push("build");
     }
+    let mut dst = config.build();
+    dst.push("lib");
 
     println!("cargo:rustc-link-search=native={}", dst.display());
     println!("cargo:rustc-link-lib=static=UDPConnection");
