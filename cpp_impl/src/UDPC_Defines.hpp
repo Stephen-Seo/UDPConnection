@@ -3,9 +3,9 @@
 
 #define UDPC_CONTEXT_IDENTIFIER 0x902F4DB3
 
-#include <cstdint>
-#include <bitset>
 #include <atomic>
+#include <bitset>
+#include <cstdint>
 
 #include "UDPConnection.h"
 
