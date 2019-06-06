@@ -5,6 +5,7 @@ set(UDPConnection_VERSION 1.0)
 
 set(UDPConnection_SOURCES
     src/UDPConnection.cpp
+    src/TSQueue.cpp
 )
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wpedantic -Wno-missing-braces")
