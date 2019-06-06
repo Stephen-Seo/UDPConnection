@@ -23,6 +23,9 @@ class TSQueue {
     bool push(void *data);
     std::unique_ptr<unsigned char[]> top();
     bool pop();
+    void clear();
+    void changeCapacity(unsigned int newCapacity);
+    unsigned int size();
 
   private:
     unsigned int elemSize;

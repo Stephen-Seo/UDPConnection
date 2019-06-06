@@ -70,3 +70,94 @@ bool TSQueue::pop() {
     spinLock.store(false);
     return true;
 }
+
+void TSQueue::clear() {
+    while (spinLock.exchange(true) == true) {
+    }
+
+    head = 0;
+    tail = 0;
+    isEmpty = 0;
+
+    spinLock.store(false);
+}
+
+void TSQueue::changeCapacity(unsigned int newCapacity) {
+    if (newCapacity == 0) {
+        return;
+    }
+    while (spinLock.exchange(true) == true) {
+    }
+
+    // repeat of size() to avoid deadlock
+    unsigned int size;
+    if (head == tail) {
+        size = capacity;
+    } else if (head < tail) {
+        size = tail - head;
+    } else {
+        size = capacity - head + tail;
+    }
+
+    unsigned int newCap = newCapacity * elemSize;
+    auto newBuffer =
+        std::unique_ptr<unsigned char[]>(new unsigned char[newCap]);
+
+    if (!isEmpty) {
+        unsigned int tempHead = head;
+        if (size > newCap) {
+            unsigned int diff = size - newCap;
+            tempHead = (head + diff) % capacity;
+        }
+        if (tempHead < tail) {
+            memcpy(newBuffer.get(), buffer.get() + tempHead, tail - tempHead);
+        } else {
+            memcpy(newBuffer.get(), buffer.get() + tempHead,
+                   capacity - tempHead);
+            if (tail != 0) {
+                memcpy(newBuffer.get() + capacity - tempHead, buffer.get(),
+                       tail);
+            }
+        }
+    }
+
+    if (size < newCap) {
+        if (head < tail) {
+            tail = tail - head;
+            head = 0;
+        } else {
+            tail = capacity - head + tail;
+            head = 0;
+        }
+    } else {
+        head = 0;
+        tail = 0;
+        isEmpty = false;
+    }
+    buffer = std::move(newBuffer);
+    capacity = newCap;
+
+    spinLock.store(false);
+}
+
+unsigned int TSQueue::size() {
+    while (spinLock.exchange(true) == true) {
+    }
+
+    if (isEmpty) {
+        spinLock.store(false);
+        return 0;
+    }
+
+    unsigned int size;
+    if (head == tail) {
+        size = capacity;
+    } else if (head < tail) {
+        size = tail - head;
+    } else {
+        size = capacity - head + tail;
+    }
+
+    spinLock.store(false);
+    return size;
+}
