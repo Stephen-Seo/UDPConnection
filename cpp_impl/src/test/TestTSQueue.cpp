@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdio>
+#include <future>
+
 #include "TSQueue.hpp"
 
 TEST(TSQueue, Usage)
@@ -106,4 +109,45 @@ TEST(TSQueue, Usage)
 
     EXPECT_FALSE(q.pop());
     EXPECT_EQ(0, q.size());
+}
+
+TEST(TSQueue, Concurrent)
+{
+    TSQueue q(sizeof(int), 4);
+
+    auto a0 = std::async(std::launch::async, [&q] () {int i = 0; return q.push(&i); });
+    auto a1 = std::async(std::launch::async, [&q] () {int i = 1; return q.push(&i); });
+    auto a2 = std::async(std::launch::async, [&q] () {int i = 2; return q.push(&i); });
+    auto a3 = std::async(std::launch::async, [&q] () {int i = 3; return q.push(&i); });
+    auto a4 = std::async(std::launch::async, [&q] () {int i = 4; return q.push(&i); });
+
+    bool results[] = {
+        a0.get(),
+        a1.get(),
+        a2.get(),
+        a3.get(),
+        a4.get()
+    };
+
+    int insertCount = 0;
+    for(int i = 0; i < 5; ++i) {
+        if(results[i]) {
+            ++insertCount;
+        }
+    }
+
+    EXPECT_EQ(insertCount, 4);
+    EXPECT_EQ(q.size(), 4);
+
+    TSQueue::TopType top;
+    for(int i = 0; i < 4; ++i) {
+        top = q.top();
+        EXPECT_TRUE(q.pop());
+        EXPECT_EQ(q.size(), 3 - i);
+        printf("%d ", *((int*)top.get()));
+    }
+    printf("\n");
+
+    EXPECT_FALSE(q.pop());
+    EXPECT_EQ(q.size(), 0);
 }

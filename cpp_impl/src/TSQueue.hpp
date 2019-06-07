@@ -9,6 +9,8 @@
 
 class TSQueue {
   public:
+    typedef std::unique_ptr<unsigned char[]> TopType;
+
     TSQueue(unsigned int elemSize,
             unsigned int capacity = UDPC_TSQUEUE_DEFAULT_CAPACITY);
     ~TSQueue();
@@ -21,7 +23,7 @@ class TSQueue {
     TSQueue &operator=(TSQueue &&other) = delete;
 
     bool push(void *data);
-    std::unique_ptr<unsigned char[]> top();
+    TopType top();
     bool pop();
     void clear();
     void changeCapacity(unsigned int newCapacity);
