@@ -3,17 +3,19 @@
 #include <cstring>
 
 TSQueue::TSQueue(unsigned int elemSize, unsigned int capacity)
-    : elemSize(elemSize), capacity(capacity), head(0), tail(0), isEmpty(true),
+    : elemSize(elemSize), head(0), tail(0), isEmpty(true),
       spinLock(false) {
     if (elemSize == 0) {
         this->elemSize = 1;
     }
     if (capacity == 0) {
-        this->capacity = UDPC_TSQUEUE_DEFAULT_CAPACITY * this->elemSize;
+        this->capacityBytes = UDPC_TSQUEUE_DEFAULT_CAPACITY * this->elemSize;
+    } else {
+        this->capacityBytes = capacity * this->elemSize;
     }
 
     this->buffer =
-        std::unique_ptr<unsigned char[]>(new unsigned char[this->capacity]);
+        std::unique_ptr<unsigned char[]>(new unsigned char[this->capacityBytes]);
 }
 
 TSQueue::~TSQueue() {}
@@ -27,7 +29,7 @@ bool TSQueue::push(void *data) {
     }
 
     memcpy(buffer.get() + tail, data, elemSize);
-    tail = (tail + elemSize) % capacity;
+    tail = (tail + elemSize) % capacityBytes;
 
     isEmpty = false;
 
@@ -44,11 +46,7 @@ std::unique_ptr<unsigned char[]> TSQueue::top() {
     }
 
     auto data = std::unique_ptr<unsigned char[]>(new unsigned char[elemSize]);
-    if (tail != 0) {
-        memcpy(data.get(), buffer.get() + (tail - elemSize), elemSize);
-    } else {
-        memcpy(data.get(), buffer.get() + (capacity - elemSize), elemSize);
-    }
+    memcpy(data.get(), buffer.get() + head, elemSize);
     spinLock.store(false);
     return data;
 }
@@ -61,7 +59,7 @@ bool TSQueue::pop() {
         return false;
     }
     head += elemSize;
-    if (head >= capacity) {
+    if (head >= capacityBytes) {
         head = 0;
     }
     if (head == tail) {
@@ -89,14 +87,14 @@ void TSQueue::changeCapacity(unsigned int newCapacity) {
     while (spinLock.exchange(true) == true) {
     }
 
-    // repeat of size() to avoid deadlock
+    // repeat of sizeBytes() to avoid deadlock
     unsigned int size;
     if (head == tail) {
-        size = capacity;
+        size = capacityBytes;
     } else if (head < tail) {
         size = tail - head;
     } else {
-        size = capacity - head + tail;
+        size = capacityBytes - head + tail;
     }
 
     unsigned int newCap = newCapacity * elemSize;
@@ -107,15 +105,15 @@ void TSQueue::changeCapacity(unsigned int newCapacity) {
         unsigned int tempHead = head;
         if (size > newCap) {
             unsigned int diff = size - newCap;
-            tempHead = (head + diff) % capacity;
+            tempHead = (head + diff) % capacityBytes;
         }
         if (tempHead < tail) {
             memcpy(newBuffer.get(), buffer.get() + tempHead, tail - tempHead);
         } else {
             memcpy(newBuffer.get(), buffer.get() + tempHead,
-                   capacity - tempHead);
+                   capacityBytes - tempHead);
             if (tail != 0) {
-                memcpy(newBuffer.get() + capacity - tempHead, buffer.get(),
+                memcpy(newBuffer.get() + capacityBytes - tempHead, buffer.get(),
                        tail);
             }
         }
@@ -126,7 +124,7 @@ void TSQueue::changeCapacity(unsigned int newCapacity) {
             tail = tail - head;
             head = 0;
         } else {
-            tail = capacity - head + tail;
+            tail = capacityBytes - head + tail;
             head = 0;
         }
     } else {
@@ -135,7 +133,7 @@ void TSQueue::changeCapacity(unsigned int newCapacity) {
         isEmpty = false;
     }
     buffer = std::move(newBuffer);
-    capacity = newCap;
+    capacityBytes = newCap;
 
     spinLock.store(false);
 }
@@ -151,11 +149,34 @@ unsigned int TSQueue::size() {
 
     unsigned int size;
     if (head == tail) {
-        size = capacity;
+        size = capacityBytes;
     } else if (head < tail) {
         size = tail - head;
     } else {
-        size = capacity - head + tail;
+        size = capacityBytes - head + tail;
+    }
+    size /= elemSize;
+
+    spinLock.store(false);
+    return size;
+}
+
+unsigned int TSQueue::sizeBytes() {
+    while (spinLock.exchange(true) == true) {
+    }
+
+    if (isEmpty) {
+        spinLock.store(false);
+        return 0;
+    }
+
+    unsigned int size;
+    if (head == tail) {
+        size = capacityBytes;
+    } else if (head < tail) {
+        size = tail - head;
+    } else {
+        size = capacityBytes - head + tail;
     }
 
     spinLock.store(false);

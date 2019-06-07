@@ -29,12 +29,14 @@ class TSQueue {
 
   private:
     unsigned int elemSize;
-    unsigned int capacity;
+    unsigned int capacityBytes;
     unsigned int head;
     unsigned int tail;
     bool isEmpty;
     std::unique_ptr<unsigned char[]> buffer;
     std::atomic_bool spinLock;
+
+    unsigned int sizeBytes();
 };
 
 #endif
