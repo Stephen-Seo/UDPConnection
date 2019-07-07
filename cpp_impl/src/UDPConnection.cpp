@@ -33,7 +33,7 @@ bool UDPC::VerifyContext(void *ctx) {
 }
 
 bool UDPC::isBigEndian() {
-    static std::optional<bool> isBigEndian = {};
+    static std::optional<bool> isBigEndian = std::nullopt;
     if(isBigEndian) {
         return *isBigEndian;
     }
