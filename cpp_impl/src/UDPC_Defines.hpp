@@ -27,6 +27,8 @@ struct Context {
 
 bool VerifyContext(void *ctx);
 
+bool isBigEndian();
+
 } // namespace UDPC
 
 #endif

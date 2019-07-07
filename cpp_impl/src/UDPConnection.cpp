@@ -1,6 +1,9 @@
 #include "UDPC_Defines.hpp"
 #include "UDPConnection.h"
 
+
+#include <optional>
+
 UDPC::Context::Context(bool isThreaded)
     : _contextIdentifier(UDPC_CONTEXT_IDENTIFIER), flags(),
       isAcceptNewConnections(true), protocolID(UDPC_DEFAULT_PROTOCOL_ID),
@@ -28,6 +31,21 @@ bool UDPC::VerifyContext(void *ctx) {
         return false;
     }
 }
+
+bool UDPC::isBigEndian() {
+    static std::optional<bool> isBigEndian = {};
+    if(isBigEndian) {
+        return *isBigEndian;
+    }
+    union {
+        uint32_t i;
+        char c[4];
+    } bint = { 0x01020304 };
+
+    isBigEndian = (bint.c[0] == 1);
+    return *isBigEndian;
+}
+
 
 void *UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient) {
     UDPC::Context *ctx = new UDPC::Context(false);
@@ -156,7 +174,11 @@ uint32_t UDPC_strtoa(const char *addrStr) {
             temp *= 10;
             temp += *addrStr - '0';
         } else if (*addrStr == '.' && temp <= 0xFF && index < 3) {
-            addr |= (temp << (8 * index++));
+            if(UDPC::isBigEndian()) {
+                addr |= (temp << (24 - 8 * index++));
+            } else {
+                addr |= (temp << (8 * index++));
+            }
             temp = 0;
         } else {
             return 0;
@@ -165,7 +187,11 @@ uint32_t UDPC_strtoa(const char *addrStr) {
     }
 
     if (index == 3 && temp <= 0xFF) {
-        addr |= temp << 24;
+        if(UDPC::isBigEndian()) {
+            addr |= temp;
+        } else {
+            addr |= temp << 24;
+        }
         return addr;
     } else {
         return 0;
