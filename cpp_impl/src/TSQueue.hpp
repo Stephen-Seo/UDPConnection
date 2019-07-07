@@ -7,12 +7,12 @@
 #include <cstdlib>
 #include <memory>
 
+#include <RB/RingBuffer.hpp>
+
+template <typename T>
 class TSQueue {
   public:
-    typedef std::unique_ptr<unsigned char[]> TopType;
-
-    TSQueue(unsigned int elemSize,
-            unsigned int capacity = UDPC_TSQUEUE_DEFAULT_CAPACITY);
+    TSQueue(unsigned int capacity = UDPC_TSQUEUE_DEFAULT_CAPACITY);
     ~TSQueue();
 
     // disable copy
@@ -22,23 +22,82 @@ class TSQueue {
     TSQueue(TSQueue &&other) = delete;
     TSQueue &operator=(TSQueue &&other) = delete;
 
-    bool push(void *data);
-    TopType top();
+    bool push(const T &data);
+    T top();
     bool pop();
     void clear();
     void changeCapacity(unsigned int newCapacity);
     unsigned int size();
 
   private:
-    unsigned int elemSize;
-    unsigned int capacityBytes;
-    unsigned int head;
-    unsigned int tail;
-    bool isEmpty;
-    std::unique_ptr<unsigned char[]> buffer;
     std::atomic_bool spinLock;
-
-    unsigned int sizeBytes();
+    RB::RingBuffer<T> rb;
 };
+
+template <typename T>
+TSQueue<T>::TSQueue(unsigned int capacity) :
+spinLock(false),
+rb(capacity)
+{
+    rb.setResizePolicy(false);
+}
+
+template <typename T>
+TSQueue<T>::~TSQueue()
+{}
+
+template <typename T>
+bool TSQueue<T>::push(const T &data) {
+    while(spinLock.exchange(true)) {}
+    if(rb.getSize() == rb.getCapacity()) {
+        spinLock.store(false);
+        return false;
+    }
+    rb.push(data);
+    spinLock.store(false);
+    return true;
+}
+
+template <typename T>
+T TSQueue<T>::top() {
+    while(spinLock.exchange(true)) {}
+    T value = rb.top();
+    spinLock.store(false);
+    return value;
+}
+
+template <typename T>
+bool TSQueue<T>::pop() {
+    while(spinLock.exchange(true)) {}
+    if(rb.empty()) {
+        spinLock.store(false);
+        return false;
+    }
+    rb.pop();
+    spinLock.store(false);
+    return true;
+}
+
+template <typename T>
+void TSQueue<T>::clear() {
+    while(spinLock.exchange(true)) {}
+    rb.resize(0);
+    spinLock.store(false);
+}
+
+template <typename T>
+void TSQueue<T>::changeCapacity(unsigned int newCapacity) {
+    while(spinLock.exchange(true)) {}
+    rb.changeCapacity(newCapacity);
+    spinLock.store(false);
+}
+
+template <typename T>
+unsigned int TSQueue<T>::size() {
+    while(spinLock.exchange(true)) {}
+    unsigned int size = rb.getSize();
+    spinLock.store(false);
+    return size;
+}
 
 #endif

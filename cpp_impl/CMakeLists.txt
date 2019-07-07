@@ -3,9 +3,14 @@ project(UDPConnection)
 
 set(UDPConnection_VERSION 1.0)
 
+if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/RingBuffer/src)
+    message(FATAL_ERROR "RingBuffer is missing!\nPlease update the \
+RingBuffer submodule by running 'git submodule init' and 'git submodule \
+update'!")
+endif()
+
 set(UDPConnection_SOURCES
     src/UDPConnection.cpp
-    src/TSQueue.cpp
 )
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wpedantic -Wno-missing-braces")
@@ -22,8 +27,11 @@ add_library(UDPConnection ${UDPConnection_SOURCES})
 
 set_target_properties(UDPConnection PROPERTIES VERSION ${UDPConnection_VERSION})
 
-target_compile_features(UDPConnection PUBLIC cxx_std_11)
+target_compile_features(UDPConnection PUBLIC cxx_std_17)
 target_link_libraries(UDPConnection PUBLIC pthread)
+
+target_include_directories(UDPConnection PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/RingBuffer/src")
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
 
@@ -34,6 +42,7 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
             src/test/TestTSQueue.cpp
         )
         add_executable(UnitTest ${UDPC_UnitTest_SOURCES})
+        target_compile_features(UnitTest PUBLIC cxx_std_17)
         target_link_libraries(UnitTest PUBLIC UDPConnection ${GTEST_BOTH_LIBRARIES})
         target_include_directories(UnitTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
     endif()
