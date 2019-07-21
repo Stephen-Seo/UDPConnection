@@ -25,7 +25,7 @@ struct Context {
     char atostrBuf[16];
 }; // struct Context
 
-bool VerifyContext(void *ctx);
+Context* verifyContext(void *ctx);
 
 bool isBigEndian();
 
