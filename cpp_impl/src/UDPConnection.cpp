@@ -1,7 +1,9 @@
 #include "UDPC_Defines.hpp"
 #include "UDPConnection.h"
 
+#include <chrono>
 #include <optional>
+#include <vector>
 
 UDPC::Context::Context(bool isThreaded)
     : _contextIdentifier(UDPC_CONTEXT_IDENTIFIER), flags(),
@@ -48,12 +50,54 @@ bool UDPC::isBigEndian() {
 void *UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient) {
     UDPC::Context *ctx = new UDPC::Context(false);
 
+    // create socket
+    ctx->socketHandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if(ctx->socketHandle <= 0) {
+        // TODO maybe different way of handling init fail
+        delete ctx;
+        return nullptr;
+    }
+
+    // bind socket
+    ctx->socketInfo.sin_family = AF_INET;
+    ctx->socketInfo.sin_addr.s_addr =
+        (listenAddr == 0 ? INADDR_ANY : listenAddr);
+    ctx->socketInfo.sin_port = htons(listenPort);
+    if(bind(ctx->socketHandle, (const struct sockaddr *)&ctx->socketInfo,
+            sizeof(struct sockaddr_in)) < 0) {
+        // TODO maybe different way of handling init fail
+        CleanupSocket(ctx->socketHandle);
+        delete ctx;
+        return nullptr;
+    }
+
+    // set non-blocking on socket
+#if UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
+    int nonblocking = 1;
+    if(fcntl(ctx->socketHandle, F_SETFL, O_NONBLOCK, nonblocking) == -1) {
+#elif UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+    DWORD nonblocking = 1;
+    if(ioctlsocket(ctx->socketHandle, FIONBIO, &nonblocking) != 0) {
+#else
+    {
+#endif
+        // TODO maybe different way of handling init fail
+        CleanupSocket(ctx->socketHandle);
+        delete ctx;
+        return nullptr;
+    }
+
     return ctx;
 }
 
 void *UDPC_init_threaded_update(uint16_t listenPort, uint32_t listenAddr,
                                 int isClient) {
-    UDPC::Context *ctx = new UDPC::Context(true);
+    UDPC::Context *ctx =
+        (UDPC::Context *)UDPC_init(listenPort, listenAddr, isClient);
+    if(!ctx) {
+        return nullptr;
+    }
+    ctx->flags.set(0);
 
     return ctx;
 }
@@ -67,12 +111,36 @@ void UDPC_destroy(void *ctx) {
 
 void UDPC_update(void *ctx) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
-    if(!c) {
+    if(!c || c->flags.test(0)) {
+        // invalid or is threaded, update should not be called
         return;
     }
-    if(c->flags.test(0)) {
-        // is threaded, update should not be called
-        return;
+
+    const auto now = std::chrono::steady_clock::now();
+    const auto dt = now - c->lastUpdated;
+    const float dt_fs = (float)dt.count() * (float)decltype(dt)::period::num /
+                        (float)decltype(dt)::period::den;
+
+    std::chrono::steady_clock::duration temp_dt;
+    float temp_dt_fs;
+    std::vector<uint32_t> removed;
+    for(auto iter = c->conMap.begin(); iter != c->conMap.end(); ++iter) {
+        temp_dt = now - iter->second.received;
+        temp_dt_fs = (float)temp_dt.count() *
+                     (float)decltype(temp_dt)::period::num /
+                     (float)decltype(temp_dt)::period::den;
+        if(temp_dt_fs >= UDPC_TIMEOUT_SECONDS) {
+            removed.push_back(iter->first);
+            // TODO log timed out connection
+        }
+
+        // check good/bad mode
+        iter->second.toggleTimer += temp_dt_fs;
+        iter->second.toggledTimer += temp_dt_fs;
+        if(iter->second.flags.test(1) && !iter->second.flags.test(2)) {
+            // good mode, bad rtt
+            // TODO
+        }
     }
 
     // TODO impl
