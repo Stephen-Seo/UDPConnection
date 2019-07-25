@@ -28,6 +28,7 @@ class TSQueue {
     void clear();
     void changeCapacity(unsigned int newCapacity);
     unsigned int size();
+    bool empty();
 
   private:
     std::atomic_bool spinLock;
@@ -98,6 +99,13 @@ unsigned int TSQueue<T>::size() {
     unsigned int size = rb.getSize();
     spinLock.store(false);
     return size;
+}
+
+template <typename T>
+bool TSQueue<T>::empty() {
+    // No lock required, since this is calling size() that uses a lock
+    unsigned int size = this->size();
+    return size == 0;
 }
 
 #endif

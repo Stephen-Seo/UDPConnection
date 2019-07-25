@@ -48,12 +48,19 @@ typedef enum { SILENT, ERROR, WARNING, VERBOSE, INFO } UDPC_LoggingType;
 
 typedef struct {
     char data[UDPC_PACKET_MAX_SIZE];
+    /*
+     * 0x1 - connect
+     * 0x2 - ping
+     * 0x4 - no_rec_chk
+     * 0x8 - resending
+     */
+    uint32_t flags;
     uint16_t dataSize; // zero if invalid
     uint32_t sender;
     uint32_t receiver;
     uint16_t senderPort;
     uint16_t receiverPort;
-} PacketInfo;
+} UDPC_PacketInfo;
 
 void *UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient);
 void *UDPC_init_threaded_update(uint16_t listenPort, uint32_t listenAddr,
@@ -76,7 +83,7 @@ uint32_t UDPC_set_protocol_id(void *ctx, uint32_t id);
 
 UDPC_LoggingType set_logging_type(void *ctx, UDPC_LoggingType loggingType);
 
-PacketInfo UDPC_get_received(void *ctx);
+UDPC_PacketInfo UDPC_get_received(void *ctx);
 
 const char *UDPC_atostr(void *ctx, uint32_t addr);
 
