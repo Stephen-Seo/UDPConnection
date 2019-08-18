@@ -365,9 +365,65 @@ void UDPC_update(void *ctx) {
                 iter->second.sendPkts.pop();
             }
             std::unique_ptr<char[]> buf = std::make_unique<char[]>(20 + pInfo.dataSize);
-            // TODO prepare and send packet
+            UDPC::preparePacket(
+                buf.get(),
+                c->protocolID,
+                iter->second.id,
+                iter->second.rseq,
+                iter->second.ack,
+                &iter->second.lseq,
+                pInfo.flags & 0xC);
+            std::memcpy(buf.get() + 20, pInfo.data, pInfo.dataSize);
+
+            struct sockaddr_in destinationInfo;
+            destinationInfo.sin_family = AF_INET;
+            destinationInfo.sin_addr.s_addr = iter->first;
+            destinationInfo.sin_port = htons(iter->second.port);
+            long int sentBytes = sendto(
+                c->socketHandle,
+                buf.get(),
+                pInfo.dataSize + 20,
+                0,
+                (struct sockaddr*) &destinationInfo,
+                sizeof(struct sockaddr_in));
+            if(sentBytes != 20 + pInfo.dataSize) {
+                // TODO log fail send packet
+            }
+
+            if((pInfo.flags & 0x4) == 0) {
+                // is check-received, store data in case packet gets lost
+                UDPC_PacketInfo sentPInfo;
+                std::memcpy(sentPInfo.data, buf.get(), 20 + pInfo.dataSize);
+                sentPInfo.flags = 0;
+                sentPInfo.dataSize = 20 + pInfo.dataSize;
+                sentPInfo.sender = UDPC::LOCAL_ADDR;
+                sentPInfo.receiver = iter->first;
+                sentPInfo.senderPort = c->socketInfo.sin_port;
+                sentPInfo.receiverPort = iter->second.port;
+
+                iter->second.sentPkts.push_back(std::move(pInfo));
+                while(iter->second.sentPkts.size() > UDPC_SENT_PKTS_MAX_SIZE) {
+                    iter->second.sentPkts.pop_front();
+                }
+            } else {
+                // is not check-received, no data stored but other data is kept
+                UDPC_PacketInfo sentPInfo;
+                sentPInfo.flags = 0x4;
+                sentPInfo.dataSize = 0;
+                sentPInfo.sender = UDPC::LOCAL_ADDR;
+                sentPInfo.receiver = iter->first;
+                sentPInfo.senderPort = c->socketInfo.sin_port;
+                sentPInfo.receiverPort = iter->second.port;
+
+                iter->second.sentPkts.push_back(std::move(pInfo));
+                while(iter->second.sentPkts.size() > UDPC_SENT_PKTS_MAX_SIZE) {
+                    iter->second.sentPkts.pop_front();
+                }
+            }
         }
     }
+
+    // TODO receive packet
 
     // TODO impl
 }
