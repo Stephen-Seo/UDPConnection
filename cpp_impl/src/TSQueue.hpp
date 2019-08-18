@@ -3,9 +3,9 @@
 
 #define UDPC_TSQUEUE_DEFAULT_CAPACITY 32
 
-#include <atomic>
 #include <cstdlib>
 #include <memory>
+#include <mutex>
 
 #include <RB/RingBuffer.hpp>
 
@@ -31,13 +31,13 @@ class TSQueue {
     bool empty();
 
   private:
-    std::atomic_bool spinLock;
+    std::mutex mutex;
     RB::RingBuffer<T> rb;
 };
 
 template <typename T>
 TSQueue<T>::TSQueue(unsigned int capacity) :
-spinLock(false),
+mutex(),
 rb(capacity)
 {
     rb.setResizePolicy(false);
@@ -49,55 +49,47 @@ TSQueue<T>::~TSQueue()
 
 template <typename T>
 bool TSQueue<T>::push(const T &data) {
-    while(spinLock.exchange(true)) {}
+    std::lock_guard<std::mutex> lock(mutex);
     if(rb.getSize() == rb.getCapacity()) {
-        spinLock.store(false);
         return false;
     }
     rb.push(data);
-    spinLock.store(false);
     return true;
 }
 
 template <typename T>
 T TSQueue<T>::top() {
-    while(spinLock.exchange(true)) {}
+    std::lock_guard<std::mutex> lock(mutex);
     T value = rb.top();
-    spinLock.store(false);
     return value;
 }
 
 template <typename T>
 bool TSQueue<T>::pop() {
-    while(spinLock.exchange(true)) {}
+    std::lock_guard<std::mutex> lock(mutex);
     if(rb.empty()) {
-        spinLock.store(false);
         return false;
     }
     rb.pop();
-    spinLock.store(false);
     return true;
 }
 
 template <typename T>
 void TSQueue<T>::clear() {
-    while(spinLock.exchange(true)) {}
+    std::lock_guard<std::mutex> lock(mutex);
     rb.resize(0);
-    spinLock.store(false);
 }
 
 template <typename T>
 void TSQueue<T>::changeCapacity(unsigned int newCapacity) {
-    while(spinLock.exchange(true)) {}
+    std::lock_guard<std::mutex> lock(mutex);
     rb.changeCapacity(newCapacity);
-    spinLock.store(false);
 }
 
 template <typename T>
 unsigned int TSQueue<T>::size() {
-    while(spinLock.exchange(true)) {}
+    std::lock_guard<std::mutex> lock(mutex);
     unsigned int size = rb.getSize();
-    spinLock.store(false);
     return size;
 }
 
