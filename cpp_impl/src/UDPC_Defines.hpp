@@ -6,6 +6,7 @@
 #define UDPC_GOOD_MODE_SEND_INTERVAL (1.0f / 30.0f)
 #define UDPC_BAD_MODE_SEND_INTERVAL (1.0f / 10.0f)
 #define UDPC_SENT_PKTS_MAX_SIZE 33
+#define UDPC_QUEUED_PKTS_MAX_SIZE 32
 
 #define UDPC_ID_CONNECT 0x80000000
 #define UDPC_ID_PING 0x40000000
@@ -18,6 +19,7 @@
 #include <cstdint>
 #include <deque>
 #include <unordered_map>
+#include <random>
 
 #include "TSQueue.hpp"
 #include "UDPConnection.h"
@@ -27,8 +29,14 @@ namespace UDPC {
 static uint32_t LOCAL_ADDR = 0;
 static const auto INIT_PKT_INTERVAL_DT = std::chrono::seconds(5);
 static const auto HEARTBEAT_PKT_INTERVAL_DT = std::chrono::milliseconds(150);
+static const auto PACKET_TIMEOUT_TIME = std::chrono::seconds(1);
+
+struct Context;
 
 struct ConnectionData {
+    ConnectionData();
+    ConnectionData(bool isServer, Context *ctx);
+
     /*
      * 0 - trigger send
      * 1 - is good mode
@@ -59,9 +67,11 @@ struct Context {
     Context(bool isThreaded);
 
     uint_fast32_t _contextIdentifier;
+    char recvBuf[UDPC_PACKET_MAX_SIZE];
     /*
      * 0 - is threaded
      * 1 - is client
+     * 2 - is accepting new connections
      */
     std::bitset<32> flags;
     std::atomic_bool isAcceptNewConnections;
@@ -73,8 +83,12 @@ struct Context {
     struct sockaddr_in socketInfo;
 
     std::chrono::steady_clock::time_point lastUpdated;
+    // ipv4 address to ConnectionData
     std::unordered_map<uint32_t, ConnectionData> conMap;
+    // id to ipv4 address
     std::unordered_map<uint32_t, uint32_t> idMap;
+
+    std::default_random_engine rng_engine;
 
 }; // struct Context
 
@@ -91,6 +105,8 @@ bool isBigEndian();
  */
 void preparePacket(char *data, uint32_t protocolID, uint32_t conID,
                    uint32_t rseq, uint32_t ack, uint32_t *seqID, int flags);
+
+uint32_t generateConnectionID(Context &ctx);
 
 } // namespace UDPC
 

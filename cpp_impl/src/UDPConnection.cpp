@@ -7,14 +7,36 @@
 #include <optional>
 #include <vector>
 
+UDPC::ConnectionData::ConnectionData() :
+flags(),
+sentPkts(),
+sendPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
+priorityPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
+received(std::chrono::steady_clock::now()),
+sent(std::chrono::steady_clock::now())
+{
+}
+
+UDPC::ConnectionData::ConnectionData(bool isServer, Context *ctx) :
+UDPC::ConnectionData::ConnectionData()
+{
+    if(isServer) {
+        flags.set(0);
+        flags.set(3);
+        id = UDPC::generateConnectionID(*ctx);
+        flags.set(4);
+    }
+}
+
 UDPC::Context::Context(bool isThreaded)
     : _contextIdentifier(UDPC_CONTEXT_IDENTIFIER), flags(),
       isAcceptNewConnections(true), protocolID(UDPC_DEFAULT_PROTOCOL_ID),
 #ifndef NDEBUG
-      loggingType(INFO)
+      loggingType(INFO),
 #else
-      loggingType(WARNING)
+      loggingType(WARNING),
 #endif
+      rng_engine()
 {
     if(isThreaded) {
         flags.set(0);
@@ -29,6 +51,8 @@ UDPC::Context::Context(bool isThreaded)
             UDPC::LOCAL_ADDR = 0x0100007F;
         }
     }
+
+    rng_engine.seed(std::chrono::system_clock::now().time_since_epoch().count());
 }
 
 UDPC::Context *UDPC::verifyContext(void *ctx) {
@@ -82,6 +106,15 @@ void UDPC::preparePacket(char *data, uint32_t protocolID, uint32_t conID,
     std::memcpy(data + 12, &temp, 4);
     temp = htonl(ack);
     std::memcpy(data + 16, &temp, 4);
+}
+
+uint32_t UDPC::generateConnectionID(Context &ctx) {
+    auto dist = std::uniform_int_distribution<uint32_t>(0, 0xFFFFFFFF);
+    uint32_t id = dist(ctx.rng_engine);
+    while(ctx.idMap.find(id) != ctx.idMap.end()) {
+        id = dist(ctx.rng_engine);
+    }
+    return id;
 }
 
 void *UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient) {
@@ -423,7 +456,58 @@ void UDPC_update(void *ctx) {
         }
     }
 
-    // TODO receive packet
+    // receive packet
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+    typedef int socklen_t;
+#endif
+    struct sockaddr_in receivedData;
+    socklen_t receivedDataSize = sizeof(receivedData);
+    int bytes = recvfrom(
+        c->socketHandle,
+        c->recvBuf,
+        UDPC_PACKET_MAX_SIZE,
+        0,
+        (struct sockaddr*) &receivedData,
+        &receivedDataSize);
+
+    if(bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        // no packet was received
+        return;
+    } else if(bytes < 20) {
+        // packet size is too small, invalid packet
+        // TODO log this
+        return;
+    }
+
+    uint32_t temp = ntohl(*((uint32_t*)c->recvBuf));
+    if(temp != c->protocolID) {
+        // Invalid protocol id in packet
+        // TODO log this
+        return;
+    }
+
+    uint32_t conID = ntohl(*((uint32_t*)(c->recvBuf + 4)));
+    uint32_t seqID = ntohl(*((uint32_t*)(c->recvBuf + 8)));
+    uint32_t rseq = ntohl(*((uint32_t*)(c->recvBuf + 12)));
+    uint32_t ack = htonl(*((uint32_t*)(c->recvBuf + 16)));
+
+    bool isConnect = conID & UDPC_ID_CONNECT;
+    bool isPing = conID & UDPC_ID_PING;
+    bool isNotRecChecked = conID & UDPC_ID_NO_REC_CHK;
+    bool isResending = conID & UDPC_ID_RESENDING;
+    conID &= 0x0FFFFFFF;
+
+    if(isConnect && c->flags.test(2)) {
+        // is connect packet and is accepting new connections
+        if(!c->flags.test(1)
+                && c->conMap.find(receivedData.sin_addr.s_addr) == c->conMap.end()) {
+            // is receiving as server, connection did not already exist
+            // TODO log establishing connection with client peer
+            UDPC::ConnectionData newConnection(true, c);
+            // TODO update idMap and conMap with new CD
+            // TODO impl establish connection with client peer as server
+        }
+    }
 
     // TODO impl
 }
