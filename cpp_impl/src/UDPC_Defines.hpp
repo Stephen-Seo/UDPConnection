@@ -7,6 +7,7 @@
 #define UDPC_BAD_MODE_SEND_INTERVAL (1.0f / 10.0f)
 #define UDPC_SENT_PKTS_MAX_SIZE 33
 #define UDPC_QUEUED_PKTS_MAX_SIZE 32
+#define UDPC_GOOD_RTT_LIMIT_SEC 0.25f
 
 #define UDPC_ID_CONNECT 0x80000000
 #define UDPC_ID_PING 0x40000000
@@ -19,7 +20,9 @@
 #include <cstdint>
 #include <deque>
 #include <unordered_map>
+#include <queue>
 #include <random>
+#include <memory>
 
 #include "TSQueue.hpp"
 #include "UDPConnection.h"
@@ -31,7 +34,17 @@ static const auto INIT_PKT_INTERVAL_DT = std::chrono::seconds(5);
 static const auto HEARTBEAT_PKT_INTERVAL_DT = std::chrono::milliseconds(150);
 static const auto PACKET_TIMEOUT_TIME = std::chrono::seconds(1);
 
+// forward declaration
 struct Context;
+
+struct SentPktInfo {
+    typedef std::shared_ptr<SentPktInfo> Ptr;
+
+    SentPktInfo();
+
+    uint32_t id;
+    std::chrono::steady_clock::time_point sentTime;
+};
 
 struct ConnectionData {
     ConnectionData();
@@ -44,6 +57,8 @@ struct ConnectionData {
     // move
     ConnectionData(ConnectionData&& other) = default;
     ConnectionData& operator=(ConnectionData&& other) = default;
+
+    void cleanupSentPkts();
 
     /*
      * 0 - trigger send
@@ -66,6 +81,8 @@ struct ConnectionData {
     std::deque<UDPC_PacketInfo> sentPkts;
     TSQueue<UDPC_PacketInfo> sendPkts;
     TSQueue<UDPC_PacketInfo> priorityPkts;
+    // pkt id to pkt shared_ptr
+    std::unordered_map<uint32_t, SentPktInfo::Ptr> sentInfoMap;
     std::chrono::steady_clock::time_point received;
     std::chrono::steady_clock::time_point sent;
     float rtt;
@@ -115,6 +132,10 @@ void preparePacket(char *data, uint32_t protocolID, uint32_t conID,
                    uint32_t rseq, uint32_t ack, uint32_t *seqID, int flags);
 
 uint32_t generateConnectionID(Context &ctx);
+
+float durationToFSec(
+    const std::chrono::steady_clock::time_point& older,
+    const std::chrono::steady_clock::time_point& newer);
 
 } // namespace UDPC
 

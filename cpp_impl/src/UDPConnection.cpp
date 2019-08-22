@@ -7,6 +7,11 @@
 #include <optional>
 #include <vector>
 
+UDPC::SentPktInfo::SentPktInfo() :
+id(0),
+sentTime(std::chrono::steady_clock::now())
+{}
+
 UDPC::ConnectionData::ConnectionData() :
 flags(),
 timer(0.0f),
@@ -30,6 +35,15 @@ UDPC::ConnectionData::ConnectionData()
         flags.set(3);
         id = UDPC::generateConnectionID(*ctx);
         flags.set(4);
+    }
+}
+
+void UDPC::ConnectionData::cleanupSentPkts() {
+    uint32_t id;
+    while(sentPkts.size() > UDPC_SENT_PKTS_MAX_SIZE) {
+        id = *((uint32_t*)(sentPkts.front().data + 8));
+        sentInfoMap.erase(id);
+        sentPkts.pop_front();
     }
 }
 
@@ -122,6 +136,14 @@ uint32_t UDPC::generateConnectionID(Context &ctx) {
     return id;
 }
 
+float UDPC::durationToFSec(
+        const std::chrono::steady_clock::time_point& older,
+        const std::chrono::steady_clock::time_point& newer) {
+    const auto dt = newer - older;
+    return (float)dt.count()
+        * (float)decltype(dt)::period::num / (float)decltype(dt)::period::den;
+}
+
 void *UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient) {
     UDPC::Context *ctx = new UDPC::Context(false);
 
@@ -200,21 +222,16 @@ void UDPC_update(void *ctx) {
         return;
     }
 
+    const auto prevNow = std::move(c->lastUpdated);
     const auto now = std::chrono::steady_clock::now();
-    const auto dt = now - c->lastUpdated;
-    const float dt_fs = (float)dt.count() * (float)decltype(dt)::period::num /
-                        (float)decltype(dt)::period::den;
+    c->lastUpdated = now;
 
-    std::chrono::steady_clock::duration temp_dt;
     float temp_dt_fs;
     {
         // check timed out, check good/bad mode with rtt, remove timed out
         std::vector<uint32_t> removed;
         for(auto iter = c->conMap.begin(); iter != c->conMap.end(); ++iter) {
-            temp_dt = now - iter->second.received;
-            temp_dt_fs = (float)temp_dt.count() *
-                         (float)decltype(temp_dt)::period::num /
-                         (float)decltype(temp_dt)::period::den;
+            temp_dt_fs = UDPC::durationToFSec(iter->second.received, now);
             if(temp_dt_fs >= UDPC_TIMEOUT_SECONDS) {
                 removed.push_back(iter->first);
                 continue;
@@ -384,11 +401,15 @@ void UDPC_update(void *ctx) {
             pInfo.receiver = iter->first;
             pInfo.senderPort = c->socketInfo.sin_port;
             pInfo.receiverPort = iter->second.port;
+            *((uint32_t*)(pInfo.data + 8)) = iter->second.lseq - 1;
 
             iter->second.sentPkts.push_back(std::move(pInfo));
-            while(iter->second.sentPkts.size() > UDPC_SENT_PKTS_MAX_SIZE) {
-                iter->second.sentPkts.pop_front();
-            }
+            iter->second.cleanupSentPkts();
+
+            // store other pkt info
+            UDPC::SentPktInfo::Ptr sentPktInfo = std::make_shared<UDPC::SentPktInfo>();
+            sentPktInfo->id = iter->second.lseq - 1;
+            iter->second.sentInfoMap.insert(std::make_pair(sentPktInfo->id, sentPktInfo));
         } else {
             // sendPkts or priorityPkts not empty
             UDPC_PacketInfo pInfo;
@@ -440,11 +461,9 @@ void UDPC_update(void *ctx) {
                 sentPInfo.receiverPort = iter->second.port;
 
                 iter->second.sentPkts.push_back(std::move(pInfo));
-                while(iter->second.sentPkts.size() > UDPC_SENT_PKTS_MAX_SIZE) {
-                    iter->second.sentPkts.pop_front();
-                }
+                iter->second.cleanupSentPkts();
             } else {
-                // is not check-received, no data stored but other data is kept
+                // is not check-received, only id stored in data array
                 UDPC_PacketInfo sentPInfo;
                 sentPInfo.flags = 0x4;
                 sentPInfo.dataSize = 0;
@@ -452,12 +471,16 @@ void UDPC_update(void *ctx) {
                 sentPInfo.receiver = iter->first;
                 sentPInfo.senderPort = c->socketInfo.sin_port;
                 sentPInfo.receiverPort = iter->second.port;
+                *((uint32_t*)(sentPInfo.data + 8)) = iter->second.lseq - 1;
 
                 iter->second.sentPkts.push_back(std::move(pInfo));
-                while(iter->second.sentPkts.size() > UDPC_SENT_PKTS_MAX_SIZE) {
-                    iter->second.sentPkts.pop_front();
-                }
+                iter->second.cleanupSentPkts();
             }
+
+            // store other pkt info
+            UDPC::SentPktInfo::Ptr sentPktInfo = std::make_shared<UDPC::SentPktInfo>();
+            sentPktInfo->id = iter->second.lseq - 1;
+            iter->second.sentInfoMap.insert(std::make_pair(sentPktInfo->id, sentPktInfo));
         }
     }
 
@@ -540,6 +563,30 @@ void UDPC_update(void *ctx) {
 
     // packet is valid
     // TODO log received valid packet
+
+    // update rtt
+    for(auto sentIter = iter->second.sentPkts.rbegin(); sentIter != iter->second.sentPkts.rend(); ++sentIter) {
+        uint32_t id = *((uint32_t*)(sentIter->data + 8));
+        if(id == rseq) {
+            auto sentInfoIter = iter->second.sentInfoMap.find(id);
+            assert(sentInfoIter != iter->second.sentInfoMap.end()
+                    && "sentInfoMap should have known stored id");
+            float diff = UDPC::durationToFSec(sentInfoIter->second->sentTime, now);
+            if(diff > iter->second.rtt) {
+                iter->second.rtt += (diff - iter->second.rtt) / 10.0f;
+            } else {
+                iter->second.rtt -= (iter->second.rtt - diff) / 10.0f;
+            }
+
+            iter->second.flags.set(2, iter->second.rtt <= UDPC_GOOD_RTT_LIMIT_SEC);
+
+            // TODO verbose log rtt
+            break;
+        }
+    }
+
+    iter->second.received = now;
+    // TODO impl check pkt timeout
 
     // TODO impl
 }

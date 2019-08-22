@@ -47,6 +47,7 @@ extern "C" {
 typedef enum { SILENT, ERROR, WARNING, VERBOSE, INFO } UDPC_LoggingType;
 
 typedef struct {
+    // id is stored at offset 8, size 4 (uint32_t) even for "empty" PktInfos
     char data[UDPC_PACKET_MAX_SIZE];
     /*
      * 0x1 - connect
