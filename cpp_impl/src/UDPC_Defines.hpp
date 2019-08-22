@@ -37,6 +37,14 @@ struct ConnectionData {
     ConnectionData();
     ConnectionData(bool isServer, Context *ctx);
 
+    // copy
+    ConnectionData(const ConnectionData& other) = delete;
+    ConnectionData& operator=(const ConnectionData& other) = delete;
+
+    // move
+    ConnectionData(ConnectionData&& other) = default;
+    ConnectionData& operator=(ConnectionData&& other) = default;
+
     /*
      * 0 - trigger send
      * 1 - is good mode
@@ -54,7 +62,7 @@ struct ConnectionData {
     float toggleTimer;
     float toggledTimer;
     uint32_t addr; // in network order
-    uint16_t port;
+    uint16_t port; // in native order
     std::deque<UDPC_PacketInfo> sentPkts;
     TSQueue<UDPC_PacketInfo> sendPkts;
     TSQueue<UDPC_PacketInfo> priorityPkts;

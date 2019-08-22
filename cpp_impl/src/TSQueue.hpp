@@ -18,9 +18,9 @@ class TSQueue {
     // disable copy
     TSQueue(const TSQueue &other) = delete;
     TSQueue &operator=(const TSQueue &other) = delete;
-    // disable move
-    TSQueue(TSQueue &&other) = delete;
-    TSQueue &operator=(TSQueue &&other) = delete;
+    // enable move
+    TSQueue(TSQueue &&other);
+    TSQueue &operator=(TSQueue &&other);
 
     bool push(const T &data);
     T top();
@@ -41,6 +41,27 @@ mutex(),
 rb(capacity)
 {
     rb.setResizePolicy(false);
+}
+
+template <typename T>
+TSQueue<T>::TSQueue(TSQueue &&other) :
+TSQueue<T>::TSQueue(other.rb.getCapacity())
+{
+    std::lock_guard<std::mutex> lock(other.mutex);
+    for(unsigned int i = 0; i < other.rb.getSize(); ++i) {
+        rb.push(other.rb[i]);
+    }
+}
+
+template <typename T>
+TSQueue<T>& TSQueue<T>::operator =(TSQueue &&other)
+{
+    std::scoped_lock lock(other.mutex, mutex);
+    rb.resize(0);
+    rb.changeCapacity(other.rb.getCapacity());
+    for(unsigned int i = 0; i < other.rb.getSize(); ++i) {
+        rb.push(other.rb[i]);
+    }
 }
 
 template <typename T>

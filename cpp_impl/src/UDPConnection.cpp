@@ -9,11 +9,16 @@
 
 UDPC::ConnectionData::ConnectionData() :
 flags(),
+timer(0.0f),
+toggleT(30.0f),
+toggleTimer(0.0f),
+toggledTimer(0.0f),
 sentPkts(),
 sendPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
 priorityPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
 received(std::chrono::steady_clock::now()),
-sent(std::chrono::steady_clock::now())
+sent(std::chrono::steady_clock::now()),
+rtt(0.0f)
 {
 }
 
@@ -504,10 +509,37 @@ void UDPC_update(void *ctx) {
             // is receiving as server, connection did not already exist
             // TODO log establishing connection with client peer
             UDPC::ConnectionData newConnection(true, c);
-            // TODO update idMap and conMap with new CD
-            // TODO impl establish connection with client peer as server
+            newConnection.addr = receivedData.sin_addr.s_addr;
+            newConnection.port = ntohs(receivedData.sin_port);
+
+            c->idMap.insert(std::make_pair(newConnection.id, newConnection.addr));
+            c->conMap.insert(std::make_pair(newConnection.addr, std::move(newConnection)));
+            // TODO trigger event server established connection with client
+        } else if (c->flags.test(1)) {
+            // is client
+            auto iter = c->conMap.find(receivedData.sin_addr.s_addr);
+            if(iter == c->conMap.end() || !iter->second.flags.test(3)) {
+                return;
+            }
+            iter->second.flags.reset(3);
+            iter->second.id = conID;
+            iter->second.flags.set(4);
+            // TODO trigger event client established connection with server
         }
+        return;
     }
+
+    auto iter = c->conMap.find(receivedData.sin_addr.s_addr);
+    if(iter == c->conMap.end() || iter->second.flags.test(3)
+            || !iter->second.flags.test(4) || iter->second.id != conID) {
+        return;
+    }
+    else if(isPing) {
+        iter->second.flags.set(0);
+    }
+
+    // packet is valid
+    // TODO log received valid packet
 
     // TODO impl
 }
