@@ -41,7 +41,7 @@ UDPC::ConnectionData::ConnectionData()
 void UDPC::ConnectionData::cleanupSentPkts() {
     uint32_t id;
     while(sentPkts.size() > UDPC_SENT_PKTS_MAX_SIZE) {
-        id = *((uint32_t*)(sentPkts.front().data + 8));
+        id = ntohl(*((uint32_t*)(sentPkts.front().data + 8)));
         sentInfoMap.erase(id);
         sentPkts.pop_front();
     }
@@ -401,7 +401,7 @@ void UDPC_update(void *ctx) {
             pInfo.receiver = iter->first;
             pInfo.senderPort = c->socketInfo.sin_port;
             pInfo.receiverPort = iter->second.port;
-            *((uint32_t*)(pInfo.data + 8)) = iter->second.lseq - 1;
+            *((uint32_t*)(pInfo.data + 8)) = htonl(iter->second.lseq - 1);
 
             iter->second.sentPkts.push_back(std::move(pInfo));
             iter->second.cleanupSentPkts();
@@ -471,7 +471,7 @@ void UDPC_update(void *ctx) {
                 sentPInfo.receiver = iter->first;
                 sentPInfo.senderPort = c->socketInfo.sin_port;
                 sentPInfo.receiverPort = iter->second.port;
-                *((uint32_t*)(sentPInfo.data + 8)) = iter->second.lseq - 1;
+                *((uint32_t*)(sentPInfo.data + 8)) = htonl(iter->second.lseq - 1);
 
                 iter->second.sentPkts.push_back(std::move(pInfo));
                 iter->second.cleanupSentPkts();
@@ -566,7 +566,7 @@ void UDPC_update(void *ctx) {
 
     // update rtt
     for(auto sentIter = iter->second.sentPkts.rbegin(); sentIter != iter->second.sentPkts.rend(); ++sentIter) {
-        uint32_t id = *((uint32_t*)(sentIter->data + 8));
+        uint32_t id = ntohl(*((uint32_t*)(sentIter->data + 8)));
         if(id == rseq) {
             auto sentInfoIter = iter->second.sentInfoMap.find(id);
             assert(sentInfoIter != iter->second.sentInfoMap.end()
@@ -586,7 +586,46 @@ void UDPC_update(void *ctx) {
     }
 
     iter->second.received = now;
-    // TODO impl check pkt timeout
+
+    // check pkt timeout
+    --rseq;
+    for(; ack != 0; ack = ack << 1) {
+        if((ack & 0x80000000) != 0) {
+            --rseq;
+            continue;
+        }
+
+        // pkt not received yet, find it in sent to check if it timed out
+        for(auto sentIter = iter->second.sentPkts.rbegin(); sentIter != iter->second.sentPkts.rend(); ++sentIter) {
+            uint32_t sentID = ntohl(*((uint32_t*)(sentIter->data + 8)));
+            if(sentID == rseq) {
+                if((sentIter->flags & 0x4) != 0 || (sentIter->flags & 0x8) != 0) {
+                    // already resent or not rec-checked pkt
+                    break;
+                }
+                auto sentInfoIter = iter->second.sentInfoMap.find(sentID);
+                assert(sentInfoIter != iter->second.sentInfoMap.end()
+                        && "Every entry in sentPkts must have a corresponding entry in sentInfoMap");
+                float seconds = UDPC::durationToFSec(sentInfoIter->second->sentTime, now);
+                if(seconds > UDPC_PACKET_TIMEOUT_SEC) {
+                    if(sentIter->dataSize <= 20) {
+                        // TODO log error: timed out packet has no data
+                        sentIter->flags |= 0x8;
+                        break;
+                    }
+
+                    UDPC_PacketInfo resendingData;
+                    resendingData.dataSize = sentIter->dataSize - 20;
+                    std::memcpy(resendingData.data, sentIter->data + 20, resendingData.dataSize);
+                    resendingData.flags = 0;
+                    iter->second.priorityPkts.push(resendingData);
+                }
+                break;
+            }
+        }
+
+        --rseq;
+    }
 
     // TODO impl
 }
