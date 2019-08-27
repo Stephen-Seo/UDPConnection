@@ -14,17 +14,17 @@ sentTime(std::chrono::steady_clock::now())
 
 UDPC::ConnectionData::ConnectionData() :
 flags(),
-timer(0.0f),
-toggleT(30.0f),
-toggleTimer(0.0f),
-toggledTimer(0.0f),
+timer(std::chrono::steady_clock::duration::zero()),
+toggleT(std::chrono::seconds(30)),
+toggleTimer(std::chrono::steady_clock::duration::zero()),
+toggledTimer(std::chrono::steady_clock::duration::zero()),
 sentPkts(),
 sendPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
 priorityPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
 receivedPkts(UDPC_RECEIVED_PKTS_MAX_SIZE),
 received(std::chrono::steady_clock::now()),
 sent(std::chrono::steady_clock::now()),
-rtt(0.0f)
+rtt(std::chrono::steady_clock::duration::zero())
 {
     flags.set(0);
 }
@@ -227,13 +227,13 @@ void UDPC_update(void *ctx) {
     const auto now = std::chrono::steady_clock::now();
     c->lastUpdated = now;
 
-    float temp_dt_fs;
+    std::chrono::steady_clock::duration temp_dt_fs;
     {
         // check timed out, check good/bad mode with rtt, remove timed out
         std::vector<uint32_t> removed;
         for(auto iter = c->conMap.begin(); iter != c->conMap.end(); ++iter) {
-            temp_dt_fs = UDPC::durationToFSec(iter->second.received, now);
-            if(temp_dt_fs >= UDPC_TIMEOUT_SECONDS) {
+            temp_dt_fs = now - iter->second.received;
+            if(temp_dt_fs >= UDPC::CONNECTION_TIMEOUT) {
                 removed.push_back(iter->first);
                 continue;
                 // TODO log timed out connection
@@ -246,38 +246,38 @@ void UDPC_update(void *ctx) {
                 // good mode, bad rtt
                 // TODO log switching to bad mode
                 iter->second.flags.reset(1);
-                if(iter->second.toggledTimer <= 10.0f) {
-                    iter->second.toggleT *= 2.0f;
+                if(iter->second.toggledTimer <= UDPC::TEN_SECONDS) {
+                    iter->second.toggleT *= 2;
                 }
-                iter->second.toggledTimer = 0.0f;
+                iter->second.toggledTimer = std::chrono::steady_clock::duration::zero();
             } else if(iter->second.flags.test(1)) {
                 // good mode, good rtt
-                if(iter->second.toggleTimer >= 10.0f) {
-                    iter->second.toggleTimer = 0.0f;
-                    iter->second.toggleT /= 2.0f;
-                    if(iter->second.toggleT < 1.0f) {
-                        iter->second.toggleT = 1.0f;
+                if(iter->second.toggleTimer >= UDPC::TEN_SECONDS) {
+                    iter->second.toggleTimer = std::chrono::steady_clock::duration::zero();
+                    iter->second.toggleT /= 2;
+                    if(iter->second.toggleT < UDPC::ONE_SECOND) {
+                        iter->second.toggleT = UDPC::ONE_SECOND;
                     }
                 }
             } else if(!iter->second.flags.test(1) &&
                       iter->second.flags.test(2)) {
                 // bad mode, good rtt
                 if(iter->second.toggledTimer >= iter->second.toggleT) {
-                    iter->second.toggleTimer = 0.0f;
-                    iter->second.toggledTimer = 0.0f;
+                    iter->second.toggleTimer = std::chrono::steady_clock::duration::zero();
+                    iter->second.toggledTimer = std::chrono::steady_clock::duration::zero();
                     // TODO log switching to good mode
                     iter->second.flags.set(1);
                 }
             } else {
                 // bad mode, bad rtt
-                iter->second.toggledTimer = 0.0f;
+                iter->second.toggledTimer = std::chrono::steady_clock::duration::zero();
             }
 
             iter->second.timer += temp_dt_fs;
             if(iter->second.timer >= (iter->second.flags.test(1)
-                                          ? UDPC_GOOD_MODE_SEND_INTERVAL
-                                          : UDPC_BAD_MODE_SEND_INTERVAL)) {
-                iter->second.timer = 0.0f;
+                                          ? UDPC::GOOD_MODE_SEND_RATE
+                                          : UDPC::BAD_MODE_SEND_RATE)) {
+                iter->second.timer = std::chrono::steady_clock::duration::zero();
                 iter->second.flags.set(0);
             }
         }
@@ -572,14 +572,14 @@ void UDPC_update(void *ctx) {
             auto sentInfoIter = iter->second.sentInfoMap.find(id);
             assert(sentInfoIter != iter->second.sentInfoMap.end()
                     && "sentInfoMap should have known stored id");
-            float diff = UDPC::durationToFSec(sentInfoIter->second->sentTime, now);
+            auto diff = now - sentInfoIter->second->sentTime;
             if(diff > iter->second.rtt) {
-                iter->second.rtt += (diff - iter->second.rtt) / 10.0f;
+                iter->second.rtt += (diff - iter->second.rtt) / 10;
             } else {
-                iter->second.rtt -= (iter->second.rtt - diff) / 10.0f;
+                iter->second.rtt -= (iter->second.rtt - diff) / 10;
             }
 
-            iter->second.flags.set(2, iter->second.rtt <= UDPC_GOOD_RTT_LIMIT_SEC);
+            iter->second.flags.set(2, iter->second.rtt <= UDPC::GOOD_RTT_LIMIT);
 
             // TODO verbose log rtt
             break;
@@ -607,8 +607,8 @@ void UDPC_update(void *ctx) {
                 auto sentInfoIter = iter->second.sentInfoMap.find(sentID);
                 assert(sentInfoIter != iter->second.sentInfoMap.end()
                         && "Every entry in sentPkts must have a corresponding entry in sentInfoMap");
-                float seconds = UDPC::durationToFSec(sentInfoIter->second->sentTime, now);
-                if(seconds > UDPC_PACKET_TIMEOUT_SEC) {
+                auto duration = now - sentInfoIter->second->sentTime;
+                if(duration > UDPC::PACKET_TIMEOUT_TIME) {
                     if(sentIter->dataSize <= 20) {
                         // TODO log error: timed out packet has no data
                         sentIter->flags |= 0x8;
