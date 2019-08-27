@@ -50,6 +50,37 @@ struct SentPktInfo {
     std::chrono::steady_clock::time_point sentTime;
 };
 
+struct ConnectionIdentifier {
+    ConnectionIdentifier();
+    ConnectionIdentifier(uint32_t addr, uint16_t port);
+
+    // copy
+    ConnectionIdentifier(const ConnectionIdentifier& other) = default;
+    ConnectionIdentifier& operator =(const ConnectionIdentifier& other) = default;
+
+    // move
+    ConnectionIdentifier(ConnectionIdentifier&& other) = default;
+    ConnectionIdentifier& operator =(ConnectionIdentifier&& other) = default;
+
+    uint64_t id;
+
+    /// expects address to be in network byte order (big-endian)
+    void setAddr(uint32_t addr);
+    /// expects port to be in native order (not network byte order)
+    void setPort(uint16_t port);
+
+    /// returns address as a 4 byte unsigned int in network byte order (big-endian)
+    uint32_t getAddr() const;
+    /// returns port as a 2 byte unsigned int in native order (not network byte order)
+    uint16_t getPort() const;
+
+    bool operator ==(const ConnectionIdentifier& other) const;
+
+    struct Hasher {
+        std::size_t operator()(const ConnectionIdentifier& key) const;
+    };
+};
+
 struct ConnectionData {
     ConnectionData();
     ConnectionData(bool isServer, Context *ctx);
@@ -114,10 +145,10 @@ struct Context {
     struct sockaddr_in socketInfo;
 
     std::chrono::steady_clock::time_point lastUpdated;
-    // ipv4 address to ConnectionData
-    std::unordered_map<uint32_t, ConnectionData> conMap;
+    // ipv4 address and port to ConnectionData
+    std::unordered_map<ConnectionIdentifier, ConnectionData, ConnectionIdentifier::Hasher> conMap;
     // id to ipv4 address
-    std::unordered_map<uint32_t, uint32_t> idMap;
+    std::unordered_map<uint32_t, ConnectionIdentifier> idMap;
 
     std::default_random_engine rng_engine;
 

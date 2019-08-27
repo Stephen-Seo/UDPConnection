@@ -6,11 +6,47 @@
 #include <cstring>
 #include <optional>
 #include <vector>
+#include <functional>
 
 UDPC::SentPktInfo::SentPktInfo() :
 id(0),
 sentTime(std::chrono::steady_clock::now())
 {}
+
+UDPC::ConnectionIdentifier::ConnectionIdentifier() :
+id(0)
+{}
+
+UDPC::ConnectionIdentifier::ConnectionIdentifier(uint32_t addr, uint16_t port) :
+UDPC::ConnectionIdentifier::ConnectionIdentifier()
+{
+    *((uint32_t*)&id) = addr;
+    *((uint16_t*)(((unsigned char*)&id) + 4)) = port;
+}
+
+void UDPC::ConnectionIdentifier::setAddr(uint32_t addr) {
+    *((uint32_t*)&id) = addr;
+}
+
+void UDPC::ConnectionIdentifier::setPort(uint16_t port) {
+    *((uint16_t*)(((unsigned char*)&id) + 4)) = port;
+}
+
+uint32_t UDPC::ConnectionIdentifier::getAddr() const {
+    return *((uint32_t*)&id);
+}
+
+uint16_t UDPC::ConnectionIdentifier::getPort() const {
+    return *((uint16_t*)(((unsigned char*)&id) + 4));
+}
+
+bool UDPC::ConnectionIdentifier::operator==(const ConnectionIdentifier& other) const {
+    return id == other.id;
+}
+
+std::size_t UDPC::ConnectionIdentifier::Hasher::operator()(const ConnectionIdentifier& key) const {
+    return std::hash<uint64_t>()(key.id);
+}
 
 UDPC::ConnectionData::ConnectionData() :
 flags(),
@@ -230,7 +266,7 @@ void UDPC_update(void *ctx) {
     std::chrono::steady_clock::duration temp_dt_fs;
     {
         // check timed out, check good/bad mode with rtt, remove timed out
-        std::vector<uint32_t> removed;
+        std::vector<UDPC::ConnectionIdentifier> removed;
         for(auto iter = c->conMap.begin(); iter != c->conMap.end(); ++iter) {
             temp_dt_fs = now - iter->second.received;
             if(temp_dt_fs >= UDPC::CONNECTION_TIMEOUT) {
@@ -319,7 +355,7 @@ void UDPC_update(void *ctx) {
 
                 struct sockaddr_in destinationInfo;
                 destinationInfo.sin_family = AF_INET;
-                destinationInfo.sin_addr.s_addr = iter->first;
+                destinationInfo.sin_addr.s_addr = iter->first.getAddr();
                 destinationInfo.sin_port = htons(iter->second.port);
                 long int sentBytes = sendto(
                     c->socketHandle,
@@ -348,7 +384,7 @@ void UDPC_update(void *ctx) {
 
                 struct sockaddr_in destinationInfo;
                 destinationInfo.sin_family = AF_INET;
-                destinationInfo.sin_addr.s_addr = iter->first;
+                destinationInfo.sin_addr.s_addr = iter->first.getAddr();
                 destinationInfo.sin_port = htons(iter->second.port);
                 long int sentBytes = sendto(
                     c->socketHandle,
@@ -384,7 +420,7 @@ void UDPC_update(void *ctx) {
 
             struct sockaddr_in destinationInfo;
             destinationInfo.sin_family = AF_INET;
-            destinationInfo.sin_addr.s_addr = iter->first;
+            destinationInfo.sin_addr.s_addr = iter->first.getAddr();
             destinationInfo.sin_port = htons(iter->second.port);
             long int sentBytes = sendto(
                 c->socketHandle,
@@ -399,7 +435,7 @@ void UDPC_update(void *ctx) {
 
             UDPC_PacketInfo pInfo{{0}, 0, 0, 0, 0, 0, 0};
             pInfo.sender = UDPC::LOCAL_ADDR;
-            pInfo.receiver = iter->first;
+            pInfo.receiver = iter->first.getAddr();
             pInfo.senderPort = c->socketInfo.sin_port;
             pInfo.receiverPort = iter->second.port;
             *((uint32_t*)(pInfo.data + 8)) = htonl(iter->second.lseq - 1);
@@ -437,7 +473,7 @@ void UDPC_update(void *ctx) {
 
             struct sockaddr_in destinationInfo;
             destinationInfo.sin_family = AF_INET;
-            destinationInfo.sin_addr.s_addr = iter->first;
+            destinationInfo.sin_addr.s_addr = iter->first.getAddr();
             destinationInfo.sin_port = htons(iter->second.port);
             long int sentBytes = sendto(
                 c->socketHandle,
@@ -457,7 +493,7 @@ void UDPC_update(void *ctx) {
                 sentPInfo.flags = 0;
                 sentPInfo.dataSize = 20 + pInfo.dataSize;
                 sentPInfo.sender = UDPC::LOCAL_ADDR;
-                sentPInfo.receiver = iter->first;
+                sentPInfo.receiver = iter->first.getAddr();
                 sentPInfo.senderPort = c->socketInfo.sin_port;
                 sentPInfo.receiverPort = iter->second.port;
 
@@ -469,7 +505,7 @@ void UDPC_update(void *ctx) {
                 sentPInfo.flags = 0x4;
                 sentPInfo.dataSize = 0;
                 sentPInfo.sender = UDPC::LOCAL_ADDR;
-                sentPInfo.receiver = iter->first;
+                sentPInfo.receiver = iter->first.getAddr();
                 sentPInfo.senderPort = c->socketInfo.sin_port;
                 sentPInfo.receiverPort = iter->second.port;
                 *((uint32_t*)(sentPInfo.data + 8)) = htonl(iter->second.lseq - 1);
@@ -526,22 +562,24 @@ void UDPC_update(void *ctx) {
     bool isResending = conID & UDPC_ID_RESENDING;
     conID &= 0x0FFFFFFF;
 
+    UDPC::ConnectionIdentifier identifier(receivedData.sin_addr.s_addr, ntohs(receivedData.sin_port));
+
     if(isConnect && c->flags.test(2)) {
         // is connect packet and is accepting new connections
         if(!c->flags.test(1)
-                && c->conMap.find(receivedData.sin_addr.s_addr) == c->conMap.end()) {
+                && c->conMap.find(identifier) == c->conMap.end()) {
             // is receiving as server, connection did not already exist
             // TODO log establishing connection with client peer
             UDPC::ConnectionData newConnection(true, c);
             newConnection.addr = receivedData.sin_addr.s_addr;
             newConnection.port = ntohs(receivedData.sin_port);
 
-            c->idMap.insert(std::make_pair(newConnection.id, newConnection.addr));
-            c->conMap.insert(std::make_pair(newConnection.addr, std::move(newConnection)));
+            c->idMap.insert(std::make_pair(newConnection.id, identifier));
+            c->conMap.insert(std::make_pair(identifier, std::move(newConnection)));
             // TODO trigger event server established connection with client
         } else if (c->flags.test(1)) {
             // is client
-            auto iter = c->conMap.find(receivedData.sin_addr.s_addr);
+            auto iter = c->conMap.find(identifier);
             if(iter == c->conMap.end() || !iter->second.flags.test(3)) {
                 return;
             }
@@ -553,7 +591,7 @@ void UDPC_update(void *ctx) {
         return;
     }
 
-    auto iter = c->conMap.find(receivedData.sin_addr.s_addr);
+    auto iter = c->conMap.find(identifier);
     if(iter == c->conMap.end() || iter->second.flags.test(3)
             || !iter->second.flags.test(4) || iter->second.id != conID) {
         return;
@@ -698,13 +736,15 @@ void UDPC_update(void *ctx) {
     }
 }
 
-int UDPC_get_queue_send_available(void *ctx, uint32_t addr) {
+int UDPC_get_queue_send_available(void *ctx, uint32_t addr, uint16_t port) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return 0;
     }
 
-    auto iter = c->conMap.find(addr);
+    UDPC::ConnectionIdentifier identifier(addr, port);
+
+    auto iter = c->conMap.find(identifier);
     if(iter != c->conMap.end()) {
         return iter->second.sendPkts.capacity() - iter->second.sendPkts.size();
     } else {
@@ -712,7 +752,7 @@ int UDPC_get_queue_send_available(void *ctx, uint32_t addr) {
     }
 }
 
-void UDPC_queue_send(void *ctx, uint32_t destAddr,
+void UDPC_queue_send(void *ctx, uint32_t destAddr, uint16_t destPort,
                      uint32_t isChecked, void *data, uint32_t size) {
     if(size == 0 || !data) {
         return;
@@ -723,7 +763,9 @@ void UDPC_queue_send(void *ctx, uint32_t destAddr,
         return;
     }
 
-    auto iter = c->conMap.find(destAddr);
+    UDPC::ConnectionIdentifier identifier(destAddr, destPort);
+
+    auto iter = c->conMap.find(identifier);
     if(iter == c->conMap.end()) {
         // TODO log failed to add packet to queue; unknown recipient
         return;
@@ -749,13 +791,15 @@ int UDPC_set_accept_new_connections(void *ctx, int isAccepting) {
     return c->isAcceptNewConnections.exchange(isAccepting == 0 ? false : true);
 }
 
-int UDPC_drop_connection(void *ctx, uint32_t addr) {
+int UDPC_drop_connection(void *ctx, uint32_t addr, uint16_t port) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return 0;
     }
 
-    auto iter = c->conMap.find(addr);
+    UDPC::ConnectionIdentifier identifier(addr, port);
+
+    auto iter = c->conMap.find(identifier);
     if(iter != c->conMap.end()) {
         c->conMap.erase(iter);
         return 1;
