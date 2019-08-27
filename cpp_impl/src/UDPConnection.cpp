@@ -313,7 +313,8 @@ void UDPC_update(void *ctx) {
             if(iter->second.timer >= (iter->second.flags.test(1)
                                           ? UDPC::GOOD_MODE_SEND_RATE
                                           : UDPC::BAD_MODE_SEND_RATE)) {
-                iter->second.timer = std::chrono::steady_clock::duration::zero();
+                iter->second.timer -= (iter->second.flags.test(1)
+                        ? UDPC::GOOD_MODE_SEND_RATE : UDPC::BAD_MODE_SEND_RATE);
                 iter->second.flags.set(0);
             }
         }
