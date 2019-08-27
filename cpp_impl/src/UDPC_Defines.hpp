@@ -95,6 +95,7 @@ struct Context {
     Context(bool isThreaded);
 
     uint_fast32_t _contextIdentifier;
+
     char recvBuf[UDPC_PACKET_MAX_SIZE];
     /*
      * 0 - is threaded

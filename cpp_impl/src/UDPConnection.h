@@ -73,12 +73,12 @@ void UDPC_update(void *ctx);
 
 int UDPC_get_queue_send_available(void *ctx, uint32_t addr);
 
-void UDPC_queue_send(void *ctx, uint32_t destAddr, uint16_t destPort,
+void UDPC_queue_send(void *ctx, uint32_t destAddr,
                      uint32_t isChecked, void *data, uint32_t size);
 
 int UDPC_set_accept_new_connections(void *ctx, int isAccepting);
 
-int UDPC_drop_connection(void *ctx, uint32_t addr, uint16_t port);
+int UDPC_drop_connection(void *ctx, uint32_t addr);
 
 uint32_t UDPC_set_protocol_id(void *ctx, uint32_t id);
 
