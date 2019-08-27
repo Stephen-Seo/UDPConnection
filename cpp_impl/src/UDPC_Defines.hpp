@@ -82,6 +82,7 @@ struct ConnectionData {
     std::deque<UDPC_PacketInfo> sentPkts;
     TSQueue<UDPC_PacketInfo> sendPkts;
     TSQueue<UDPC_PacketInfo> priorityPkts;
+    TSQueue<UDPC_PacketInfo> receivedPkts;
     // pkt id to pkt shared_ptr
     std::unordered_map<uint32_t, SentPktInfo::Ptr> sentInfoMap;
     std::chrono::steady_clock::time_point received;

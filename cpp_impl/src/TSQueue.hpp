@@ -28,6 +28,7 @@ class TSQueue {
     void clear();
     void changeCapacity(unsigned int newCapacity);
     unsigned int size();
+    unsigned int capacity();
     bool empty();
 
   private:
@@ -112,6 +113,13 @@ unsigned int TSQueue<T>::size() {
     std::lock_guard<std::mutex> lock(mutex);
     unsigned int size = rb.getSize();
     return size;
+}
+
+template <typename T>
+unsigned int TSQueue<T>::capacity() {
+    std::lock_guard<std::mutex> lock(mutex);
+    unsigned int capacity = rb.getCapacity();
+    return capacity;
 }
 
 template <typename T>

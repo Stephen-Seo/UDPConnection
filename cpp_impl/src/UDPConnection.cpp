@@ -627,7 +627,74 @@ void UDPC_update(void *ctx) {
         --rseq;
     }
 
-    // TODO impl
+    // calculate sequence and ack
+    bool isOutOfOrder = false;
+    uint32_t diff = 0;
+    if(seqID > iter->second.rseq) {
+        diff = seqID - iter->second.rseq;
+        if(diff <= 0x7FFFFFFF) {
+            // sequence is more recent
+            iter->second.rseq = seqID;
+            iter->second.ack = (iter->second.ack >> diff) | 0x80000000;
+        } else {
+            // sequence is older, recalc diff
+            diff = 0xFFFFFFFF - seqID + 1 + iter->second.rseq;
+            if((iter->second.ack & (0x80000000 >> (diff - 1))) != 0) {
+                // already received packet
+                // TODO log that already received packet is ignored
+                return;
+            }
+            iter->second.ack |= 0x80000000 >> (diff - 1);
+            isOutOfOrder = true;
+        }
+    } else if(seqID < iter->second.rseq) {
+        diff = iter->second.rseq - seqID;
+        if(diff <= 0x7FFFFFFF) {
+            // sequence is older
+            if((iter->second.ack & (0x80000000 >> (diff - 1))) != 0) {
+                // already received packet
+                // TODO log that already received packet is ignored
+                return;
+            }
+            iter->second.ack |= 0x80000000 >> (diff - 1);
+            isOutOfOrder = true;
+        } else {
+            // sequence is more recent, recalc diff
+            diff = 0xFFFFFFFF - iter->second.rseq + 1 + seqID;
+            iter->second.rseq = seqID;
+            iter->second.ack = (iter->second.ack >> diff) | 0x80000000;
+        }
+    } else {
+        // already received packet
+        // TODO log that already received packet is ignored
+        return;
+    }
+
+    // TODO log that received packet is out of order
+
+    if(bytes > 20) {
+        UDPC_PacketInfo recPktInfo;
+        std::memcpy(recPktInfo.data, c->recvBuf, bytes);
+        recPktInfo.dataSize = bytes;
+        recPktInfo.flags =
+            (isConnect ? 0x1 : 0)
+            | (isPing ? 0x2 : 0)
+            | (isNotRecChecked ? 0x4 : 0)
+            | (isResending ? 0x8 : 0);
+        recPktInfo.sender = receivedData.sin_addr.s_addr;
+        recPktInfo.receiver = UDPC::LOCAL_ADDR;
+        recPktInfo.senderPort = receivedData.sin_port;
+        recPktInfo.receiverPort = c->socketInfo.sin_port;
+
+        if(iter->second.receivedPkts.size() == iter->second.receivedPkts.capacity()) {
+            // TODO log that receivedPkts is full, so removed an entry for a new one
+            iter->second.receivedPkts.pop();
+        }
+
+        iter->second.receivedPkts.push(recPktInfo);
+    } else if(bytes == 20) {
+        // TODO log that packet had no payload
+    }
 }
 
 int UDPC_get_queue_send_available(void *ctx, uint32_t addr) {
