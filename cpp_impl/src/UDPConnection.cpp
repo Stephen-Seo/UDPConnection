@@ -21,17 +21,18 @@ toggledTimer(0.0f),
 sentPkts(),
 sendPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
 priorityPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
+receivedPkts(UDPC_RECEIVED_PKTS_MAX_SIZE),
 received(std::chrono::steady_clock::now()),
 sent(std::chrono::steady_clock::now()),
 rtt(0.0f)
 {
+    flags.set(0);
 }
 
 UDPC::ConnectionData::ConnectionData(bool isServer, Context *ctx) :
 UDPC::ConnectionData::ConnectionData()
 {
     if(isServer) {
-        flags.set(0);
         flags.set(3);
         id = UDPC::generateConnectionID(*ctx);
         flags.set(4);
