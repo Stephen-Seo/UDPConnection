@@ -86,6 +86,9 @@ int UDPC_set_accept_new_connections(void *ctx, int isAccepting);
 /// addr must be in network byte order (big-endian), port must be in native byte order
 int UDPC_drop_connection(void *ctx, uint32_t addr, uint16_t port);
 
+/// addr must be in network byte order, drops all connections to specified addr
+int UDPC_drop_connection_addr(void *ctx, uint32_t addr);
+
 uint32_t UDPC_set_protocol_id(void *ctx, uint32_t id);
 
 UDPC_LoggingType set_logging_type(void *ctx, UDPC_LoggingType loggingType);

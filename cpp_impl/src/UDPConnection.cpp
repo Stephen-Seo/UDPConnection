@@ -322,11 +322,25 @@ void UDPC_update(void *ctx) {
             }
         }
         for(auto iter = removed.begin(); iter != removed.end(); ++iter) {
+            auto addrConIter = c->addrConMap.find(iter->getAddr());
+            assert(addrConIter != c->addrConMap.end()
+                    && "addrConMap must have an entry for a current connection");
+            auto addrConSetIter = addrConIter->second.find(*iter);
+            assert(addrConSetIter != addrConIter->second.end()
+                    && "nested set in addrConMap must have an entry for a current connection");
+            addrConIter->second.erase(addrConSetIter);
+            if(addrConIter->second.empty()) {
+                c->addrConMap.erase(addrConIter);
+            }
+
             auto cIter = c->conMap.find(*iter);
-            assert(cIter != c->conMap.end());
+            assert(cIter != c->conMap.end()
+                    && "conMap must have the entry set to be removed");
+
             if(cIter->second.flags.test(4)) {
                 c->idMap.erase(cIter->second.id);
             }
+
             c->conMap.erase(cIter);
         }
     }
@@ -584,6 +598,18 @@ void UDPC_update(void *ctx) {
 
             c->idMap.insert(std::make_pair(newConnection.id, identifier));
             c->conMap.insert(std::make_pair(identifier, std::move(newConnection)));
+            auto addrConIter = c->addrConMap.find(identifier.getAddr());
+            if(addrConIter == c->addrConMap.end()) {
+                auto insertResult = c->addrConMap.insert(
+                    std::make_pair(
+                        identifier.getAddr(),
+                        std::unordered_set<UDPC::ConnectionIdentifier, UDPC::ConnectionIdentifier::Hasher>{}
+                    ));
+                assert(insertResult.second
+                        && "Must successfully insert into addrConMap");
+                addrConIter = insertResult.first;
+            }
+            addrConIter->second.insert(identifier);
             // TODO trigger event server established connection with client
         } else if (c->flags.test(1)) {
             // is client
@@ -809,7 +835,42 @@ int UDPC_drop_connection(void *ctx, uint32_t addr, uint16_t port) {
 
     auto iter = c->conMap.find(identifier);
     if(iter != c->conMap.end()) {
+        if(iter->second.flags.test(4)) {
+            c->idMap.erase(iter->second.id);
+        }
+        auto addrConIter = c->addrConMap.find(addr);
+        if(addrConIter != c->addrConMap.end()) {
+            addrConIter->second.erase(identifier);
+            if(addrConIter->second.empty()) {
+                c->addrConMap.erase(addrConIter);
+            }
+        }
         c->conMap.erase(iter);
+        return 1;
+    }
+
+    return 0;
+}
+
+int UDPC_drop_connection_addr(void *ctx, uint32_t addr) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return 0;
+    }
+
+    auto addrConIter = c->addrConMap.find(addr);
+    if(addrConIter != c->addrConMap.end()) {
+        for(auto identIter = addrConIter->second.begin();
+                identIter != addrConIter->second.end();
+                ++identIter) {
+            auto conIter = c->conMap.find(*identIter);
+            assert(conIter != c->conMap.end());
+            if(conIter->second.flags.test(4)) {
+                c->idMap.erase(conIter->second.id);
+            }
+            c->conMap.erase(conIter);
+        }
+        c->addrConMap.erase(addrConIter);
         return 1;
     }
 

@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <deque>
 #include <unordered_map>
+#include <unordered_set>
 #include <queue>
 #include <random>
 #include <memory>
@@ -147,6 +148,8 @@ struct Context {
     std::chrono::steady_clock::time_point lastUpdated;
     // ipv4 address and port (as ConnectionIdentifier) to ConnectionData
     std::unordered_map<ConnectionIdentifier, ConnectionData, ConnectionIdentifier::Hasher> conMap;
+    // ipv4 address to all connected ConnectionIdentifiers
+    std::unordered_map<uint32_t, std::unordered_set<ConnectionIdentifier, ConnectionIdentifier::Hasher> > addrConMap;
     // id to ipv4 address and port (as ConnectionIdentifier)
     std::unordered_map<uint32_t, ConnectionIdentifier> idMap;
 
