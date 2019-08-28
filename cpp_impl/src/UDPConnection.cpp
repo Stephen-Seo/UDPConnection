@@ -78,8 +78,11 @@ UDPC::ConnectionData::ConnectionData()
 void UDPC::ConnectionData::cleanupSentPkts() {
     uint32_t id;
     while(sentPkts.size() > UDPC_SENT_PKTS_MAX_SIZE) {
-        id = ntohl(*((uint32_t*)(sentPkts.front().data + 8)));
-        sentInfoMap.erase(id);
+        id = *((uint32_t*)(sentPkts.front().data + 8));
+        auto iter = sentInfoMap.find(id);
+        assert(iter != sentInfoMap.end()
+                && "Sent packet must have correspoding entry in sentInfoMap");
+        sentInfoMap.erase(iter);
         sentPkts.pop_front();
     }
 }
@@ -367,6 +370,7 @@ void UDPC_update(void *ctx) {
                     sizeof(struct sockaddr_in));
                 if(sentBytes != 20) {
                     // TODO log fail of sending connection-initiate-packet
+                    continue;
                 }
             } else {
                 // is server, initiate connection to client
@@ -396,6 +400,7 @@ void UDPC_update(void *ctx) {
                     sizeof(struct sockaddr_in));
                 if(sentBytes != 20) {
                     // TODO log fail send init connection packet as server
+                    continue;
                 }
             }
             continue;
@@ -432,6 +437,7 @@ void UDPC_update(void *ctx) {
                 sizeof(struct sockaddr_in));
             if(sentBytes != 20) {
                 // TODO log fail send heartbeat packet
+                continue;
             }
 
             UDPC_PacketInfo pInfo{{0}, 0, 0, 0, 0, 0, 0};
@@ -439,7 +445,7 @@ void UDPC_update(void *ctx) {
             pInfo.receiver = iter->first.getAddr();
             pInfo.senderPort = c->socketInfo.sin_port;
             pInfo.receiverPort = iter->second.port;
-            *((uint32_t*)(pInfo.data + 8)) = htonl(iter->second.lseq - 1);
+            *((uint32_t*)(pInfo.data + 8)) = iter->second.lseq - 1;
 
             iter->second.sentPkts.push_back(std::move(pInfo));
             iter->second.cleanupSentPkts();
@@ -485,6 +491,7 @@ void UDPC_update(void *ctx) {
                 sizeof(struct sockaddr_in));
             if(sentBytes != 20 + pInfo.dataSize) {
                 // TODO log fail send packet
+                continue;
             }
 
             if((pInfo.flags & 0x4) == 0) {
@@ -509,7 +516,7 @@ void UDPC_update(void *ctx) {
                 sentPInfo.receiver = iter->first.getAddr();
                 sentPInfo.senderPort = c->socketInfo.sin_port;
                 sentPInfo.receiverPort = iter->second.port;
-                *((uint32_t*)(sentPInfo.data + 8)) = htonl(iter->second.lseq - 1);
+                *((uint32_t*)(sentPInfo.data + 8)) = iter->second.lseq - 1;
 
                 iter->second.sentPkts.push_back(std::move(pInfo));
                 iter->second.cleanupSentPkts();

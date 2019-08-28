@@ -145,9 +145,9 @@ struct Context {
     struct sockaddr_in socketInfo;
 
     std::chrono::steady_clock::time_point lastUpdated;
-    // ipv4 address and port to ConnectionData
+    // ipv4 address and port (as ConnectionIdentifier) to ConnectionData
     std::unordered_map<ConnectionIdentifier, ConnectionData, ConnectionIdentifier::Hasher> conMap;
-    // id to ipv4 address
+    // id to ipv4 address and port (as ConnectionIdentifier)
     std::unordered_map<uint32_t, ConnectionIdentifier> idMap;
 
     std::default_random_engine rng_engine;
