@@ -93,15 +93,17 @@ void UDPC::ConnectionData::cleanupSentPkts() {
     }
 }
 
-UDPC::Context::Context(bool isThreaded)
-    : _contextIdentifier(UDPC_CONTEXT_IDENTIFIER), flags(),
-      isAcceptNewConnections(true), protocolID(UDPC_DEFAULT_PROTOCOL_ID),
+UDPC::Context::Context(bool isThreaded) :
+_contextIdentifier(UDPC_CONTEXT_IDENTIFIER),
+flags(),
+isAcceptNewConnections(true),
+protocolID(UDPC_DEFAULT_PROTOCOL_ID),
 #ifndef NDEBUG
-      loggingType(INFO),
+loggingType(INFO),
 #else
-      loggingType(WARNING),
+loggingType(WARNING),
 #endif
-      rng_engine()
+rng_engine()
 {
     if(isThreaded) {
         flags.set(0);
