@@ -73,10 +73,13 @@ void UDPC_destroy(void *ctx);
 
 void UDPC_update(void *ctx);
 
-/// port must be in native byte order, addr must be in network byte order (big-endian)
+/// addr must be in network byte order (big-endian), port must be in native byte order
+void UDPC_client_initiate_connection(void *ctx, uint32_t addr, uint16_t port);
+
+/// addr must be in network byte order (big-endian), port must be in native byte order
 int UDPC_get_queue_send_available(void *ctx, uint32_t addr, uint16_t port);
 
-/// destPort must be in native byte order, destAddr must be in network byte order (big-endian)
+/// destAddr must be in network byte order (big-endian), destPort must be in native byte order
 void UDPC_queue_send(void *ctx, uint32_t destAddr, uint16_t destPort,
                      uint32_t isChecked, void *data, uint32_t size);
 

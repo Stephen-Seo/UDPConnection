@@ -50,8 +50,12 @@ std::size_t UDPC::ConnectionIdentifier::Hasher::operator()(const ConnectionIdent
 
 UDPC::ConnectionData::ConnectionData() :
 flags(),
+id(0),
+lseq(0),
+rseq(0),
+ack(0xFFFFFFFF),
 timer(std::chrono::steady_clock::duration::zero()),
-toggleT(std::chrono::seconds(30)),
+toggleT(UDPC::THIRTY_SECONDS),
 toggleTimer(std::chrono::steady_clock::duration::zero()),
 toggledTimer(std::chrono::steady_clock::duration::zero()),
 sentPkts(),
@@ -68,10 +72,12 @@ rtt(std::chrono::steady_clock::duration::zero())
 UDPC::ConnectionData::ConnectionData(bool isServer, Context *ctx) :
 UDPC::ConnectionData::ConnectionData()
 {
+    flags.set(3);
     if(isServer) {
-        flags.set(3);
         id = UDPC::generateConnectionID(*ctx);
         flags.set(4);
+    } else {
+        lseq = 1;
     }
 }
 
@@ -768,6 +774,29 @@ void UDPC_update(void *ctx) {
     } else if(bytes == 20) {
         // TODO log that packet had no payload
     }
+}
+
+void UDPC_client_initiate_connection(void *ctx, uint32_t addr, uint16_t port) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c || !c->flags.test(1)) {
+        return;
+    }
+
+    UDPC::ConnectionData newCon(false, c);
+    UDPC::ConnectionIdentifier identifier(addr, port);
+
+    // TODO make thread safe by using mutex
+    c->conMap.insert(std::make_pair(identifier, std::move(newCon)));
+    auto addrConIter = c->addrConMap.find(addr);
+    if(addrConIter == c->addrConMap.end()) {
+        auto insertResult = c->addrConMap.insert(std::make_pair(
+                addr,
+                std::unordered_set<UDPC::ConnectionIdentifier, UDPC::ConnectionIdentifier::Hasher>{}
+            ));
+        assert(insertResult.second);
+        addrConIter = insertResult.first;
+    }
+    addrConIter->second.insert(identifier);
 }
 
 int UDPC_get_queue_send_available(void *ctx, uint32_t addr, uint16_t port) {

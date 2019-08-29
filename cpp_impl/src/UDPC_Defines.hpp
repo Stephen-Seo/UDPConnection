@@ -29,6 +29,7 @@ namespace UDPC {
 
 static const auto ONE_SECOND = std::chrono::seconds(1);
 static const auto TEN_SECONDS = std::chrono::seconds(10);
+static const auto THIRTY_SECONDS = std::chrono::seconds(30);
 
 static uint32_t LOCAL_ADDR = 0;
 static const auto INIT_PKT_INTERVAL_DT = std::chrono::seconds(5);
