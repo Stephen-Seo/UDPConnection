@@ -7,6 +7,7 @@
 #include <optional>
 #include <vector>
 #include <functional>
+#include <type_traits>
 
 UDPC::SentPktInfo::SentPktInfo() :
 id(0),
@@ -184,7 +185,13 @@ uint32_t UDPC::generateConnectionID(Context &ctx) {
     return id;
 }
 
-float UDPC::durationToFSec(
+float UDPC::durationToFSec(const std::chrono::steady_clock::duration& duration) {
+    return (float)duration.count()
+        * (float)std::decay_t<decltype(duration)>::period::num
+        / (float)std::decay_t<decltype(duration)>::period::den;
+}
+
+float UDPC::timePointsToFSec(
         const std::chrono::steady_clock::time_point& older,
         const std::chrono::steady_clock::time_point& newer) {
     const auto dt = newer - older;
@@ -282,8 +289,13 @@ void UDPC_update(void *ctx) {
             temp_dt_fs = now - iter->second.received;
             if(temp_dt_fs >= UDPC::CONNECTION_TIMEOUT) {
                 removed.push_back(iter->first);
+                c->log(
+                    UDPC_LoggingType::VERBOSE,
+                    "Timed out connection with ",
+                    UDPC_atostr(c, iter->second.addr),
+                    ":",
+                    iter->second.port);
                 continue;
-                // TODO log timed out connection
             }
 
             // check good/bad mode
@@ -291,7 +303,12 @@ void UDPC_update(void *ctx) {
             iter->second.toggledTimer += temp_dt_fs;
             if(iter->second.flags.test(1) && !iter->second.flags.test(2)) {
                 // good mode, bad rtt
-                // TODO log switching to bad mode
+                c->log(
+                    UDPC_LoggingType::INFO,
+                    "Switching to bad mode in connection with ",
+                    UDPC_atostr(c, iter->second.addr),
+                    ":",
+                    iter->second.port);
                 iter->second.flags.reset(1);
                 if(iter->second.toggledTimer <= UDPC::TEN_SECONDS) {
                     iter->second.toggleT *= 2;
@@ -312,7 +329,12 @@ void UDPC_update(void *ctx) {
                 if(iter->second.toggledTimer >= iter->second.toggleT) {
                     iter->second.toggleTimer = std::chrono::steady_clock::duration::zero();
                     iter->second.toggledTimer = std::chrono::steady_clock::duration::zero();
-                    // TODO log switching to good mode
+                    c->log(
+                        UDPC_LoggingType::INFO,
+                        "Switching to good mode in connection with ",
+                        UDPC_atostr(c, iter->second.addr),
+                        ":",
+                        iter->second.port);
                     iter->second.flags.set(1);
                 }
             } else {
@@ -381,7 +403,7 @@ void UDPC_update(void *ctx) {
 
                 struct sockaddr_in destinationInfo;
                 destinationInfo.sin_family = AF_INET;
-                destinationInfo.sin_addr.s_addr = iter->first.getAddr();
+                destinationInfo.sin_addr.s_addr = iter->second.addr;
                 destinationInfo.sin_port = htons(iter->second.port);
                 long int sentBytes = sendto(
                     c->socketHandle,
@@ -391,7 +413,12 @@ void UDPC_update(void *ctx) {
                     (struct sockaddr*) &destinationInfo,
                     sizeof(struct sockaddr_in));
                 if(sentBytes != 20) {
-                    // TODO log fail of sending connection-initiate-packet
+                    c->log(
+                        UDPC_LoggingType::ERROR,
+                        "Failed to send packet to initiate connection to ",
+                        UDPC_atostr(c, iter->second.addr),
+                        ":",
+                        iter->second.port);
                     continue;
                 }
             } else {
@@ -411,7 +438,7 @@ void UDPC_update(void *ctx) {
 
                 struct sockaddr_in destinationInfo;
                 destinationInfo.sin_family = AF_INET;
-                destinationInfo.sin_addr.s_addr = iter->first.getAddr();
+                destinationInfo.sin_addr.s_addr = iter->second.addr;
                 destinationInfo.sin_port = htons(iter->second.port);
                 long int sentBytes = sendto(
                     c->socketHandle,
@@ -421,7 +448,12 @@ void UDPC_update(void *ctx) {
                     (struct sockaddr*) &destinationInfo,
                     sizeof(struct sockaddr_in));
                 if(sentBytes != 20) {
-                    // TODO log fail send init connection packet as server
+                    c->log(
+                        UDPC_LoggingType::ERROR,
+                        "Failed to send packet to initiate connection to ",
+                        UDPC_atostr(c, iter->second.addr),
+                        ":",
+                        iter->second.port);
                     continue;
                 }
             }
@@ -448,7 +480,7 @@ void UDPC_update(void *ctx) {
 
             struct sockaddr_in destinationInfo;
             destinationInfo.sin_family = AF_INET;
-            destinationInfo.sin_addr.s_addr = iter->first.getAddr();
+            destinationInfo.sin_addr.s_addr = iter->second.addr;
             destinationInfo.sin_port = htons(iter->second.port);
             long int sentBytes = sendto(
                 c->socketHandle,
@@ -458,7 +490,12 @@ void UDPC_update(void *ctx) {
                 (struct sockaddr*) &destinationInfo,
                 sizeof(struct sockaddr_in));
             if(sentBytes != 20) {
-                // TODO log fail send heartbeat packet
+                c->log(
+                    UDPC_LoggingType::ERROR,
+                    "Failed to send heartbeat packet to ",
+                    UDPC_atostr(c, iter->second.addr),
+                    ":",
+                    iter->second.port);
                 continue;
             }
 
@@ -502,7 +539,7 @@ void UDPC_update(void *ctx) {
 
             struct sockaddr_in destinationInfo;
             destinationInfo.sin_family = AF_INET;
-            destinationInfo.sin_addr.s_addr = iter->first.getAddr();
+            destinationInfo.sin_addr.s_addr = iter->second.addr;
             destinationInfo.sin_port = htons(iter->second.port);
             long int sentBytes = sendto(
                 c->socketHandle,
@@ -512,7 +549,12 @@ void UDPC_update(void *ctx) {
                 (struct sockaddr*) &destinationInfo,
                 sizeof(struct sockaddr_in));
             if(sentBytes != 20 + pInfo.dataSize) {
-                // TODO log fail send packet
+                c->log(
+                    UDPC_LoggingType::ERROR,
+                    "Failed to send packet to ",
+                    UDPC_atostr(c, iter->second.addr),
+                    ":",
+                    iter->second.port);
                 continue;
             }
 
@@ -570,14 +612,24 @@ void UDPC_update(void *ctx) {
         return;
     } else if(bytes < 20) {
         // packet size is too small, invalid packet
-        // TODO log this
+        c->log(
+            UDPC_LoggingType::INFO,
+            "Received packet is smaller than header, ignoring packet from ",
+            UDPC_atostr(c, receivedData.sin_addr.s_addr),
+            ":",
+            receivedData.sin_port);
         return;
     }
 
     uint32_t temp = ntohl(*((uint32_t*)c->recvBuf));
     if(temp != c->protocolID) {
         // Invalid protocol id in packet
-        // TODO log this
+        c->log(
+            UDPC_LoggingType::INFO,
+            "Received packet has invalid protocol id, ignoring packet from ",
+            UDPC_atostr(c, receivedData.sin_addr.s_addr),
+            ":",
+            receivedData.sin_port);
         return;
     }
 
@@ -599,7 +651,12 @@ void UDPC_update(void *ctx) {
         if(!c->flags.test(1)
                 && c->conMap.find(identifier) == c->conMap.end()) {
             // is receiving as server, connection did not already exist
-            // TODO log establishing connection with client peer
+            c->log(
+                UDPC_LoggingType::VERBOSE,
+                "Establishing connection with client ",
+                UDPC_atostr(c, receivedData.sin_addr.s_addr),
+                ":",
+                receivedData.sin_port);
             UDPC::ConnectionData newConnection(true, c);
             newConnection.addr = receivedData.sin_addr.s_addr;
             newConnection.port = ntohs(receivedData.sin_port);
@@ -628,6 +685,12 @@ void UDPC_update(void *ctx) {
             iter->second.flags.reset(3);
             iter->second.id = conID;
             iter->second.flags.set(4);
+            c->log(
+                UDPC_LoggingType::VERBOSE,
+                "Established connection with server ",
+                UDPC_atostr(c, receivedData.sin_addr.s_addr),
+                ":",
+                receivedData.sin_port);
             // TODO trigger event client established connection with server
         }
         return;
@@ -643,7 +706,12 @@ void UDPC_update(void *ctx) {
     }
 
     // packet is valid
-    // TODO log received valid packet
+    c->log(
+        UDPC_LoggingType::INFO,
+        "Received valid packet from ",
+        UDPC_atostr(c, receivedData.sin_addr.s_addr),
+        ":",
+        receivedData.sin_port);
 
     // update rtt
     for(auto sentIter = iter->second.sentPkts.rbegin(); sentIter != iter->second.sentPkts.rend(); ++sentIter) {
@@ -661,7 +729,10 @@ void UDPC_update(void *ctx) {
 
             iter->second.flags.set(2, iter->second.rtt <= UDPC::GOOD_RTT_LIMIT);
 
-            // TODO verbose log rtt
+            c->log(
+                UDPC_LoggingType::INFO,
+                "RTT: ",
+                UDPC::durationToFSec(iter->second.rtt));
             break;
         }
     }
@@ -690,7 +761,10 @@ void UDPC_update(void *ctx) {
                 auto duration = now - sentInfoIter->second->sentTime;
                 if(duration > UDPC::PACKET_TIMEOUT_TIME) {
                     if(sentIter->dataSize <= 20) {
-                        // TODO log error: timed out packet has no data
+                        c->log(
+                            UDPC_LoggingType::INFO,
+                            "Timed out packet has no payload (probably "
+                            "heartbeat packet), ignoring it");
                         sentIter->flags |= 0x8;
                         break;
                     }
@@ -722,7 +796,9 @@ void UDPC_update(void *ctx) {
             diff = 0xFFFFFFFF - seqID + 1 + iter->second.rseq;
             if((iter->second.ack & (0x80000000 >> (diff - 1))) != 0) {
                 // already received packet
-                // TODO log that already received packet is ignored
+                c->log(
+                    UDPC_LoggingType::INFO,
+                    "Received packet is already marked as received, ignoring it");
                 return;
             }
             iter->second.ack |= 0x80000000 >> (diff - 1);
@@ -734,7 +810,9 @@ void UDPC_update(void *ctx) {
             // sequence is older
             if((iter->second.ack & (0x80000000 >> (diff - 1))) != 0) {
                 // already received packet
-                // TODO log that already received packet is ignored
+                c->log(
+                    UDPC_LoggingType::INFO,
+                    "Received packet is already marked as received, ignoring it");
                 return;
             }
             iter->second.ack |= 0x80000000 >> (diff - 1);
@@ -747,11 +825,17 @@ void UDPC_update(void *ctx) {
         }
     } else {
         // already received packet
-        // TODO log that already received packet is ignored
+        c->log(
+            UDPC_LoggingType::INFO,
+            "Received packet is already marked as received, ignoring it");
         return;
     }
 
-    // TODO log that received packet is out of order
+    if(isOutOfOrder) {
+        c->log(
+            UDPC_LoggingType::VERBOSE,
+            "Received packet is out of order");
+    }
 
     if(bytes > 20) {
         UDPC_PacketInfo recPktInfo;
@@ -768,13 +852,17 @@ void UDPC_update(void *ctx) {
         recPktInfo.receiverPort = c->socketInfo.sin_port;
 
         if(iter->second.receivedPkts.size() == iter->second.receivedPkts.capacity()) {
-            // TODO log that receivedPkts is full, so removed an entry for a new one
+            c->log(
+                UDPC_LoggingType::WARNING,
+                "receivedPkts is full, removing oldest entry to make room");
             iter->second.receivedPkts.pop();
         }
 
         iter->second.receivedPkts.push(recPktInfo);
     } else if(bytes == 20) {
-        // TODO log that packet had no payload
+        c->log(
+            UDPC_LoggingType::VERBOSE,
+            "Received packet has no payload");
     }
 }
 
@@ -832,7 +920,10 @@ void UDPC_queue_send(void *ctx, uint32_t destAddr, uint16_t destPort,
 
     auto iter = c->conMap.find(identifier);
     if(iter == c->conMap.end()) {
-        // TODO log failed to add packet to queue; unknown recipient
+        c->log(
+            UDPC_LoggingType::ERROR,
+            "Failed to add packet to queue, no established connection "
+            "with recipient");
         return;
     }
 

@@ -21,6 +21,8 @@
 #include <queue>
 #include <random>
 #include <memory>
+#include <thread>
+#include <iostream>
 
 #include "TSQueue.hpp"
 #include "UDPConnection.h"
@@ -127,8 +129,120 @@ struct ConnectionData {
 }; // struct ConnectionData
 
 struct Context {
+public:
     Context(bool isThreaded);
 
+    void log(UDPC_LoggingType) {}
+
+    template<typename... Targs>
+    void log(UDPC_LoggingType type, Targs... args) {
+        log_impl(type, args...);
+    }
+
+private:
+    void log_impl(UDPC_LoggingType) {}
+
+    template<typename... Targs>
+    void log_impl(UDPC_LoggingType type, Targs... args) {
+        switch(loggingType.load()) {
+        case UDPC_LoggingType::SILENT:
+            return;
+        case UDPC_LoggingType::ERROR:
+            if(type == UDPC_LoggingType::ERROR) {
+                std::cerr << "ERROR: ";
+            } else {
+                return;
+            }
+            break;
+        case UDPC_LoggingType::WARNING:
+            switch(type) {
+            case UDPC_LoggingType::ERROR:
+                std::cerr << "ERROR: ";
+                break;
+            case UDPC_LoggingType::WARNING:
+                std::cerr << "WARNING: ";
+                break;
+            default:
+                return;
+            }
+            break;
+        case UDPC_LoggingType::VERBOSE:
+            switch(type) {
+            case UDPC_LoggingType::ERROR:
+                std::cerr << "ERROR: ";
+                break;
+            case UDPC_LoggingType::WARNING:
+                std::cerr << "WARNING: ";
+                break;
+            case UDPC_LoggingType::VERBOSE:
+                std::cerr << "VERBOSE: ";
+                break;
+            default:
+                return;
+            }
+            break;
+        case UDPC_LoggingType::INFO:
+            switch(type) {
+            case UDPC_LoggingType::ERROR:
+                std::cerr << "ERROR: ";
+                break;
+            case UDPC_LoggingType::WARNING:
+                std::cerr << "WARNING: ";
+                break;
+            case UDPC_LoggingType::VERBOSE:
+                std::cerr << "VERBOSE: ";
+                break;
+            case UDPC_LoggingType::INFO:
+                std::cerr << "INFO: ";
+                break;
+            default:
+                return;
+            }
+            break;
+        default:
+            return;
+        }
+
+        log_impl_next(type, args...);
+    }
+
+    void log_impl_next(UDPC_LoggingType) {
+        std::cerr << '\n';
+    }
+
+    template<typename T, typename... Targs>
+    void log_impl_next(UDPC_LoggingType type, T value, Targs... args) {
+        switch(loggingType.load()) {
+        case UDPC_LoggingType::SILENT:
+            return;
+        case UDPC_LoggingType::ERROR:
+            if(type == UDPC_LoggingType::ERROR) {
+                std::cerr << value;
+            }
+            break;
+        case UDPC_LoggingType::WARNING:
+            if(type == UDPC_LoggingType::ERROR || type == UDPC_LoggingType::WARNING) {
+                std::cerr << value;
+            }
+            break;
+        case UDPC_LoggingType::VERBOSE:
+            if(type == UDPC_LoggingType::ERROR || type == UDPC_LoggingType::WARNING
+                    || type == UDPC_LoggingType::VERBOSE) {
+                std::cerr << value;
+            }
+            break;
+        case UDPC_LoggingType::INFO:
+            if(type == UDPC_LoggingType::ERROR || type == UDPC_LoggingType::WARNING
+                    || type == UDPC_LoggingType::VERBOSE
+                    || type == UDPC_LoggingType::INFO) {
+                std::cerr << value;
+            }
+            break;
+        }
+        log_impl_next(loggingType, args...);
+    }
+
+public:
     uint_fast32_t _contextIdentifier;
 
     char recvBuf[UDPC_PACKET_MAX_SIZE];
@@ -174,7 +288,9 @@ void preparePacket(char *data, uint32_t protocolID, uint32_t conID,
 
 uint32_t generateConnectionID(Context &ctx);
 
-float durationToFSec(
+float durationToFSec(const std::chrono::steady_clock::duration& duration);
+
+float timePointsToFSec(
     const std::chrono::steady_clock::time_point& older,
     const std::chrono::steady_clock::time_point& newer);
 
