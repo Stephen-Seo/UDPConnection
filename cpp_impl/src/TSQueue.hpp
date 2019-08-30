@@ -25,6 +25,7 @@ class TSQueue {
     bool push(const T &data);
     T top();
     bool pop();
+    T top_and_pop();
     void clear();
     void changeCapacity(unsigned int newCapacity);
     unsigned int size();
@@ -94,6 +95,14 @@ bool TSQueue<T>::pop() {
     }
     rb.pop();
     return true;
+}
+
+template <typename T>
+T TSQueue<T>::top_and_pop() {
+    std::lock_guard<std::mutex> lock(mutex);
+    T value = rb.top();
+    rb.pop();
+    return value;
 }
 
 template <typename T>
