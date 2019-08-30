@@ -90,7 +90,6 @@ void UDPC_queue_send(UDPC_HContext ctx, uint32_t destAddr, uint16_t destPort,
 
 int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);
 
-// TODO implement drop_connection for all connections on an address and any port
 /// addr must be in network byte order (big-endian), port must be in native byte order
 int UDPC_drop_connection(UDPC_HContext ctx, uint32_t addr, uint16_t port);
 
