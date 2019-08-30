@@ -8,13 +8,13 @@
 TEST(UDPC, atostr) {
     UDPC::Context context(false);
 
-    UDPC_atostr(&context, 0x0100007F);
+    UDPC_atostr((UDPC_HContext)&context, 0x0100007F);
     EXPECT_EQ(std::strcmp(context.atostrBuf, "127.0.0.1"), 0);
 
-    UDPC_atostr(&context, 0xFF08000A);
+    UDPC_atostr((UDPC_HContext)&context, 0xFF08000A);
     EXPECT_EQ(std::strcmp(context.atostrBuf, "10.0.8.255"), 0);
 
-    UDPC_atostr(&context, 0x0201A8C0);
+    UDPC_atostr((UDPC_HContext)&context, 0x0201A8C0);
     EXPECT_EQ(std::strcmp(context.atostrBuf, "192.168.1.2"), 0);
 }
 

@@ -239,7 +239,7 @@ private:
             }
             break;
         }
-        log_impl_next(loggingType, args...);
+        log_impl_next(type, args...);
     }
 
 public:
@@ -272,7 +272,7 @@ public:
 
 }; // struct Context
 
-Context *verifyContext(void *ctx);
+Context *verifyContext(UDPC_HContext ctx);
 
 bool isBigEndian();
 

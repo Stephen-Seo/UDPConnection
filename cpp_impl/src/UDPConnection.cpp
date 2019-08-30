@@ -123,7 +123,7 @@ rng_engine()
     rng_engine.seed(std::chrono::system_clock::now().time_since_epoch().count());
 }
 
-UDPC::Context *UDPC::verifyContext(void *ctx) {
+UDPC::Context *UDPC::verifyContext(UDPC_HContext ctx) {
     if(ctx == nullptr) {
         return nullptr;
     }
@@ -199,7 +199,7 @@ float UDPC::timePointsToFSec(
         * (float)decltype(dt)::period::num / (float)decltype(dt)::period::den;
 }
 
-void *UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient) {
+UDPC_HContext UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient) {
     UDPC::Context *ctx = new UDPC::Context(false);
     ctx->flags.set(1, isClient);
 
@@ -249,10 +249,10 @@ void *UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient) {
         return nullptr;
     }
 
-    return ctx;
+    return (UDPC_HContext) ctx;
 }
 
-void *UDPC_init_threaded_update(uint16_t listenPort, uint32_t listenAddr,
+UDPC_HContext UDPC_init_threaded_update(uint16_t listenPort, uint32_t listenAddr,
                                 int isClient) {
     UDPC::Context *ctx =
         (UDPC::Context *)UDPC_init(listenPort, listenAddr, isClient);
@@ -261,17 +261,17 @@ void *UDPC_init_threaded_update(uint16_t listenPort, uint32_t listenAddr,
     }
     ctx->flags.set(0);
 
-    return ctx;
+    return (UDPC_HContext) ctx;
 }
 
-void UDPC_destroy(void *ctx) {
+void UDPC_destroy(UDPC_HContext ctx) {
     UDPC::Context *UDPC_ctx = UDPC::verifyContext(ctx);
     if(UDPC_ctx) {
         delete UDPC_ctx;
     }
 }
 
-void UDPC_update(void *ctx) {
+void UDPC_update(UDPC_HContext ctx) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c || c->flags.test(0)) {
         // invalid or is threaded, update should not be called
@@ -292,7 +292,7 @@ void UDPC_update(void *ctx) {
                 c->log(
                     UDPC_LoggingType::VERBOSE,
                     "Timed out connection with ",
-                    UDPC_atostr(c, iter->second.addr),
+                    UDPC_atostr(ctx, iter->second.addr),
                     ":",
                     iter->second.port);
                 continue;
@@ -306,7 +306,7 @@ void UDPC_update(void *ctx) {
                 c->log(
                     UDPC_LoggingType::INFO,
                     "Switching to bad mode in connection with ",
-                    UDPC_atostr(c, iter->second.addr),
+                    UDPC_atostr(ctx, iter->second.addr),
                     ":",
                     iter->second.port);
                 iter->second.flags.reset(1);
@@ -332,7 +332,7 @@ void UDPC_update(void *ctx) {
                     c->log(
                         UDPC_LoggingType::INFO,
                         "Switching to good mode in connection with ",
-                        UDPC_atostr(c, iter->second.addr),
+                        UDPC_atostr(ctx, iter->second.addr),
                         ":",
                         iter->second.port);
                     iter->second.flags.set(1);
@@ -416,7 +416,7 @@ void UDPC_update(void *ctx) {
                     c->log(
                         UDPC_LoggingType::ERROR,
                         "Failed to send packet to initiate connection to ",
-                        UDPC_atostr(c, iter->second.addr),
+                        UDPC_atostr(ctx, iter->second.addr),
                         ":",
                         iter->second.port);
                     continue;
@@ -451,7 +451,7 @@ void UDPC_update(void *ctx) {
                     c->log(
                         UDPC_LoggingType::ERROR,
                         "Failed to send packet to initiate connection to ",
-                        UDPC_atostr(c, iter->second.addr),
+                        UDPC_atostr(ctx, iter->second.addr),
                         ":",
                         iter->second.port);
                     continue;
@@ -493,7 +493,7 @@ void UDPC_update(void *ctx) {
                 c->log(
                     UDPC_LoggingType::ERROR,
                     "Failed to send heartbeat packet to ",
-                    UDPC_atostr(c, iter->second.addr),
+                    UDPC_atostr(ctx, iter->second.addr),
                     ":",
                     iter->second.port);
                 continue;
@@ -552,7 +552,7 @@ void UDPC_update(void *ctx) {
                 c->log(
                     UDPC_LoggingType::ERROR,
                     "Failed to send packet to ",
-                    UDPC_atostr(c, iter->second.addr),
+                    UDPC_atostr(ctx, iter->second.addr),
                     ":",
                     iter->second.port);
                 continue;
@@ -615,7 +615,7 @@ void UDPC_update(void *ctx) {
         c->log(
             UDPC_LoggingType::INFO,
             "Received packet is smaller than header, ignoring packet from ",
-            UDPC_atostr(c, receivedData.sin_addr.s_addr),
+            UDPC_atostr(ctx, receivedData.sin_addr.s_addr),
             ":",
             receivedData.sin_port);
         return;
@@ -627,7 +627,7 @@ void UDPC_update(void *ctx) {
         c->log(
             UDPC_LoggingType::INFO,
             "Received packet has invalid protocol id, ignoring packet from ",
-            UDPC_atostr(c, receivedData.sin_addr.s_addr),
+            UDPC_atostr(ctx, receivedData.sin_addr.s_addr),
             ":",
             receivedData.sin_port);
         return;
@@ -654,7 +654,7 @@ void UDPC_update(void *ctx) {
             c->log(
                 UDPC_LoggingType::VERBOSE,
                 "Establishing connection with client ",
-                UDPC_atostr(c, receivedData.sin_addr.s_addr),
+                UDPC_atostr(ctx, receivedData.sin_addr.s_addr),
                 ":",
                 receivedData.sin_port);
             UDPC::ConnectionData newConnection(true, c);
@@ -688,7 +688,7 @@ void UDPC_update(void *ctx) {
             c->log(
                 UDPC_LoggingType::VERBOSE,
                 "Established connection with server ",
-                UDPC_atostr(c, receivedData.sin_addr.s_addr),
+                UDPC_atostr(ctx, receivedData.sin_addr.s_addr),
                 ":",
                 receivedData.sin_port);
             // TODO trigger event client established connection with server
@@ -709,7 +709,7 @@ void UDPC_update(void *ctx) {
     c->log(
         UDPC_LoggingType::INFO,
         "Received valid packet from ",
-        UDPC_atostr(c, receivedData.sin_addr.s_addr),
+        UDPC_atostr(ctx, receivedData.sin_addr.s_addr),
         ":",
         receivedData.sin_port);
 
@@ -866,7 +866,7 @@ void UDPC_update(void *ctx) {
     }
 }
 
-void UDPC_client_initiate_connection(void *ctx, uint32_t addr, uint16_t port) {
+void UDPC_client_initiate_connection(UDPC_HContext ctx, uint32_t addr, uint16_t port) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c || !c->flags.test(1)) {
         return;
@@ -889,7 +889,7 @@ void UDPC_client_initiate_connection(void *ctx, uint32_t addr, uint16_t port) {
     addrConIter->second.insert(identifier);
 }
 
-int UDPC_get_queue_send_available(void *ctx, uint32_t addr, uint16_t port) {
+int UDPC_get_queue_send_available(UDPC_HContext ctx, uint32_t addr, uint16_t port) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return 0;
@@ -905,7 +905,7 @@ int UDPC_get_queue_send_available(void *ctx, uint32_t addr, uint16_t port) {
     }
 }
 
-void UDPC_queue_send(void *ctx, uint32_t destAddr, uint16_t destPort,
+void UDPC_queue_send(UDPC_HContext ctx, uint32_t destAddr, uint16_t destPort,
                      uint32_t isChecked, void *data, uint32_t size) {
     if(size == 0 || !data) {
         return;
@@ -939,7 +939,7 @@ void UDPC_queue_send(void *ctx, uint32_t destAddr, uint16_t destPort,
     iter->second.sendPkts.push(sendInfo);
 }
 
-int UDPC_set_accept_new_connections(void *ctx, int isAccepting) {
+int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return 0;
@@ -947,7 +947,7 @@ int UDPC_set_accept_new_connections(void *ctx, int isAccepting) {
     return c->isAcceptNewConnections.exchange(isAccepting == 0 ? false : true);
 }
 
-int UDPC_drop_connection(void *ctx, uint32_t addr, uint16_t port) {
+int UDPC_drop_connection(UDPC_HContext ctx, uint32_t addr, uint16_t port) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return 0;
@@ -974,7 +974,7 @@ int UDPC_drop_connection(void *ctx, uint32_t addr, uint16_t port) {
     return 0;
 }
 
-int UDPC_drop_connection_addr(void *ctx, uint32_t addr) {
+int UDPC_drop_connection_addr(UDPC_HContext ctx, uint32_t addr) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return 0;
@@ -999,7 +999,7 @@ int UDPC_drop_connection_addr(void *ctx, uint32_t addr) {
     return 0;
 }
 
-uint32_t UDPC_set_protocol_id(void *ctx, uint32_t id) {
+uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return 0;
@@ -1007,7 +1007,7 @@ uint32_t UDPC_set_protocol_id(void *ctx, uint32_t id) {
     return c->protocolID.exchange(id);
 }
 
-UDPC_LoggingType set_logging_type(void *ctx, UDPC_LoggingType loggingType) {
+UDPC_LoggingType set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingType) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return static_cast<UDPC_LoggingType>(0);
@@ -1015,7 +1015,7 @@ UDPC_LoggingType set_logging_type(void *ctx, UDPC_LoggingType loggingType) {
     return static_cast<UDPC_LoggingType>(c->loggingType.exchange(loggingType));
 }
 
-UDPC_PacketInfo UDPC_get_received(void *ctx) {
+UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return UDPC_PacketInfo{{0}, 0, 0, 0, 0, 0, 0};
@@ -1024,7 +1024,7 @@ UDPC_PacketInfo UDPC_get_received(void *ctx) {
     return UDPC_PacketInfo{{0}, 0, 0, 0, 0, 0, 0};
 }
 
-const char *UDPC_atostr(void *ctx, uint32_t addr) {
+const char *UDPC_atostr(UDPC_HContext ctx, uint32_t addr) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return nullptr;
