@@ -1,3 +1,4 @@
+// vim: foldmethod=marker
 #ifndef UDPC_DEFINES_HPP
 #define UDPC_DEFINES_HPP
 
@@ -143,7 +144,7 @@ private:
     void log_impl(UDPC_LoggingType) {}
 
     template<typename... Targs>
-    void log_impl(UDPC_LoggingType type, Targs... args) {
+    void log_impl(UDPC_LoggingType type, Targs... args) { // {{{
         switch(loggingType.load()) {
         case UDPC_LoggingType::SILENT:
             return;
@@ -204,14 +205,14 @@ private:
         }
 
         log_impl_next(type, args...);
-    }
+    } // }}}
 
     void log_impl_next(UDPC_LoggingType) {
         std::cerr << '\n';
     }
 
     template<typename T, typename... Targs>
-    void log_impl_next(UDPC_LoggingType type, T value, Targs... args) {
+    void log_impl_next(UDPC_LoggingType type, T value, Targs... args) { // {{{
         switch(loggingType.load()) {
         case UDPC_LoggingType::SILENT:
             return;
@@ -240,7 +241,7 @@ private:
             break;
         }
         log_impl_next(type, args...);
-    }
+    } // }}}
 
 public:
     uint_fast32_t _contextIdentifier;

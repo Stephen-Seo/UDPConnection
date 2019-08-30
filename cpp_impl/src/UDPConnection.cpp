@@ -1010,7 +1010,7 @@ uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id) {
 UDPC_LoggingType set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingType) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
-        return static_cast<UDPC_LoggingType>(0);
+        return UDPC_LoggingType::SILENT;
     }
     return static_cast<UDPC_LoggingType>(c->loggingType.exchange(loggingType));
 }
