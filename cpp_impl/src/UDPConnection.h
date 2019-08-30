@@ -46,8 +46,7 @@ extern "C" {
 
 // Opaque struct handle to Context
 struct UDPC_Context;
-typedef struct UDPC_Context *UDPC_PContext;
-typedef UDPC_PContext UDPC_HContext;
+typedef struct UDPC_Context *UDPC_HContext;
 
 typedef enum { SILENT, ERROR, WARNING, VERBOSE, INFO } UDPC_LoggingType;
 
