@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <memory>
 #include <mutex>
+#include <optional>
 
 #include <RB/RingBuffer.hpp>
 
@@ -23,9 +24,9 @@ class TSQueue {
     TSQueue &operator=(TSQueue &&other);
 
     bool push(const T &data);
-    T top();
+    std::optional<T> top();
     bool pop();
-    T top_and_pop();
+    std::optional<T> top_and_pop();
     void clear();
     void changeCapacity(unsigned int newCapacity);
     unsigned int size();
@@ -81,9 +82,12 @@ bool TSQueue<T>::push(const T &data) {
 }
 
 template <typename T>
-T TSQueue<T>::top() {
+std::optional<T> TSQueue<T>::top() {
     std::lock_guard<std::mutex> lock(mutex);
-    T value = rb.top();
+    std::optional<T> value = std::nullopt;
+    if(!rb.empty()) {
+        value = rb.top();
+    }
     return value;
 }
 
@@ -98,10 +102,13 @@ bool TSQueue<T>::pop() {
 }
 
 template <typename T>
-T TSQueue<T>::top_and_pop() {
+std::optional<T> TSQueue<T>::top_and_pop() {
     std::lock_guard<std::mutex> lock(mutex);
-    T value = rb.top();
-    rb.pop();
+    std::optional<T> value = std::nullopt;
+    if(!rb.empty()) {
+        value = rb.top();
+        rb.pop();
+    }
     return value;
 }
 

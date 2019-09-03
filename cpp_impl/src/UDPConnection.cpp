@@ -496,11 +496,11 @@ void UDPC_update(UDPC_HContext ctx) {
             bool isResending = false;
             if(!iter->second.priorityPkts.empty()) {
                 // TODO verify getting struct copy is valid
-                pInfo = iter->second.priorityPkts.top();
+                pInfo = std::move(iter->second.priorityPkts.top().value());
                 iter->second.priorityPkts.pop();
                 isResending = true;
             } else {
-                pInfo = iter->second.sendPkts.top();
+                pInfo = std::move(iter->second.sendPkts.top().value());
                 iter->second.sendPkts.pop();
             }
             std::unique_ptr<char[]> buf = std::make_unique<char[]>(20 + pInfo.dataSize);

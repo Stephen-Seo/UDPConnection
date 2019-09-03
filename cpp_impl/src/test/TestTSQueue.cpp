@@ -133,7 +133,7 @@ TEST(TSQueue, Concurrent)
 
     int top;
     for(int i = 0; i < 4; ++i) {
-        top = q.top();
+        top = q.top().value();
         EXPECT_TRUE(q.pop());
         EXPECT_EQ(q.size(), 3 - i);
         printf("%d ", top);
