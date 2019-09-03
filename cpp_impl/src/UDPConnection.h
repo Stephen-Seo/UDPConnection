@@ -51,6 +51,11 @@ typedef struct UDPC_Context *UDPC_HContext;
 typedef enum { SILENT, ERROR, WARNING, VERBOSE, INFO } UDPC_LoggingType;
 
 typedef struct {
+    uint32_t addr;
+    uint16_t port;
+} UDPC_ConnectionId;
+
+typedef struct {
     // id is stored at offset 8, size 4 (uint32_t) even for "empty" PktInfos
     char data[UDPC_PACKET_MAX_SIZE];
     /*
@@ -61,11 +66,11 @@ typedef struct {
      */
     uint32_t flags;
     uint16_t dataSize; // zero if invalid
-    uint32_t sender;
-    uint32_t receiver;
-    uint16_t senderPort;
-    uint16_t receiverPort;
+    UDPC_ConnectionId sender;
+    UDPC_ConnectionId receiver;
 } UDPC_PacketInfo;
+
+UDPC_ConnectionId UDPC_create_id(uint32_t addr, uint16_t port);
 
 /// listenPort must be in native byte order, listenAddr must be in network byte order (big-endian)
 UDPC_HContext UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient);
