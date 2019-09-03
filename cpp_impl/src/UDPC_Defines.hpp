@@ -12,6 +12,10 @@
 #define UDPC_ID_NO_REC_CHK 0x20000000
 #define UDPC_ID_RESENDING 0x10000000
 
+#define UDPC_ATOSTR_BUFCOUNT 64
+#define UDPC_ATOSTR_BUFSIZE 16
+#define UDPC_ATOSTR_SIZE (UDPC_ATOSTR_BUFCOUNT * UDPC_ATOSTR_BUFSIZE)
+
 #include <atomic>
 #include <bitset>
 #include <chrono>
@@ -229,7 +233,8 @@ public:
     std::atomic_bool isAcceptNewConnections;
     std::atomic_uint32_t protocolID;
     std::atomic_uint_fast8_t loggingType;
-    char atostrBuf[16];
+    std::atomic_uint32_t atostrBufIndex;
+    char atostrBuf[UDPC_ATOSTR_SIZE];
 
     int socketHandle;
     struct sockaddr_in socketInfo;

@@ -77,6 +77,7 @@ loggingType(INFO),
 #else
 loggingType(WARNING),
 #endif
+atostrBufIndex(0),
 rng_engine()
 {
     if(isThreaded) {
@@ -1006,7 +1007,9 @@ const char *UDPC_atostr(UDPC_HContext ctx, uint32_t addr) {
     if(!c) {
         return nullptr;
     }
-    int index = 0;
+    const uint32_t headIndex =
+        c->atostrBufIndex.fetch_add(UDPC_ATOSTR_BUFSIZE) % UDPC_ATOSTR_SIZE;
+    uint32_t index = headIndex;
     for(int x = 0; x < 4; ++x) {
         unsigned char temp = (addr >> (x * 8)) & 0xFF;
 
@@ -1024,7 +1027,7 @@ const char *UDPC_atostr(UDPC_HContext ctx, uint32_t addr) {
     }
     c->atostrBuf[index] = 0;
 
-    return c->atostrBuf;
+    return c->atostrBuf + headIndex;
 }
 
 uint32_t UDPC_strtoa(const char *addrStr) {
