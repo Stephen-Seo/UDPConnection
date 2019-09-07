@@ -51,7 +51,7 @@ typedef struct UDPC_Context *UDPC_HContext;
 typedef enum { SILENT, ERROR, WARNING, VERBOSE, INFO } UDPC_LoggingType;
 
 typedef struct {
-    uint32_t addr;
+    struct in6_addr addr;
     uint16_t port;
 } UDPC_ConnectionId;
 
@@ -70,35 +70,29 @@ typedef struct {
     UDPC_ConnectionId receiver;
 } UDPC_PacketInfo;
 
-UDPC_ConnectionId UDPC_create_id(uint32_t addr, uint16_t port);
+/// port should be in native byte order (not network/big-endian)
+UDPC_ConnectionId UDPC_create_id(struct in6_addr addr, uint16_t port);
 
-/// listenPort must be in native byte order, listenAddr must be in network byte order (big-endian)
-UDPC_HContext UDPC_init(uint16_t listenPort, uint32_t listenAddr, int isClient);
-/// listenPort must be in native byte order, listenAddr must be in network byte order (big-endian)
-UDPC_HContext UDPC_init_threaded_update(uint16_t listenPort, uint32_t listenAddr,
+UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
+
+UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient);
+UDPC_HContext UDPC_init_threaded_update(UDPC_ConnectionId listenId,
                                 int isClient);
 
 void UDPC_destroy(UDPC_HContext ctx);
 
 void UDPC_update(UDPC_HContext ctx);
 
-/// addr must be in network byte order (big-endian), port must be in native byte order
-void UDPC_client_initiate_connection(UDPC_HContext ctx, uint32_t addr, uint16_t port);
+void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
-/// addr must be in network byte order (big-endian), port must be in native byte order
-int UDPC_get_queue_send_available(UDPC_HContext ctx, uint32_t addr, uint16_t port);
+int UDPC_get_queue_send_available(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
-/// destAddr must be in network byte order (big-endian), destPort must be in native byte order
-void UDPC_queue_send(UDPC_HContext ctx, uint32_t destAddr, uint16_t destPort,
+void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
                      uint32_t isChecked, void *data, uint32_t size);
 
 int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);
 
-/// addr must be in network byte order (big-endian), port must be in native byte order
-int UDPC_drop_connection(UDPC_HContext ctx, uint32_t addr, uint16_t port);
-
-/// addr must be in network byte order, drops all connections to specified addr
-int UDPC_drop_connection_addr(UDPC_HContext ctx, uint32_t addr);
+int UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, bool dropAllWithAddr);
 
 uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id);
 
@@ -106,11 +100,9 @@ UDPC_LoggingType set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingTyp
 
 UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx);
 
-/// addr must be in network byte order
-const char *UDPC_atostr(UDPC_HContext ctx, uint32_t addr);
+const char *UDPC_atostr(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
-/// returns a 4 byte unsigned integer address in network byte order
-uint32_t UDPC_strtoa(const char *addrStr);
+struct in6_addr UDPC_strtoa(const char *addrStr);
 
 #ifdef __cplusplus
 }

@@ -9,108 +9,167 @@
 TEST(UDPC, atostr) {
     UDPC::Context context(false);
 
+    UDPC_ConnectionId conId;
     const char* resultBuf;
 
-    resultBuf = UDPC_atostr((UDPC_HContext)&context, 0x0100007F);
-    EXPECT_EQ(std::strcmp(resultBuf, "127.0.0.1"), 0);
+    for(unsigned int i = 0; i < 16; ++i) {
+        conId.addr.s6_addr[i] = (i % 3 == 0 ? 0xFF : (i % 3 == 1 ? 0x12 : 0x56));
+    }
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId);
+    EXPECT_STREQ(resultBuf, "ff12:56ff:1256:ff12:56ff:1256:ff12:56ff");
 
-    resultBuf = UDPC_atostr((UDPC_HContext)&context, 0xFF08000A);
-    EXPECT_EQ(std::strcmp(resultBuf, "10.0.8.255"), 0);
+    for(unsigned int i = 0; i < 8; ++i) {
+        conId.addr.s6_addr[i] = 0;
+    }
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId);
+    EXPECT_STREQ(resultBuf, "::56ff:1256:ff12:56ff");
 
-    resultBuf = UDPC_atostr((UDPC_HContext)&context, 0x0201A8C0);
-    EXPECT_EQ(std::strcmp(resultBuf, "192.168.1.2"), 0);
+    conId.addr.s6_addr[0] = 1;
+    conId.addr.s6_addr[1] = 2;
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId);
+    EXPECT_STREQ(resultBuf, "12::56ff:1256:ff12:56ff");
+
+    conId.addr.s6_addr[14] = 0;
+    conId.addr.s6_addr[15] = 0;
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId);
+    EXPECT_STREQ(resultBuf, "12::56ff:1256:ff12:0");
+
+    for(unsigned int i = 0; i < 15; ++i) {
+        conId.addr.s6_addr[i] = 0;
+    }
+    conId.addr.s6_addr[15] = 1;
+
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId);
+    EXPECT_STREQ(resultBuf, "::1");
+
+    conId.addr.s6_addr[15] = 0;
+
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId);
+    EXPECT_STREQ(resultBuf, "::");
 }
 
 TEST(UDPC, atostr_concurrent) {
     UDPC::Context context(false);
 
     const char* results[64] = {
-        "0.0.0.0",
-        "1.1.1.1",
-        "2.2.2.2",
-        "3.3.3.3",
-        "4.4.4.4",
-        "5.5.5.5",
-        "6.6.6.6",
-        "7.7.7.7",
-        "8.8.8.8",
-        "9.9.9.9",
-        "10.10.10.10",
-        "11.11.11.11",
-        "12.12.12.12",
-        "13.13.13.13",
-        "14.14.14.14",
-        "15.15.15.15",
-        "16.16.16.16",
-        "17.17.17.17",
-        "18.18.18.18",
-        "19.19.19.19",
-        "20.20.20.20",
-        "21.21.21.21",
-        "22.22.22.22",
-        "23.23.23.23",
-        "24.24.24.24",
-        "25.25.25.25",
-        "26.26.26.26",
-        "27.27.27.27",
-        "28.28.28.28",
-        "29.29.29.29",
-        "30.30.30.30",
-        "31.31.31.31",
-        "32.32.32.32",
-        "33.33.33.33",
-        "34.34.34.34",
-        "35.35.35.35",
-        "36.36.36.36",
-        "37.37.37.37",
-        "38.38.38.38",
-        "39.39.39.39",
-        "40.40.40.40",
-        "41.41.41.41",
-        "42.42.42.42",
-        "43.43.43.43",
-        "44.44.44.44",
-        "45.45.45.45",
-        "46.46.46.46",
-        "47.47.47.47",
-        "48.48.48.48",
-        "49.49.49.49",
-        "50.50.50.50",
-        "51.51.51.51",
-        "52.52.52.52",
-        "53.53.53.53",
-        "54.54.54.54",
-        "55.55.55.55",
-        "56.56.56.56",
-        "57.57.57.57",
-        "58.58.58.58",
-        "59.59.59.59",
-        "60.60.60.60",
-        "61.61.61.61",
-        "62.62.62.62",
-        "63.63.63.63"
+        "::1111:1",
+        "::1111:2",
+        "::1111:3",
+        "::1111:4",
+        "::1111:5",
+        "::1111:6",
+        "::1111:7",
+        "::1111:8",
+        "::1111:9",
+        "::1111:a",
+        "::1111:b",
+        "::1111:c",
+        "::1111:d",
+        "::1111:e",
+        "::1111:f",
+        "::1111:10",
+        "::1111:11",
+        "::1111:12",
+        "::1111:13",
+        "::1111:14",
+        "::1111:15",
+        "::1111:16",
+        "::1111:17",
+        "::1111:18",
+        "::1111:19",
+        "::1111:1a",
+        "::1111:1b",
+        "::1111:1c",
+        "::1111:1d",
+        "::1111:1e",
+        "::1111:1f",
+        "::1111:20",
+        "::1111:21",
+        "::1111:22",
+        "::1111:23",
+        "::1111:24",
+        "::1111:25",
+        "::1111:26",
+        "::1111:27",
+        "::1111:28",
+        "::1111:29",
+        "::1111:2a",
+        "::1111:2b",
+        "::1111:2c",
+        "::1111:2d",
+        "::1111:2e",
+        "::1111:2f",
+        "::1111:30",
+        "::1111:31",
+        "::1111:32",
+        "::1111:33",
+        "::1111:34",
+        "::1111:35",
+        "::1111:36",
+        "::1111:37",
+        "::1111:38",
+        "::1111:39",
+        "::1111:3a",
+        "::1111:3b",
+        "::1111:3c",
+        "::1111:3d",
+        "::1111:3e",
+        "::1111:3f",
+        "::1111:40"
     };
 
-    std::future<void> futures[64];
-    const char* ptrs[64];
+    std::future<void> futures[32];
+    const char* ptrs[32];
     for(unsigned int i = 0; i < 2; ++i) {
-        for(unsigned int j = 0; j < 64; ++j) {
+        for(unsigned int j = 0; j < 32; ++j) {
             futures[j] = std::async(std::launch::async, [] (unsigned int id, const char** ptr, UDPC::Context* c) {
-                ptr[id] = UDPC_atostr((UDPC_HContext)c, id | (id << 8) | (id << 16) | (id << 24));
+                UDPC_ConnectionId conId = {
+                    {0, 0, 0, 0,
+                    0, 0, 0, 0,
+                    0, 0, 0, 0,
+                    0x11, 0x11, 0x0, (unsigned char)(id + 1)},
+                    0
+                };
+                ptr[id] = UDPC_atostr((UDPC_HContext)c, conId);
             }, j, ptrs, &context);
         }
-        for(unsigned int j = 0; j < 64; ++j) {
+        for(unsigned int j = 0; j < 32; ++j) {
             ASSERT_TRUE(futures[j].valid());
             futures[j].wait();
         }
-        for(unsigned int j = 0; j < 64; ++j) {
-            EXPECT_EQ(std::strcmp(ptrs[j], results[j]), 0);
+        for(unsigned int j = 0; j < 32; ++j) {
+            EXPECT_STREQ(ptrs[j], results[j]);
         }
     }
 }
 
 TEST(UDPC, strtoa) {
-    EXPECT_EQ(UDPC_strtoa("127.0.0.1"), 0x0100007F);
-    EXPECT_EQ(UDPC_strtoa("10.0.8.255"), 0xFF08000A);
-    EXPECT_EQ(UDPC_strtoa("192.168.1.2"), 0x0201A8C0);
+    struct in6_addr addr;
+
+    for(unsigned int i = 0; i < 16; ++i) {
+        addr.s6_addr[i] = 0;
+    }
+    addr.s6_addr[15] = 1;
+
+    EXPECT_EQ(UDPC_strtoa("::1"), addr);
+
+    // check invalid
+    EXPECT_EQ(UDPC_strtoa("1:1::1:1::1"), addr);
+    EXPECT_EQ(UDPC_strtoa("derpadoodle"), addr);
+
+    addr = {
+        0xF0, 0xF, 0x0, 0x1,
+        0x56, 0x78, 0x9A, 0xBC,
+        0xDE, 0xFF, 0x1, 0x2,
+        0x3, 0x4, 0x5, 0x6
+    };
+    EXPECT_EQ(UDPC_strtoa("F00F:1:5678:9abc:deff:102:304:506"), addr);
+
+    addr = {
+        0x0, 0xFF, 0x1, 0x0,
+        0x0, 0x1, 0x10, 0x0,
+        0x0, 0x0, 0x0, 0x0,
+        0x12, 0x34, 0xab, 0xcd
+    };
+    EXPECT_EQ(UDPC_strtoa("ff:100:1:1000::1234:abcd"), addr);
 }

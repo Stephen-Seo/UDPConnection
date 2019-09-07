@@ -12,8 +12,8 @@
 #define UDPC_ID_NO_REC_CHK 0x20000000
 #define UDPC_ID_RESENDING 0x10000000
 
-#define UDPC_ATOSTR_BUFCOUNT 64
-#define UDPC_ATOSTR_BUFSIZE 16
+#define UDPC_ATOSTR_BUFCOUNT 32
+#define UDPC_ATOSTR_BUFSIZE 40
 #define UDPC_ATOSTR_SIZE (UDPC_ATOSTR_BUFCOUNT * UDPC_ATOSTR_BUFSIZE)
 
 #include <atomic>
@@ -38,7 +38,6 @@ static const auto ONE_SECOND = std::chrono::seconds(1);
 static const auto TEN_SECONDS = std::chrono::seconds(10);
 static const auto THIRTY_SECONDS = std::chrono::seconds(30);
 
-static uint32_t LOCAL_ADDR = 0;
 static const auto INIT_PKT_INTERVAL_DT = std::chrono::seconds(5);
 static const auto HEARTBEAT_PKT_INTERVAL_DT = std::chrono::milliseconds(150);
 static const auto PACKET_TIMEOUT_TIME = ONE_SECOND;
@@ -61,6 +60,10 @@ struct SentPktInfo {
 
 struct ConnectionIdHasher {
     std::size_t operator()(const UDPC_ConnectionId& key) const;
+};
+
+struct IPV6_Hasher {
+    std::size_t operator()(const struct in6_addr& addr) const;
 };
 
 struct ConnectionData {
@@ -93,7 +96,7 @@ struct ConnectionData {
     std::chrono::steady_clock::duration toggleT;
     std::chrono::steady_clock::duration toggleTimer;
     std::chrono::steady_clock::duration toggledTimer;
-    uint32_t addr; // in network order
+    struct in6_addr addr; // in network order
     uint16_t port; // in native order
     std::deque<UDPC_PacketInfo> sentPkts;
     TSQueue<UDPC_PacketInfo> sendPkts;
@@ -237,14 +240,14 @@ public:
     char atostrBuf[UDPC_ATOSTR_SIZE];
 
     int socketHandle;
-    struct sockaddr_in socketInfo;
+    struct sockaddr_in6 socketInfo;
 
     std::chrono::steady_clock::time_point lastUpdated;
-    // ipv4 address and port (as UDPC_ConnectionId) to ConnectionData
+    // ipv6 address and port (as UDPC_ConnectionId) to ConnectionData
     std::unordered_map<UDPC_ConnectionId, ConnectionData, ConnectionIdHasher> conMap;
-    // ipv4 address to all connected UDPC_ConnectionId
-    std::unordered_map<uint32_t, std::unordered_set<UDPC_ConnectionId, ConnectionIdHasher> > addrConMap;
-    // id to ipv4 address and port (as UDPC_ConnectionId)
+    // ipv6 address to all connected UDPC_ConnectionId
+    std::unordered_map<struct in6_addr, std::unordered_set<UDPC_ConnectionId, ConnectionIdHasher>, IPV6_Hasher> addrConMap;
+    // id to ipv6 address and port (as UDPC_ConnectionId)
     std::unordered_map<uint32_t, UDPC_ConnectionId> idMap;
 
     std::default_random_engine rng_engine;
@@ -273,8 +276,12 @@ float timePointsToFSec(
     const std::chrono::steady_clock::time_point& older,
     const std::chrono::steady_clock::time_point& newer);
 
+UDPC_PacketInfo get_empty_pinfo();
+
 } // namespace UDPC
 
 bool operator ==(const UDPC_ConnectionId& a, const UDPC_ConnectionId& b);
+
+bool operator ==(const struct in6_addr& a, const struct in6_addr& b);
 
 #endif
