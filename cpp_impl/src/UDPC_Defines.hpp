@@ -224,6 +224,8 @@ private:
     } // }}}
 
 public:
+    void update_impl();
+
     uint_fast32_t _contextIdentifier;
 
     char recvBuf[UDPC_PACKET_MAX_SIZE];
@@ -252,6 +254,9 @@ public:
 
     std::default_random_engine rng_engine;
 
+    std::thread thread;
+    std::atomic_bool threadRunning;
+
 }; // struct Context
 
 Context *verifyContext(UDPC_HContext ctx);
@@ -277,6 +282,8 @@ float timePointsToFSec(
     const std::chrono::steady_clock::time_point& newer);
 
 UDPC_PacketInfo get_empty_pinfo();
+
+void threadedUpdate(Context *ctx);
 
 } // namespace UDPC
 
