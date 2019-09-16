@@ -97,7 +97,8 @@ loggingType(INFO),
 loggingType(WARNING),
 #endif
 atostrBufIndex(0),
-rng_engine()
+rng_engine(),
+mutex()
 {
     if(isThreaded) {
         flags.set(0);
@@ -796,7 +797,9 @@ void UDPC::threadedUpdate(Context *ctx) {
     decltype(now) nextNow;
     while(ctx->threadRunning.load()) {
         now = std::chrono::steady_clock::now();
+        ctx->mutex.lock();
         ctx->update_impl();
+        ctx->mutex.unlock();
         nextNow = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(std::chrono::milliseconds(33) - (nextNow - now));
     }
@@ -907,9 +910,10 @@ void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connec
         return;
     }
 
+    std::lock_guard<std::mutex> lock(c->mutex);
+
     UDPC::ConnectionData newCon(false, c);
 
-    // TODO make thread safe by using mutex
     c->conMap.insert(std::make_pair(connectionId, std::move(newCon)));
     auto addrConIter = c->addrConMap.find(connectionId.addr);
     if(addrConIter == c->addrConMap.end()) {
@@ -929,6 +933,8 @@ int UDPC_get_queue_send_available(UDPC_HContext ctx, UDPC_ConnectionId connectio
         return 0;
     }
 
+    std::lock_guard<std::mutex> lock(c->mutex);
+
     auto iter = c->conMap.find(connectionId);
     if(iter != c->conMap.end()) {
         return iter->second.sendPkts.capacity() - iter->second.sendPkts.size();
@@ -947,6 +953,8 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
     if(!c) {
         return;
     }
+
+    std::lock_guard<std::mutex> lock(c->mutex);
 
     auto iter = c->conMap.find(destinationId);
     if(iter == c->conMap.end()) {
@@ -974,6 +982,7 @@ int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting) {
     if(!c) {
         return 0;
     }
+    std::lock_guard<std::mutex> lock(c->mutex);
     return c->isAcceptNewConnections.exchange(isAccepting == 0 ? false : true);
 }
 
@@ -982,6 +991,8 @@ int UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, bool
     if(!c) {
         return 0;
     }
+
+    std::lock_guard<std::mutex> lock(c->mutex);
 
     if(dropAllWithAddr) {
         auto addrConIter = c->addrConMap.find(connectionId.addr);
@@ -1025,6 +1036,7 @@ uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id) {
     if(!c) {
         return 0;
     }
+    std::lock_guard<std::mutex> lock(c->mutex);
     return c->protocolID.exchange(id);
 }
 
@@ -1041,6 +1053,9 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx) {
     if(!c) {
         return UDPC::get_empty_pinfo();
     }
+
+    std::lock_guard<std::mutex> lock(c->mutex);
+
     // TODO impl
     return UDPC::get_empty_pinfo();
 }

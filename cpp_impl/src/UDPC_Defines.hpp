@@ -27,6 +27,7 @@
 #include <random>
 #include <memory>
 #include <thread>
+#include <mutex>
 #include <iostream>
 
 #include "TSQueue.hpp"
@@ -256,6 +257,7 @@ public:
 
     std::thread thread;
     std::atomic_bool threadRunning;
+    std::mutex mutex;
 
 }; // struct Context
 
