@@ -11,6 +11,12 @@
 #include <string>
 #include <sstream>
 #include <ios>
+#include <regex>
+
+static std::regex ipv6_regex = std::regex(R"d((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])))d");
+// TODO remove ipv6_regex_nolink when link device is supported
+static std::regex ipv6_regex_nolink = std::regex(R"d((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])))d");
+static std::regex ipv4_regex = std::regex(R"d((1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9])\.(1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9])\.(1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9])\.(1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9]))d");
 
 UDPC::SentPktInfo::SentPktInfo() :
 id(0),
@@ -1117,171 +1123,183 @@ const char *UDPC_atostr(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
 }
 
 struct in6_addr UDPC_strtoa(const char *addrStr) {
-    struct in6_addr result{{0}};
-    unsigned int index = 0;
-    unsigned int strIndex = 0;
-    int doubleColonIndex = -1;
-    unsigned char bytes[2] = {0, 0};
-    unsigned char bytesState = 0;
-    bool prevColon = false;
+    struct in6_addr result = in6addr_loopback;
+    std::cmatch matchResults;
+    // TODO switch regex to ipv6_regex when link device is supported
+    if(std::regex_match(addrStr, matchResults, ipv6_regex_nolink)) {
+        unsigned int index = 0;
+        unsigned int strIndex = 0;
+        int doubleColonIndex = -1;
+        unsigned char bytes[2] = {0, 0};
+        unsigned char bytesState = 0;
+        bool prevColon = false;
 
-    const auto checkInc = [&result, &index, &bytes] () -> bool {
-        if(index < 15) {
-            result.s6_addr[index++] = bytes[0];
-            result.s6_addr[index++] = bytes[1];
-            bytes[0] = 0;
-            bytes[1] = 0;
-            return false;
-        }
-        return true;
-    };
-
-    while(addrStr[strIndex] != '\0') {
-        if(addrStr[strIndex] >= '0' && addrStr[strIndex] <= '9') {
-            switch(bytesState) {
-            case 0:
-                bytes[0] = (addrStr[strIndex] - '0');
-                bytesState = 1;
-                break;
-            case 1:
-                bytes[0] = (bytes[0] << 4) | (addrStr[strIndex] - '0');
-                bytesState = 2;
-                break;
-            case 2:
-                bytes[1] = (addrStr[strIndex] - '0');
-                bytesState = 3;
-                break;
-            case 3:
-                bytes[1] = (bytes[1] << 4) | (addrStr[strIndex] - '0');
-                bytesState = 0;
-                if(checkInc()) {
-                    return in6addr_loopback;
-                }
-                break;
-            default:
-                return in6addr_loopback;
-            }
-            prevColon = false;
-        } else if(addrStr[strIndex] >= 'a' && addrStr[strIndex] <= 'f') {
-            switch(bytesState) {
-            case 0:
-                bytes[0] = (addrStr[strIndex] - 'a' + 10);
-                bytesState = 1;
-                break;
-            case 1:
-                bytes[0] = (bytes[0] << 4) | (addrStr[strIndex] - 'a' + 10);
-                bytesState = 2;
-                break;
-            case 2:
-                bytes[1] = (addrStr[strIndex] - 'a' + 10);
-                bytesState = 3;
-                break;
-            case 3:
-                bytes[1] = (bytes[1] << 4) | (addrStr[strIndex] - 'a' + 10);
-                bytesState = 0;
-                if(checkInc()) {
-                    return in6addr_loopback;
-                }
-                break;
-            default:
-                return in6addr_loopback;
-            }
-            prevColon = false;
-        } else if(addrStr[strIndex] >= 'A' && addrStr[strIndex] <= 'F') {
-            switch(bytesState) {
-            case 0:
-                bytes[0] = (addrStr[strIndex] - 'A' + 10);
-                bytesState = 1;
-                break;
-            case 1:
-                bytes[0] = (bytes[0] << 4) | (addrStr[strIndex] - 'A' + 10);
-                bytesState = 2;
-                break;
-            case 2:
-                bytes[1] = (addrStr[strIndex] - 'A' + 10);
-                bytesState = 3;
-                break;
-            case 3:
-                bytes[1] = (bytes[1] << 4) | (addrStr[strIndex] - 'A' + 10);
-                bytesState = 0;
-                if(checkInc()) {
-                    return in6addr_loopback;
-                }
-                break;
-            default:
-                return in6addr_loopback;
-            }
-            prevColon = false;
-        } else if(addrStr[strIndex] == ':') {
-            switch(bytesState) {
-            case 1:
-            case 2:
-                bytes[1] = bytes[0];
+        const auto checkInc = [&result, &index, &bytes] () -> bool {
+            if(index < 15) {
+                result.s6_addr[index++] = bytes[0];
+                result.s6_addr[index++] = bytes[1];
                 bytes[0] = 0;
-                if(checkInc()) {
-                    return in6addr_loopback;
-                }
-                break;
-            case 3:
-                bytes[1] |= (bytes[0] & 0xF) << 4;
-                bytes[0] = bytes[0] >> 4;
-                if(checkInc()) {
-                    return in6addr_loopback;
-                }
-                break;
-            case 0:
-                break;
-            default:
-                return in6addr_loopback;
+                bytes[1] = 0;
+                return false;
             }
-            bytesState = 0;
-            if(prevColon) {
-                if(doubleColonIndex >= 0) {
+            return true;
+        };
+
+        while(addrStr[strIndex] != '\0') {
+            if(addrStr[strIndex] >= '0' && addrStr[strIndex] <= '9') {
+                switch(bytesState) {
+                case 0:
+                    bytes[0] = (addrStr[strIndex] - '0');
+                    bytesState = 1;
+                    break;
+                case 1:
+                    bytes[0] = (bytes[0] << 4) | (addrStr[strIndex] - '0');
+                    bytesState = 2;
+                    break;
+                case 2:
+                    bytes[1] = (addrStr[strIndex] - '0');
+                    bytesState = 3;
+                    break;
+                case 3:
+                    bytes[1] = (bytes[1] << 4) | (addrStr[strIndex] - '0');
+                    bytesState = 0;
+                    if(checkInc()) {
+                        return in6addr_loopback;
+                    }
+                    break;
+                default:
                     return in6addr_loopback;
+                }
+                prevColon = false;
+            } else if(addrStr[strIndex] >= 'a' && addrStr[strIndex] <= 'f') {
+                switch(bytesState) {
+                case 0:
+                    bytes[0] = (addrStr[strIndex] - 'a' + 10);
+                    bytesState = 1;
+                    break;
+                case 1:
+                    bytes[0] = (bytes[0] << 4) | (addrStr[strIndex] - 'a' + 10);
+                    bytesState = 2;
+                    break;
+                case 2:
+                    bytes[1] = (addrStr[strIndex] - 'a' + 10);
+                    bytesState = 3;
+                    break;
+                case 3:
+                    bytes[1] = (bytes[1] << 4) | (addrStr[strIndex] - 'a' + 10);
+                    bytesState = 0;
+                    if(checkInc()) {
+                        return in6addr_loopback;
+                    }
+                    break;
+                default:
+                    return in6addr_loopback;
+                }
+                prevColon = false;
+            } else if(addrStr[strIndex] >= 'A' && addrStr[strIndex] <= 'F') {
+                switch(bytesState) {
+                case 0:
+                    bytes[0] = (addrStr[strIndex] - 'A' + 10);
+                    bytesState = 1;
+                    break;
+                case 1:
+                    bytes[0] = (bytes[0] << 4) | (addrStr[strIndex] - 'A' + 10);
+                    bytesState = 2;
+                    break;
+                case 2:
+                    bytes[1] = (addrStr[strIndex] - 'A' + 10);
+                    bytesState = 3;
+                    break;
+                case 3:
+                    bytes[1] = (bytes[1] << 4) | (addrStr[strIndex] - 'A' + 10);
+                    bytesState = 0;
+                    if(checkInc()) {
+                        return in6addr_loopback;
+                    }
+                    break;
+                default:
+                    return in6addr_loopback;
+                }
+                prevColon = false;
+            } else if(addrStr[strIndex] == ':') {
+                switch(bytesState) {
+                case 1:
+                case 2:
+                    bytes[1] = bytes[0];
+                    bytes[0] = 0;
+                    if(checkInc()) {
+                        return in6addr_loopback;
+                    }
+                    break;
+                case 3:
+                    bytes[1] |= (bytes[0] & 0xF) << 4;
+                    bytes[0] = bytes[0] >> 4;
+                    if(checkInc()) {
+                        return in6addr_loopback;
+                    }
+                    break;
+                case 0:
+                    break;
+                default:
+                    return in6addr_loopback;
+                }
+                bytesState = 0;
+                if(prevColon) {
+                    if(doubleColonIndex >= 0) {
+                        return in6addr_loopback;
+                    } else {
+                        doubleColonIndex = index;
+                    }
                 } else {
-                    doubleColonIndex = index;
+                    prevColon = true;
                 }
             } else {
-                prevColon = true;
+                return in6addr_loopback;
             }
-        } else {
+
+            ++strIndex;
+        }
+        switch(bytesState) {
+        case 1:
+        case 2:
+            bytes[1] = bytes[0];
+            bytes[0] = 0;
+            if(checkInc()) {
+                return in6addr_loopback;
+            }
+            break;
+        case 3:
+            bytes[1] |= (bytes[0] & 0xF) << 4;
+            bytes[0] = bytes[0] >> 4;
+            if(checkInc()) {
+                return in6addr_loopback;
+            }
+            break;
+        case 0:
+            break;
+        default:
             return in6addr_loopback;
         }
 
-        ++strIndex;
-    }
-    switch(bytesState) {
-    case 1:
-    case 2:
-        bytes[1] = bytes[0];
-        bytes[0] = 0;
-        if(checkInc()) {
-            return in6addr_loopback;
+        if(doubleColonIndex >= 0) {
+            strIndex = 16 - index;
+            if(strIndex < 2) {
+                return in6addr_loopback;
+            }
+            for(unsigned int i = 16; i-- > (unsigned int)doubleColonIndex + strIndex; ) {
+                result.s6_addr[i] = result.s6_addr[i - strIndex];
+                result.s6_addr[i - strIndex] = 0;
+            }
         }
-        break;
-    case 3:
-        bytes[1] |= (bytes[0] & 0xF) << 4;
-        bytes[0] = bytes[0] >> 4;
-        if(checkInc()) {
-            return in6addr_loopback;
+    } else if(std::regex_match(addrStr, matchResults, ipv4_regex)) {
+        for(unsigned int i = 0; i < 10; ++i) {
+            result.s6_addr[i] = 0;
         }
-        break;
-    case 0:
-        break;
-    default:
-        return in6addr_loopback;
-    }
-
-    if(doubleColonIndex >= 0) {
-        strIndex = 16 - index;
-        if(strIndex < 2) {
-            return in6addr_loopback;
-        }
-        for(unsigned int i = 16; i-- > (unsigned int)doubleColonIndex + strIndex; ) {
-            result.s6_addr[i] = result.s6_addr[i - strIndex];
-            result.s6_addr[i - strIndex] = 0;
+        result.s6_addr[10] = 0xFF;
+        result.s6_addr[11] = 0xFF;
+        for(unsigned int i = 0; i < 4; ++i) {
+            result.s6_addr[12 + i] = std::stoi(matchResults[i + 1].str());
         }
     }
-
     return result;
 }

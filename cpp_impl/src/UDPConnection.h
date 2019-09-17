@@ -102,6 +102,7 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx);
 
 const char *UDPC_atostr(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
+/// addrStr must be a valid ipv6 address or a valid ipv4 address
 struct in6_addr UDPC_strtoa(const char *addrStr);
 
 #ifdef __cplusplus
