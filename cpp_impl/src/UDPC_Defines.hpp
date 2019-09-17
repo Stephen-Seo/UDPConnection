@@ -69,7 +69,7 @@ struct IPV6_Hasher {
 
 struct ConnectionData {
     ConnectionData();
-    ConnectionData(bool isServer, Context *ctx);
+    ConnectionData(bool isServer, Context *ctx, struct in6_addr addr, uint16_t port);
 
     // copy
     ConnectionData(const ConnectionData& other) = delete;

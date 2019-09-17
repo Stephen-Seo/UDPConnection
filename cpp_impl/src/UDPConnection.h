@@ -35,7 +35,7 @@
 
 // other defines
 #define UDPC_PACKET_MAX_SIZE 8192
-#define UDPC_DEFAULT_PROTOCOL_ID 1357924680
+#define UDPC_DEFAULT_PROTOCOL_ID 1357924680 // 0x50f04948
 
 #ifdef __cplusplus
 #include <cstdint>
@@ -94,9 +94,11 @@ int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);
 
 int UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, bool dropAllWithAddr);
 
+int UDPC_has_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
+
 uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id);
 
-UDPC_LoggingType set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingType);
+UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingType);
 
 UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx);
 
