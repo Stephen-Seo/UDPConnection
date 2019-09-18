@@ -27,12 +27,12 @@ TEST(UDPC, atostr) {
     conId.addr.s6_addr[0] = 1;
     conId.addr.s6_addr[1] = 2;
     resultBuf = UDPC_atostr((UDPC_HContext)&context, conId.addr);
-    EXPECT_STREQ(resultBuf, "12::56ff:1256:ff12:56ff");
+    EXPECT_STREQ(resultBuf, "102::56ff:1256:ff12:56ff");
 
     conId.addr.s6_addr[14] = 0;
     conId.addr.s6_addr[15] = 0;
     resultBuf = UDPC_atostr((UDPC_HContext)&context, conId.addr);
-    EXPECT_STREQ(resultBuf, "12::56ff:1256:ff12:0");
+    EXPECT_STREQ(resultBuf, "102::56ff:1256:ff12:0");
 
     for(unsigned int i = 0; i < 15; ++i) {
         conId.addr.s6_addr[i] = 0;
@@ -46,6 +46,15 @@ TEST(UDPC, atostr) {
 
     resultBuf = UDPC_atostr((UDPC_HContext)&context, conId.addr);
     EXPECT_STREQ(resultBuf, "::");
+
+    conId.addr = {
+        0xAE, 0x0, 0x12, 1,
+        0x10, 0x45, 0x2, 0x13,
+        0, 0, 0, 0,
+        0, 0, 0, 0
+    };
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId.addr);
+    EXPECT_STREQ(resultBuf, "ae00:1201:1045:213::");
 }
 
 TEST(UDPC, atostr_concurrent) {

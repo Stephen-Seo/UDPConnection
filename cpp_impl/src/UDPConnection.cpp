@@ -11,6 +11,7 @@
 #include <string>
 #include <sstream>
 #include <ios>
+#include <iomanip>
 #include <regex>
 #include <sys/ioctl.h>
 #include <net/if.h>
@@ -1190,19 +1191,32 @@ const char *UDPC_atostr(UDPC_HContext ctx, struct in6_addr addr) {
             }
         }
 
-        if(addr.s6_addr[i] == 0) {
+        if(addr.s6_addr[i] == 0 && (headIndex - index <= 1 || c->atostrBuf[index] == ':')) {
             continue;
         } else {
             std::stringstream sstream;
-            sstream << std::hex << (unsigned int) addr.s6_addr[i];
+            sstream << std::setw(2) << std::setfill('0')
+                << std::hex << (unsigned int) addr.s6_addr[i];
             std::string out(sstream.str());
-            if(out.size() == 1) {
-                if(out[0] != '0') {
-                    std::memcpy(c->atostrBuf + index, out.c_str(), 1);
+            unsigned int outOffset = 0;
+            if(headIndex - index <= 1 || c->atostrBuf[index - 1] == ':') {
+                if(out[0] == '0') {
+                    if(out[1] == '0') {
+                        outOffset = 2;
+                    } else {
+                        outOffset = 1;
+                    }
+                }
+            }
+            if(outOffset == 2) {
+                continue;
+            } else if(outOffset == 1) {
+                if(out[outOffset] != '0') {
+                    std::memcpy(c->atostrBuf + index, out.c_str() + outOffset, 1);
                     ++index;
                 }
             } else {
-                std::memcpy(c->atostrBuf + index, out.c_str(), 2);
+                std::memcpy(c->atostrBuf + index, out.c_str() + outOffset, 2);
                 index += 2;
             }
         }
