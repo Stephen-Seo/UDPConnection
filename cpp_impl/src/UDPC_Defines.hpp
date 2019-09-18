@@ -69,7 +69,7 @@ struct IPV6_Hasher {
 
 struct ConnectionData {
     ConnectionData();
-    ConnectionData(bool isServer, Context *ctx, struct in6_addr addr, uint16_t port);
+    ConnectionData(bool isServer, Context *ctx, struct in6_addr addr, uint32_t scope_id, uint16_t port);
 
     // copy
     ConnectionData(const ConnectionData& other) = delete;
@@ -98,6 +98,7 @@ struct ConnectionData {
     std::chrono::steady_clock::duration toggleTimer;
     std::chrono::steady_clock::duration toggledTimer;
     struct in6_addr addr; // in network order
+    uint32_t scope_id;
     uint16_t port; // in native order
     std::deque<UDPC_PacketInfo> sentPkts;
     TSQueue<UDPC_PacketInfo> sendPkts;

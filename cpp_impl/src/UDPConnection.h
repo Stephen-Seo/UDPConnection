@@ -52,6 +52,7 @@ typedef enum { SILENT, ERROR, WARNING, VERBOSE, INFO } UDPC_LoggingType;
 
 typedef struct {
     struct in6_addr addr;
+    uint32_t scope_id;
     uint16_t port;
 } UDPC_ConnectionId;
 
@@ -72,6 +73,8 @@ typedef struct {
 
 /// port should be in native byte order (not network/big-endian)
 UDPC_ConnectionId UDPC_create_id(struct in6_addr addr, uint16_t port);
+
+UDPC_ConnectionId UDPC_create_id_full(struct in6_addr addr, uint32_t scope_id, uint16_t port);
 
 UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
 
@@ -102,10 +105,14 @@ UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggi
 
 UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx);
 
-const char *UDPC_atostr(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
+const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
+
+const char *UDPC_atostr(UDPC_HContext ctx, struct in6_addr addr);
 
 /// addrStr must be a valid ipv6 address or a valid ipv4 address
 struct in6_addr UDPC_strtoa(const char *addrStr);
+
+struct in6_addr UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out);
 
 #ifdef __cplusplus
 }

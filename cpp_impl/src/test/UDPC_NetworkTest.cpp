@@ -3,8 +3,11 @@
 #include <cstdio>
 #include <thread>
 #include <chrono>
+#include <regex>
 
 #include <UDPConnection.h>
+
+static const std::regex ipv6_regex_linkonly = std::regex(R"d(fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,})d");
 
 void usage() {
     puts("[-c | -s] - client or server (default server)");
@@ -75,11 +78,21 @@ int main(int argc, char **argv) {
     UDPC_ConnectionId connectionId;
     if(std::strcmp(listenAddr, "any") == 0) {
         listenId = UDPC_create_id_anyaddr(std::atoi(listenPort));
+    } else if(std::regex_match(listenAddr, ipv6_regex_linkonly)) {
+        uint32_t scope_id;
+        auto addr = UDPC_strtoa_link(listenAddr, &scope_id);
+        listenId = UDPC_create_id_full(addr, scope_id, std::atoi(listenPort));
     } else {
         listenId = UDPC_create_id(UDPC_strtoa(listenAddr), std::atoi(listenPort));
     }
     if(isClient) {
-        connectionId = UDPC_create_id(UDPC_strtoa(connectionAddr), std::atoi(connectionPort));
+        if(std::regex_match(connectionAddr, ipv6_regex_linkonly)) {
+            uint32_t scope_id;
+            auto addr = UDPC_strtoa_link(connectionAddr, &scope_id);
+            connectionId = UDPC_create_id_full(addr, scope_id, std::atoi(connectionPort));
+        } else {
+            connectionId = UDPC_create_id(UDPC_strtoa(connectionAddr), std::atoi(connectionPort));
+        }
     }
     auto context = UDPC_init_threaded_update(listenId, isClient ? 1 : 0);
     if(!context) {

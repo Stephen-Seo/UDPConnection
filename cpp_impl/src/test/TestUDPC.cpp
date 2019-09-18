@@ -15,23 +15,23 @@ TEST(UDPC, atostr) {
     for(unsigned int i = 0; i < 16; ++i) {
         conId.addr.s6_addr[i] = (i % 3 == 0 ? 0xFF : (i % 3 == 1 ? 0x12 : 0x56));
     }
-    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId);
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId.addr);
     EXPECT_STREQ(resultBuf, "ff12:56ff:1256:ff12:56ff:1256:ff12:56ff");
 
     for(unsigned int i = 0; i < 8; ++i) {
         conId.addr.s6_addr[i] = 0;
     }
-    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId);
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId.addr);
     EXPECT_STREQ(resultBuf, "::56ff:1256:ff12:56ff");
 
     conId.addr.s6_addr[0] = 1;
     conId.addr.s6_addr[1] = 2;
-    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId);
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId.addr);
     EXPECT_STREQ(resultBuf, "12::56ff:1256:ff12:56ff");
 
     conId.addr.s6_addr[14] = 0;
     conId.addr.s6_addr[15] = 0;
-    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId);
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId.addr);
     EXPECT_STREQ(resultBuf, "12::56ff:1256:ff12:0");
 
     for(unsigned int i = 0; i < 15; ++i) {
@@ -39,12 +39,12 @@ TEST(UDPC, atostr) {
     }
     conId.addr.s6_addr[15] = 1;
 
-    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId);
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId.addr);
     EXPECT_STREQ(resultBuf, "::1");
 
     conId.addr.s6_addr[15] = 0;
 
-    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId);
+    resultBuf = UDPC_atostr((UDPC_HContext)&context, conId.addr);
     EXPECT_STREQ(resultBuf, "::");
 }
 
@@ -128,9 +128,10 @@ TEST(UDPC, atostr_concurrent) {
                     0, 0, 0, 0,
                     0, 0, 0, 0,
                     0x11, 0x11, 0x0, (unsigned char)(id + 1)},
+                    0,
                     0
                 };
-                ptr[id] = UDPC_atostr((UDPC_HContext)c, conId);
+                ptr[id] = UDPC_atostr((UDPC_HContext)c, conId.addr);
             }, j, ptrs, &context);
         }
         for(unsigned int j = 0; j < 32; ++j) {

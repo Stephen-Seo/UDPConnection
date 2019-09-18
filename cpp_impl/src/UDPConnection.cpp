@@ -12,11 +12,13 @@
 #include <sstream>
 #include <ios>
 #include <regex>
+#include <sys/ioctl.h>
+#include <net/if.h>
 
-static std::regex ipv6_regex = std::regex(R"d((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])))d");
-// TODO remove ipv6_regex_nolink when link device is supported
-static std::regex ipv6_regex_nolink = std::regex(R"d((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])))d");
-static std::regex ipv4_regex = std::regex(R"d((1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9])\.(1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9])\.(1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9])\.(1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9]))d");
+//static const std::regex ipv6_regex = std::regex(R"d((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])))d");
+static const std::regex ipv6_regex_nolink = std::regex(R"d((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])))d");
+static const std::regex ipv6_regex_linkonly = std::regex(R"d(fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,})d");
+static const std::regex ipv4_regex = std::regex(R"d((1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9])\.(1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9])\.(1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9])\.(1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9]))d");
 
 UDPC::SentPktInfo::SentPktInfo() :
 id(0),
@@ -25,6 +27,10 @@ sentTime(std::chrono::steady_clock::now())
 
 std::size_t UDPC::ConnectionIdHasher::operator()(const UDPC_ConnectionId& key) const {
     std::string value((const char*)key.addr.s6_addr, 16);
+    value.push_back((char)((key.scope_id >> 24) & 0xFF));
+    value.push_back((char)((key.scope_id >> 16) & 0xFF));
+    value.push_back((char)((key.scope_id >> 8) & 0xFF));
+    value.push_back((char)(key.scope_id & 0xFF));
     value.push_back((char)((key.port >> 8) & 0xFF));
     value.push_back((char)(key.port & 0xFF));
     return std::hash<std::string>()(value);
@@ -35,7 +41,7 @@ std::size_t UDPC::IPV6_Hasher::operator()(const struct in6_addr& addr) const {
 }
 
 bool operator ==(const UDPC_ConnectionId& a, const UDPC_ConnectionId& b) {
-    return a.addr == b.addr && a.port == b.port;
+    return a.addr == b.addr && a.scope_id == b.scope_id && a.port == b.port;
 }
 
 bool operator ==(const struct in6_addr& a, const struct in6_addr& b) {
@@ -71,7 +77,12 @@ rtt(std::chrono::steady_clock::duration::zero())
     flags.reset(1);
 }
 
-UDPC::ConnectionData::ConnectionData(bool isServer, Context *ctx, struct in6_addr addr, uint16_t port) :
+UDPC::ConnectionData::ConnectionData(
+        bool isServer,
+        Context *ctx,
+        struct in6_addr addr,
+        uint32_t scope_id,
+        uint16_t port) :
 flags(),
 id(0),
 lseq(0),
@@ -82,6 +93,7 @@ toggleT(UDPC::THIRTY_SECONDS),
 toggleTimer(std::chrono::steady_clock::duration::zero()),
 toggledTimer(std::chrono::steady_clock::duration::zero()),
 addr(addr),
+scope_id(scope_id),
 port(port),
 sentPkts(),
 sendPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
@@ -154,7 +166,7 @@ void UDPC::Context::update_impl() {
                 log(
                     UDPC_LoggingType::VERBOSE,
                     "Timed out connection with ",
-                    UDPC_atostr((UDPC_HContext)this, iter->first),
+                    UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                     ", port = ",
                     iter->second.port);
                 continue;
@@ -168,7 +180,7 @@ void UDPC::Context::update_impl() {
                 log(
                     UDPC_LoggingType::INFO,
                     "Switching to bad mode in connection with ",
-                    UDPC_atostr((UDPC_HContext)this, iter->first),
+                    UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                     ", port = ",
                     iter->second.port);
                 iter->second.flags.reset(1);
@@ -194,7 +206,7 @@ void UDPC::Context::update_impl() {
                     log(
                         UDPC_LoggingType::INFO,
                         "Switching to good mode in connection with ",
-                        UDPC_atostr((UDPC_HContext)this, iter->first),
+                        UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                         ", port = ",
                         iter->second.port);
                     iter->second.flags.set(1);
@@ -272,7 +284,7 @@ void UDPC::Context::update_impl() {
                 std::memcpy(destinationInfo.sin6_addr.s6_addr, iter->first.addr.s6_addr, 16);
                 destinationInfo.sin6_port = htons(iter->second.port);
                 destinationInfo.sin6_flowinfo = 0;
-                destinationInfo.sin6_scope_id = 0;
+                destinationInfo.sin6_scope_id = iter->first.scope_id;
                 long int sentBytes = sendto(
                     socketHandle,
                     buf.get(),
@@ -284,13 +296,13 @@ void UDPC::Context::update_impl() {
                     log(
                         UDPC_LoggingType::ERROR,
                         "Failed to send packet to initiate connection to ",
-                        UDPC_atostr((UDPC_HContext)this, iter->first),
+                        UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                         ", port = ",
                         iter->second.port);
                     continue;
                 } else {
                     log(UDPC_LoggingType::INFO, "Sent initiate connection to ",
-                        UDPC_atostr((UDPC_HContext)this, iter->first),
+                        UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                         ", port = ",
                         iter->second.port);
                 }
@@ -314,7 +326,7 @@ void UDPC::Context::update_impl() {
                 std::memcpy(destinationInfo.sin6_addr.s6_addr, iter->first.addr.s6_addr, 16);
                 destinationInfo.sin6_port = htons(iter->second.port);
                 destinationInfo.sin6_flowinfo = 0;
-                destinationInfo.sin6_scope_id = 0;
+                destinationInfo.sin6_scope_id = iter->first.scope_id;
                 long int sentBytes = sendto(
                     socketHandle,
                     buf.get(),
@@ -326,7 +338,7 @@ void UDPC::Context::update_impl() {
                     log(
                         UDPC_LoggingType::ERROR,
                         "Failed to send packet to initiate connection to ",
-                        UDPC_atostr((UDPC_HContext)this, iter->first),
+                        UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                         ", port = ",
                         iter->second.port);
                     continue;
@@ -358,7 +370,7 @@ void UDPC::Context::update_impl() {
             std::memcpy(destinationInfo.sin6_addr.s6_addr, iter->first.addr.s6_addr, 16);
             destinationInfo.sin6_port = htons(iter->second.port);
             destinationInfo.sin6_flowinfo = 0;
-            destinationInfo.sin6_scope_id = 0;
+            destinationInfo.sin6_scope_id = iter->first.scope_id;
             long int sentBytes = sendto(
                 socketHandle,
                 buf.get(),
@@ -370,7 +382,7 @@ void UDPC::Context::update_impl() {
                 log(
                     UDPC_LoggingType::ERROR,
                     "Failed to send heartbeat packet to ",
-                    UDPC_atostr((UDPC_HContext)this, iter->first),
+                    UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                     ", port = ",
                     iter->second.port);
                 continue;
@@ -429,7 +441,7 @@ void UDPC::Context::update_impl() {
                 log(
                     UDPC_LoggingType::ERROR,
                     "Failed to send packet to ",
-                    UDPC_atostr((UDPC_HContext)this, iter->first),
+                    UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                     ", port = ",
                     iter->second.port);
                 continue;
@@ -492,7 +504,7 @@ void UDPC::Context::update_impl() {
         log(
             UDPC_LoggingType::INFO,
             "Received packet is smaller than header, ignoring packet from ",
-            UDPC_atostr((UDPC_HContext)this, UDPC_ConnectionId{receivedData.sin6_addr, 0}),
+            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
             ", port = ",
             receivedData.sin6_port);
         return;
@@ -504,7 +516,7 @@ void UDPC::Context::update_impl() {
         log(
             UDPC_LoggingType::INFO,
             "Received packet has invalid protocol id, ignoring packet from ",
-            UDPC_atostr((UDPC_HContext)this, UDPC_ConnectionId{receivedData.sin6_addr, 0}),
+            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
             ", port = ",
             ntohs(receivedData.sin6_port));
         return;
@@ -521,18 +533,18 @@ void UDPC::Context::update_impl() {
     bool isResending = conID & UDPC_ID_RESENDING;
     conID &= 0x0FFFFFFF;
 
-    UDPC_ConnectionId identifier{receivedData.sin6_addr, ntohs(receivedData.sin6_port)};
+    UDPC_ConnectionId identifier{receivedData.sin6_addr, receivedData.sin6_scope_id, ntohs(receivedData.sin6_port)};
 
     if(isConnect && flags.test(2)) {
         // is connect packet and is accepting new connections
         if(!flags.test(1)
                 && conMap.find(identifier) == conMap.end()) {
             // is receiving as server, connection did not already exist
-            UDPC::ConnectionData newConnection(true, this, receivedData.sin6_addr, ntohs(receivedData.sin6_port));
+            UDPC::ConnectionData newConnection(true, this, receivedData.sin6_addr, receivedData.sin6_scope_id, ntohs(receivedData.sin6_port));
             log(
                 UDPC_LoggingType::VERBOSE,
                 "Establishing connection with client ",
-                UDPC_atostr((UDPC_HContext)this, UDPC_ConnectionId{receivedData.sin6_addr, 0}),
+                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                 ", port = ",
                 ntohs(receivedData.sin6_port),
                 ", giving client id = ", newConnection.id);
@@ -564,7 +576,7 @@ void UDPC::Context::update_impl() {
             log(
                 UDPC_LoggingType::VERBOSE,
                 "Established connection with server ",
-                UDPC_atostr((UDPC_HContext)this, UDPC_ConnectionId{receivedData.sin6_addr, 0}),
+                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                 ", port = ",
                 ntohs(receivedData.sin6_port),
                 ", got id = ", conID);
@@ -585,7 +597,7 @@ void UDPC::Context::update_impl() {
     log(
         UDPC_LoggingType::INFO,
         "Received valid packet from ",
-        UDPC_atostr((UDPC_HContext)this, UDPC_ConnectionId{receivedData.sin6_addr, 0}),
+        UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
         ", port = ",
         ntohs(receivedData.sin6_port),
         ", packet id = ", seqID,
@@ -829,10 +841,12 @@ UDPC_PacketInfo UDPC::get_empty_pinfo() {
         0,       // dataSize
         {        // sender
             {0},   // ipv6 addr
+            0,     // scope_id
             0      // port
         },
         {        // receiver
             {0},   // ipv6 addr
+            0,     // scope_id
             0      // port
         },
     };
@@ -852,11 +866,15 @@ void UDPC::threadedUpdate(Context *ctx) {
 }
 
 UDPC_ConnectionId UDPC_create_id(struct in6_addr addr, uint16_t port) {
-    return UDPC_ConnectionId{addr, port};
+    return UDPC_ConnectionId{addr, 0, port};
+}
+
+UDPC_ConnectionId UDPC_create_id_full(struct in6_addr addr, uint32_t scope_id, uint16_t port) {
+    return UDPC_ConnectionId{addr, scope_id, port};
 }
 
 UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port) {
-    return UDPC_ConnectionId{in6addr_any, port};
+    return UDPC_ConnectionId{in6addr_any, 0, port};
 }
 
 UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient) {
@@ -864,7 +882,7 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient) {
     ctx->flags.set(1, isClient != 0);
 
     ctx->log(UDPC_LoggingType::INFO, "Got listen addr ",
-        UDPC_atostr((UDPC_HContext)ctx, listenId));
+        UDPC_atostr((UDPC_HContext)ctx, listenId.addr));
 
     // create socket
     ctx->socketHandle = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
@@ -886,7 +904,7 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient) {
     ctx->socketInfo.sin6_addr = listenId.addr;
     ctx->socketInfo.sin6_port = htons(listenId.port);
     ctx->socketInfo.sin6_flowinfo = 0;
-    ctx->socketInfo.sin6_scope_id = 0;
+    ctx->socketInfo.sin6_scope_id = listenId.scope_id;
     if(bind(ctx->socketHandle, (const struct sockaddr *)&ctx->socketInfo,
             sizeof(struct sockaddr_in6)) < 0) {
         // TODO maybe different way of handling init fail
@@ -969,12 +987,12 @@ void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connec
     }
 
     c->log(UDPC_LoggingType::INFO, "client_initiate_connection: Got peer a = ",
-        UDPC_atostr((UDPC_HContext)ctx, connectionId),
+        UDPC_atostr((UDPC_HContext)ctx, connectionId.addr),
         ", p = ", connectionId.port);
 
     std::lock_guard<std::mutex> lock(c->mutex);
 
-    UDPC::ConnectionData newCon(false, c, connectionId.addr, connectionId.port);
+    UDPC::ConnectionData newCon(false, c, connectionId.addr, connectionId.scope_id, connectionId.port);
     newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
 
     if(c->conMap.find(connectionId) == c->conMap.end()) {
@@ -1139,7 +1157,11 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx) {
     return UDPC::get_empty_pinfo();
 }
 
-const char *UDPC_atostr(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
+const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
+    return UDPC_atostr(ctx, connectionId.addr);
+}
+
+const char *UDPC_atostr(UDPC_HContext ctx, struct in6_addr addr) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return nullptr;
@@ -1168,11 +1190,11 @@ const char *UDPC_atostr(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
             }
         }
 
-        if(connectionId.addr.s6_addr[i] == 0) {
+        if(addr.s6_addr[i] == 0) {
             continue;
         } else {
             std::stringstream sstream;
-            sstream << std::hex << (unsigned int) connectionId.addr.s6_addr[i];
+            sstream << std::hex << (unsigned int) addr.s6_addr[i];
             std::string out(sstream.str());
             if(out.size() == 1) {
                 if(out[0] != '0') {
@@ -1198,7 +1220,6 @@ const char *UDPC_atostr(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
 struct in6_addr UDPC_strtoa(const char *addrStr) {
     struct in6_addr result = in6addr_loopback;
     std::cmatch matchResults;
-    // TODO switch regex to ipv6_regex when link device is supported
     if(std::regex_match(addrStr, matchResults, ipv6_regex_nolink)) {
         unsigned int index = 0;
         unsigned int strIndex = 0;
@@ -1374,5 +1395,212 @@ struct in6_addr UDPC_strtoa(const char *addrStr) {
             result.s6_addr[12 + i] = std::stoi(matchResults[i + 1].str());
         }
     }
+    return result;
+}
+
+struct in6_addr UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out) {
+    const auto checkSetOut = [&linkId_out] (uint32_t val) {
+        if(linkId_out) {
+            *linkId_out = val;
+        }
+    };
+
+    struct in6_addr result({0});
+    std::cmatch matchResults;
+    const char *linkName = nullptr;
+
+    if(std::regex_match(addrStr, matchResults, ipv6_regex_linkonly)) {
+        unsigned int index = 0;
+        unsigned int strIndex = 0;
+        int doubleColonIndex = -1;
+        unsigned char bytes[2] = {0, 0};
+        unsigned char bytesState = 0;
+        bool prevColon = false;
+
+        const auto checkInc = [&result, &index, &bytes] () -> bool {
+            if(index < 15) {
+                result.s6_addr[index++] = bytes[0];
+                result.s6_addr[index++] = bytes[1];
+                bytes[0] = 0;
+                bytes[1] = 0;
+                return false;
+            }
+            return true;
+        };
+
+        while(addrStr[strIndex] != '%') {
+            if(addrStr[strIndex] >= '0' && addrStr[strIndex] <= '9') {
+                switch(bytesState) {
+                case 0:
+                    bytes[0] = (addrStr[strIndex] - '0');
+                    bytesState = 1;
+                    break;
+                case 1:
+                    bytes[0] = (bytes[0] << 4) | (addrStr[strIndex] - '0');
+                    bytesState = 2;
+                    break;
+                case 2:
+                    bytes[1] = (addrStr[strIndex] - '0');
+                    bytesState = 3;
+                    break;
+                case 3:
+                    bytes[1] = (bytes[1] << 4) | (addrStr[strIndex] - '0');
+                    bytesState = 0;
+                    if(checkInc()) {
+                        checkSetOut(0);
+                        return in6addr_loopback;
+                    }
+                    break;
+                default:
+                    checkSetOut(0);
+                    return in6addr_loopback;
+                }
+                prevColon = false;
+            } else if(addrStr[strIndex] >= 'a' && addrStr[strIndex] <= 'f') {
+                switch(bytesState) {
+                case 0:
+                    bytes[0] = (addrStr[strIndex] - 'a' + 10);
+                    bytesState = 1;
+                    break;
+                case 1:
+                    bytes[0] = (bytes[0] << 4) | (addrStr[strIndex] - 'a' + 10);
+                    bytesState = 2;
+                    break;
+                case 2:
+                    bytes[1] = (addrStr[strIndex] - 'a' + 10);
+                    bytesState = 3;
+                    break;
+                case 3:
+                    bytes[1] = (bytes[1] << 4) | (addrStr[strIndex] - 'a' + 10);
+                    bytesState = 0;
+                    if(checkInc()) {
+                        checkSetOut(0);
+                        return in6addr_loopback;
+                    }
+                    break;
+                default:
+                    checkSetOut(0);
+                    return in6addr_loopback;
+                }
+                prevColon = false;
+            } else if(addrStr[strIndex] >= 'A' && addrStr[strIndex] <= 'F') {
+                switch(bytesState) {
+                case 0:
+                    bytes[0] = (addrStr[strIndex] - 'A' + 10);
+                    bytesState = 1;
+                    break;
+                case 1:
+                    bytes[0] = (bytes[0] << 4) | (addrStr[strIndex] - 'A' + 10);
+                    bytesState = 2;
+                    break;
+                case 2:
+                    bytes[1] = (addrStr[strIndex] - 'A' + 10);
+                    bytesState = 3;
+                    break;
+                case 3:
+                    bytes[1] = (bytes[1] << 4) | (addrStr[strIndex] - 'A' + 10);
+                    bytesState = 0;
+                    if(checkInc()) {
+                        checkSetOut(0);
+                        return in6addr_loopback;
+                    }
+                    break;
+                default:
+                    checkSetOut(0);
+                    return in6addr_loopback;
+                }
+                prevColon = false;
+            } else if(addrStr[strIndex] == ':') {
+                switch(bytesState) {
+                case 1:
+                case 2:
+                    bytes[1] = bytes[0];
+                    bytes[0] = 0;
+                    if(checkInc()) {
+                        checkSetOut(0);
+                        return in6addr_loopback;
+                    }
+                    break;
+                case 3:
+                    bytes[1] |= (bytes[0] & 0xF) << 4;
+                    bytes[0] = bytes[0] >> 4;
+                    if(checkInc()) {
+                        checkSetOut(0);
+                        return in6addr_loopback;
+                    }
+                    break;
+                case 0:
+                    break;
+                default:
+                    checkSetOut(0);
+                    return in6addr_loopback;
+                }
+                bytesState = 0;
+                if(prevColon) {
+                    if(doubleColonIndex >= 0) {
+                        checkSetOut(0);
+                        return in6addr_loopback;
+                    } else {
+                        doubleColonIndex = index;
+                    }
+                } else {
+                    prevColon = true;
+                }
+            } else {
+                checkSetOut(0);
+                return in6addr_loopback;
+            }
+
+            ++strIndex;
+        }
+        switch(bytesState) {
+        case 1:
+        case 2:
+            bytes[1] = bytes[0];
+            bytes[0] = 0;
+            if(checkInc()) {
+                checkSetOut(0);
+                return in6addr_loopback;
+            }
+            break;
+        case 3:
+            bytes[1] |= (bytes[0] & 0xF) << 4;
+            bytes[0] = bytes[0] >> 4;
+            if(checkInc()) {
+                checkSetOut(0);
+                return in6addr_loopback;
+            }
+            break;
+        case 0:
+            break;
+        default:
+            checkSetOut(0);
+            return in6addr_loopback;
+        }
+        linkName = addrStr + strIndex + 1;
+
+        if(doubleColonIndex >= 0) {
+            strIndex = 16 - index;
+            if(strIndex < 2) {
+                checkSetOut(0);
+                return in6addr_loopback;
+            }
+            for(unsigned int i = 16; i-- > (unsigned int)doubleColonIndex + strIndex; ) {
+                result.s6_addr[i] = result.s6_addr[i - strIndex];
+                result.s6_addr[i - strIndex] = 0;
+            }
+        }
+    }
+    struct ifreq req{{0}, 0, 0};
+    std::strncpy(req.ifr_name, linkName, IFNAMSIZ);
+    int socketHandle = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+    if(ioctl(socketHandle, SIOCGIFINDEX, &req) < 0) {
+        CleanupSocket(socketHandle);
+        checkSetOut(0);
+        return in6addr_loopback;
+    }
+
+    CleanupSocket(socketHandle);
+    checkSetOut(req.ifr_ifindex);
     return result;
 }
