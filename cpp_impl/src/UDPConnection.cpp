@@ -140,9 +140,10 @@ mutex()
 
 void UDPC::Context::update_impl() {
     const auto now = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::duration dt = now - lastUpdated;
+    std::chrono::steady_clock::duration temp_dt_fs;
     lastUpdated = now;
 
-    std::chrono::steady_clock::duration temp_dt_fs;
     {
         // check timed out, check good/bad mode with rtt, remove timed out
         std::vector<UDPC_ConnectionId> removed;
@@ -160,8 +161,8 @@ void UDPC::Context::update_impl() {
             }
 
             // check good/bad mode
-            iter->second.toggleTimer += temp_dt_fs;
-            iter->second.toggledTimer += temp_dt_fs;
+            iter->second.toggleTimer += dt;
+            iter->second.toggledTimer += dt;
             if(iter->second.flags.test(1) && !iter->second.flags.test(2)) {
                 // good mode, bad rtt
                 log(
@@ -203,7 +204,7 @@ void UDPC::Context::update_impl() {
                 iter->second.toggledTimer = std::chrono::steady_clock::duration::zero();
             }
 
-            iter->second.timer += temp_dt_fs;
+            iter->second.timer += dt;
             if(iter->second.flags.test(1)) {
                 if(iter->second.timer >= UDPC::GOOD_MODE_SEND_RATE) {
                     iter->second.timer -= UDPC::GOOD_MODE_SEND_RATE;
@@ -741,7 +742,7 @@ void UDPC::Context::update_impl() {
     } else if(bytes == 20) {
         log(
             UDPC_LoggingType::VERBOSE,
-            "Received packet has no payload");
+            "Received packet has no payload (probably heartbeat packet)");
     }
 }
 
@@ -974,6 +975,7 @@ void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connec
     std::lock_guard<std::mutex> lock(c->mutex);
 
     UDPC::ConnectionData newCon(false, c, connectionId.addr, connectionId.port);
+    newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
 
     if(c->conMap.find(connectionId) == c->conMap.end()) {
         c->conMap.insert(std::make_pair(connectionId, std::move(newCon)));
