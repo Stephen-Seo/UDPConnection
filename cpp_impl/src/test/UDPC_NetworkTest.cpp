@@ -57,11 +57,31 @@ int main(int argc, char **argv) {
         --argc; ++argv;
     }
 
+    if(!listenAddr) {
+        puts("ERROR: listenAddr was not specified");
+        return 1;
+    } else if(!listenPort) {
+        puts("ERROR: listenPort was not specified");
+        return 1;
+    } else if(isClient && !connectionAddr) {
+        puts("ERROR: connectionAddr was not specified");
+        return 1;
+    } else if(isClient && !connectionPort) {
+        puts("ERROR: connectionPort was not specified");
+        return 1;
+    }
+
+    UDPC_ConnectionId listenId;
     UDPC_ConnectionId connectionId;
+    if(std::strcmp(listenAddr, "any") == 0) {
+        listenId = UDPC_create_id_anyaddr(std::atoi(listenPort));
+    } else {
+        listenId = UDPC_create_id(UDPC_strtoa(listenAddr), std::atoi(listenPort));
+    }
     if(isClient) {
         connectionId = UDPC_create_id(UDPC_strtoa(connectionAddr), std::atoi(connectionPort));
     }
-    auto context = UDPC_init_threaded_update(UDPC_create_id(UDPC_strtoa(listenAddr), std::atoi(listenPort)), isClient ? 1 : 0);
+    auto context = UDPC_init_threaded_update(listenId, isClient ? 1 : 0);
     if(!context) {
         puts("ERROR: context is NULL");
         return 1;
