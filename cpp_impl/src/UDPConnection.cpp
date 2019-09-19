@@ -16,6 +16,23 @@
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
 #include <netioapi.h>
+
+static const UDPC_IPV6_ADDR_TYPE in6addr_any = UDPC_IPV6_ADDR_TYPE{{
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0
+}};
+static const UDPC_IPV6_ADDR_TYPE in6addr_loopback = UDPC_IPV6_ADDR_TYPE{{
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 1
+}};
+
+typedef int socklen_t;
+
+static const std::regex regex_numeric = std::regex("[0-9]+");
 #elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
 #include <sys/ioctl.h>
 #include <net/if.h>
@@ -32,7 +49,7 @@ sentTime(std::chrono::steady_clock::now())
 {}
 
 std::size_t UDPC::ConnectionIdHasher::operator()(const UDPC_ConnectionId& key) const {
-    std::string value((const char*)key.addr.s6_addr, 16);
+    std::string value((const char*)UDPC_IPV6_ADDR_SUB(key.addr), 16);
     value.push_back((char)((key.scope_id >> 24) & 0xFF));
     value.push_back((char)((key.scope_id >> 16) & 0xFF));
     value.push_back((char)((key.scope_id >> 8) & 0xFF));
@@ -42,17 +59,17 @@ std::size_t UDPC::ConnectionIdHasher::operator()(const UDPC_ConnectionId& key) c
     return std::hash<std::string>()(value);
 }
 
-std::size_t UDPC::IPV6_Hasher::operator()(const struct in6_addr& addr) const {
-    return std::hash<std::string>()(std::string((const char*)addr.s6_addr, 16));
+std::size_t UDPC::IPV6_Hasher::operator()(const UDPC_IPV6_ADDR_TYPE& addr) const {
+    return std::hash<std::string>()(std::string((const char*)UDPC_IPV6_ADDR_SUB(addr), 16));
 }
 
 bool operator ==(const UDPC_ConnectionId& a, const UDPC_ConnectionId& b) {
     return a.addr == b.addr && a.scope_id == b.scope_id && a.port == b.port;
 }
 
-bool operator ==(const struct in6_addr& a, const struct in6_addr& b) {
+bool operator ==(const UDPC_IPV6_ADDR_TYPE& a, const UDPC_IPV6_ADDR_TYPE& b) {
     for(unsigned int i = 0; i < 16; ++i) {
-        if(a.s6_addr[i] != b.s6_addr[i]) {
+        if(UDPC_IPV6_ADDR_SUB(a)[i] != UDPC_IPV6_ADDR_SUB(b)[i]) {
             return false;
         }
     }
@@ -86,7 +103,7 @@ rtt(std::chrono::steady_clock::duration::zero())
 UDPC::ConnectionData::ConnectionData(
         bool isServer,
         Context *ctx,
-        struct in6_addr addr,
+        UDPC_IPV6_ADDR_TYPE addr,
         uint32_t scope_id,
         uint16_t port) :
 flags(),
@@ -285,9 +302,9 @@ void UDPC::Context::update_impl() {
                     nullptr,
                     0x1);
 
-                struct sockaddr_in6 destinationInfo;
+                UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
                 destinationInfo.sin6_family = AF_INET6;
-                std::memcpy(destinationInfo.sin6_addr.s6_addr, iter->first.addr.s6_addr, 16);
+                std::memcpy(UDPC_IPV6_ADDR_SUB(destinationInfo.sin6_addr), UDPC_IPV6_ADDR_SUB(iter->first.addr), 16);
                 destinationInfo.sin6_port = htons(iter->second.port);
                 destinationInfo.sin6_flowinfo = 0;
                 destinationInfo.sin6_scope_id = iter->first.scope_id;
@@ -297,7 +314,7 @@ void UDPC::Context::update_impl() {
                     20,
                     0,
                     (struct sockaddr*) &destinationInfo,
-                    sizeof(struct sockaddr_in6));
+                    sizeof(UDPC_IPV6_SOCKADDR_TYPE));
                 if(sentBytes != 20) {
                     log(
                         UDPC_LoggingType::UDPC_ERROR,
@@ -327,9 +344,9 @@ void UDPC::Context::update_impl() {
                     &iter->second.lseq,
                     0x1);
 
-                struct sockaddr_in6 destinationInfo;
+                UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
                 destinationInfo.sin6_family = AF_INET6;
-                std::memcpy(destinationInfo.sin6_addr.s6_addr, iter->first.addr.s6_addr, 16);
+                std::memcpy(UDPC_IPV6_ADDR_SUB(destinationInfo.sin6_addr), UDPC_IPV6_ADDR_SUB(iter->first.addr), 16);
                 destinationInfo.sin6_port = htons(iter->second.port);
                 destinationInfo.sin6_flowinfo = 0;
                 destinationInfo.sin6_scope_id = iter->first.scope_id;
@@ -339,7 +356,7 @@ void UDPC::Context::update_impl() {
                     20,
                     0,
                     (struct sockaddr*) &destinationInfo,
-                    sizeof(struct sockaddr_in6));
+                    sizeof(UDPC_IPV6_SOCKADDR_TYPE));
                 if(sentBytes != 20) {
                     log(
                         UDPC_LoggingType::UDPC_ERROR,
@@ -371,9 +388,9 @@ void UDPC::Context::update_impl() {
                 &iter->second.lseq,
                 0);
 
-            struct sockaddr_in6 destinationInfo;
+            UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
             destinationInfo.sin6_family = AF_INET6;
-            std::memcpy(destinationInfo.sin6_addr.s6_addr, iter->first.addr.s6_addr, 16);
+            std::memcpy(UDPC_IPV6_ADDR_SUB(destinationInfo.sin6_addr), UDPC_IPV6_ADDR_SUB(iter->first.addr), 16);
             destinationInfo.sin6_port = htons(iter->second.port);
             destinationInfo.sin6_flowinfo = 0;
             destinationInfo.sin6_scope_id = iter->first.scope_id;
@@ -383,7 +400,7 @@ void UDPC::Context::update_impl() {
                 20,
                 0,
                 (struct sockaddr*) &destinationInfo,
-                sizeof(struct sockaddr_in6));
+                sizeof(UDPC_IPV6_SOCKADDR_TYPE));
             if(sentBytes != 20) {
                 log(
                     UDPC_LoggingType::UDPC_ERROR,
@@ -432,9 +449,9 @@ void UDPC::Context::update_impl() {
                 (pInfo.flags & 0x4) | (isResending ? 0x8 : 0));
             std::memcpy(buf.get() + 20, pInfo.data, pInfo.dataSize);
 
-            struct sockaddr_in6 destinationInfo;
+            UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
             destinationInfo.sin6_family = AF_INET6;
-            std::memcpy(destinationInfo.sin6_addr.s6_addr, iter->first.addr.s6_addr, 16);
+            std::memcpy(UDPC_IPV6_ADDR_SUB(destinationInfo.sin6_addr), UDPC_IPV6_ADDR_SUB(iter->first.addr), 16);
             destinationInfo.sin6_port = htons(iter->second.port);
             long int sentBytes = sendto(
                 socketHandle,
@@ -442,7 +459,7 @@ void UDPC::Context::update_impl() {
                 pInfo.dataSize + 20,
                 0,
                 (struct sockaddr*) &destinationInfo,
-                sizeof(struct sockaddr_in6));
+                sizeof(UDPC_IPV6_SOCKADDR_TYPE));
             if(sentBytes != 20 + pInfo.dataSize) {
                 log(
                     UDPC_LoggingType::UDPC_ERROR,
@@ -489,10 +506,7 @@ void UDPC::Context::update_impl() {
     }
 
     // receive packet
-#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
-    typedef int socklen_t;
-#endif
-    struct sockaddr_in6 receivedData;
+    UDPC_IPV6_SOCKADDR_TYPE receivedData;
     socklen_t receivedDataSize = sizeof(receivedData);
     int bytes = recvfrom(
         socketHandle,
@@ -502,6 +516,28 @@ void UDPC::Context::update_impl() {
         (struct sockaddr*) &receivedData,
         &receivedDataSize);
 
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+    if(bytes == 0) {
+        // connection closed
+        return;
+    } else if(bytes == SOCKET_ERROR) {
+        int error = WSAGetLastError();
+        if(error != WSAEWOULDBLOCK) {
+            log(UDPC_LoggingType::UDPC_ERROR,
+                "Error receiving packet, ", error);
+        }
+        return;
+    } else if(bytes < 20) {
+        // packet size is too small, invalid packet
+        log(
+            UDPC_LoggingType::UDPC_INFO,
+            "Received packet is smaller than header, ignoring packet from ",
+            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+            ", port = ",
+            receivedData.sin6_port);
+        return;
+    }
+#else
     if(bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
         // no packet was received
         return;
@@ -515,6 +551,7 @@ void UDPC::Context::update_impl() {
             receivedData.sin6_port);
         return;
     }
+#endif
 
     uint32_t temp = ntohl(*((uint32_t*)recvBuf));
     if(temp != protocolID) {
@@ -871,11 +908,11 @@ void UDPC::threadedUpdate(Context *ctx) {
     }
 }
 
-UDPC_ConnectionId UDPC_create_id(struct in6_addr addr, uint16_t port) {
+UDPC_ConnectionId UDPC_create_id(UDPC_IPV6_ADDR_TYPE addr, uint16_t port) {
     return UDPC_ConnectionId{addr, 0, port};
 }
 
-UDPC_ConnectionId UDPC_create_id_full(struct in6_addr addr, uint32_t scope_id, uint16_t port) {
+UDPC_ConnectionId UDPC_create_id_full(UDPC_IPV6_ADDR_TYPE addr, uint32_t scope_id, uint16_t port) {
     return UDPC_ConnectionId{addr, scope_id, port};
 }
 
@@ -890,18 +927,38 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient) {
     ctx->log(UDPC_LoggingType::UDPC_INFO, "Got listen addr ",
         UDPC_atostr((UDPC_HContext)ctx, listenId.addr));
 
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+    // Initialize Winsock
+    WORD wVersionRequested = MAKEWORD(2, 2);
+    WSADATA wsaData;
+    if(WSAStartup(wVersionRequested, &wsaData) != 0) {
+        ctx->log(UDPC_LoggingType::UDPC_ERROR, "Failed to initialize Winsock");
+        delete ctx;
+        return nullptr;
+    }
+#endif
+
     // create socket
     ctx->socketHandle = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
-    if(ctx->socketHandle <= 0) {
+    if(UDPC_SOCKET_RETURN_ERROR(ctx->socketHandle)) {
         // TODO maybe different way of handling init fail
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+        ctx->log(UDPC_LoggingType::UDPC_ERROR, "Failed to create socket, ",
+            WSAGetLastError());
+#else
         ctx->log(UDPC_LoggingType::UDPC_ERROR, "Failed to create socket");
+#endif
         delete ctx;
         return nullptr;
     }
 
     // allow ipv4 connections on ipv6 socket
     {
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+        char no = 0;
+#else
         int no = 0;
+#endif
         setsockopt(ctx->socketHandle, IPPROTO_IPV6, IPV6_V6ONLY, &no, sizeof(no));
     }
 
@@ -912,18 +969,18 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient) {
     ctx->socketInfo.sin6_flowinfo = 0;
     ctx->socketInfo.sin6_scope_id = listenId.scope_id;
     if(bind(ctx->socketHandle, (const struct sockaddr *)&ctx->socketInfo,
-            sizeof(struct sockaddr_in6)) < 0) {
+            sizeof(UDPC_IPV6_SOCKADDR_TYPE)) < 0) {
         // TODO maybe different way of handling init fail
         ctx->log(UDPC_LoggingType::UDPC_ERROR, "Failed to bind socket");
-        CleanupSocket(ctx->socketHandle);
+        UDPC_CLEANUPSOCKET(ctx->socketHandle);
         delete ctx;
         return nullptr;
     }
 
     // TODO verify this is necessary to get the listen port
     if(ctx->socketInfo.sin6_port == 0) {
-        struct sockaddr_in6 getInfo;
-        socklen_t size = sizeof(struct sockaddr_in6);
+        UDPC_IPV6_SOCKADDR_TYPE getInfo;
+        socklen_t size = sizeof(UDPC_IPV6_SOCKADDR_TYPE);
         if(getsockname(ctx->socketHandle, (struct sockaddr *)&getInfo, &size) == 0) {
             ctx->socketInfo.sin6_port = getInfo.sin6_port;
         }
@@ -941,7 +998,7 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient) {
 #endif
         // TODO maybe different way of handling init fail
         ctx->log(UDPC_LoggingType::UDPC_ERROR, "Failed to set nonblocking on socket");
-        CleanupSocket(ctx->socketHandle);
+        UDPC_CLEANUPSOCKET(ctx->socketHandle);
         delete ctx;
         return nullptr;
     }
@@ -972,6 +1029,9 @@ void UDPC_destroy(UDPC_HContext ctx) {
             UDPC_ctx->threadRunning.store(false);
             UDPC_ctx->thread.join();
         }
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+        WSACleanup();
+#endif
         delete UDPC_ctx;
     }
 }
@@ -1167,7 +1227,7 @@ const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
     return UDPC_atostr(ctx, connectionId.addr);
 }
 
-const char *UDPC_atostr(UDPC_HContext ctx, struct in6_addr addr) {
+const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return nullptr;
@@ -1196,12 +1256,12 @@ const char *UDPC_atostr(UDPC_HContext ctx, struct in6_addr addr) {
             }
         }
 
-        if(addr.s6_addr[i] == 0 && (headIndex - index <= 1 || c->atostrBuf[index] == ':')) {
+        if(UDPC_IPV6_ADDR_SUB(addr)[i] == 0 && (headIndex - index <= 1 || c->atostrBuf[index] == ':')) {
             continue;
         } else {
             std::stringstream sstream;
             sstream << std::setw(2) << std::setfill('0')
-                << std::hex << (unsigned int) addr.s6_addr[i];
+                << std::hex << (unsigned int) UDPC_IPV6_ADDR_SUB(addr)[i];
             std::string out(sstream.str());
             unsigned int outOffset = 0;
             if(headIndex - index <= 1 || c->atostrBuf[index - 1] == ':') {
@@ -1236,8 +1296,8 @@ const char *UDPC_atostr(UDPC_HContext ctx, struct in6_addr addr) {
     return c->atostrBuf + headIndex;
 }
 
-struct in6_addr UDPC_strtoa(const char *addrStr) {
-    struct in6_addr result = in6addr_loopback;
+UDPC_IPV6_ADDR_TYPE UDPC_strtoa(const char *addrStr) {
+    UDPC_IPV6_ADDR_TYPE result = in6addr_loopback;
     std::cmatch matchResults;
     if(std::regex_match(addrStr, matchResults, ipv6_regex_nolink)) {
         unsigned int index = 0;
@@ -1249,8 +1309,8 @@ struct in6_addr UDPC_strtoa(const char *addrStr) {
 
         const auto checkInc = [&result, &index, &bytes] () -> bool {
             if(index < 15) {
-                result.s6_addr[index++] = bytes[0];
-                result.s6_addr[index++] = bytes[1];
+                UDPC_IPV6_ADDR_SUB(result)[index++] = bytes[0];
+                UDPC_IPV6_ADDR_SUB(result)[index++] = bytes[1];
                 bytes[0] = 0;
                 bytes[1] = 0;
                 return false;
@@ -1400,31 +1460,31 @@ struct in6_addr UDPC_strtoa(const char *addrStr) {
                 return in6addr_loopback;
             }
             for(unsigned int i = 16; i-- > (unsigned int)doubleColonIndex + strIndex; ) {
-                result.s6_addr[i] = result.s6_addr[i - strIndex];
-                result.s6_addr[i - strIndex] = 0;
+                UDPC_IPV6_ADDR_SUB(result)[i] = UDPC_IPV6_ADDR_SUB(result)[i - strIndex];
+                UDPC_IPV6_ADDR_SUB(result)[i - strIndex] = 0;
             }
         }
     } else if(std::regex_match(addrStr, matchResults, ipv4_regex)) {
         for(unsigned int i = 0; i < 10; ++i) {
-            result.s6_addr[i] = 0;
+            UDPC_IPV6_ADDR_SUB(result)[i] = 0;
         }
-        result.s6_addr[10] = 0xFF;
-        result.s6_addr[11] = 0xFF;
+        UDPC_IPV6_ADDR_SUB(result)[10] = 0xFF;
+        UDPC_IPV6_ADDR_SUB(result)[11] = 0xFF;
         for(unsigned int i = 0; i < 4; ++i) {
-            result.s6_addr[12 + i] = std::stoi(matchResults[i + 1].str());
+            UDPC_IPV6_ADDR_SUB(result)[12 + i] = std::stoi(matchResults[i + 1].str());
         }
     }
     return result;
 }
 
-struct in6_addr UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out) {
+UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out) {
     const auto checkSetOut = [&linkId_out] (uint32_t val) {
         if(linkId_out) {
             *linkId_out = val;
         }
     };
 
-    struct in6_addr result({0});
+    UDPC_IPV6_ADDR_TYPE result({0});
     std::cmatch matchResults;
     const char *linkName = nullptr;
 
@@ -1438,8 +1498,8 @@ struct in6_addr UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out) {
 
         const auto checkInc = [&result, &index, &bytes] () -> bool {
             if(index < 15) {
-                result.s6_addr[index++] = bytes[0];
-                result.s6_addr[index++] = bytes[1];
+                UDPC_IPV6_ADDR_SUB(result)[index++] = bytes[0];
+                UDPC_IPV6_ADDR_SUB(result)[index++] = bytes[1];
                 bytes[0] = 0;
                 bytes[1] = 0;
                 return false;
@@ -1605,32 +1665,36 @@ struct in6_addr UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out) {
                 return in6addr_loopback;
             }
             for(unsigned int i = 16; i-- > (unsigned int)doubleColonIndex + strIndex; ) {
-                result.s6_addr[i] = result.s6_addr[i - strIndex];
-                result.s6_addr[i - strIndex] = 0;
+                UDPC_IPV6_ADDR_SUB(result)[i] = UDPC_IPV6_ADDR_SUB(result)[i - strIndex];
+                UDPC_IPV6_ADDR_SUB(result)[i - strIndex] = 0;
             }
         }
     }
 
     uint32_t scope_id;
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
-    scope_id = if_nametoindex(linkName);
-    if(scope_id == 0) {
-        checkSetOut(0);
-        return in6addr_loopback;
+    if(std::regex_match(linkName, regex_numeric)) {
+        scope_id = std::atoi(linkName);
+    } else {
+        scope_id = if_nametoindex(linkName);
+        if(scope_id == 0) {
+            checkSetOut(0);
+            return in6addr_loopback;
+        }
     }
 #elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
     struct ifreq req{{0}, 0, 0};
     std::strncpy(req.ifr_name, linkName, IFNAMSIZ);
     int socketHandle = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
     if(ioctl(socketHandle, SIOCGIFINDEX, &req) < 0) {
-        CleanupSocket(socketHandle);
+        UDPC_CLEANUPSOCKET(socketHandle);
         checkSetOut(0);
         return in6addr_loopback;
     }
     scope_id = req.ifr_ifindex;
+    UDPC_CLEANUPSOCKET(socketHandle);
 #endif
 
-    CleanupSocket(socketHandle);
     checkSetOut(scope_id);
     return result;
 }

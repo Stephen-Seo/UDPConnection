@@ -243,7 +243,7 @@ public:
     std::atomic_uint32_t atostrBufIndex;
     char atostrBuf[UDPC_ATOSTR_SIZE];
 
-    int socketHandle;
+    UDPC_SOCKETTYPE socketHandle;
     struct sockaddr_in6 socketInfo;
 
     std::chrono::steady_clock::time_point lastUpdated;

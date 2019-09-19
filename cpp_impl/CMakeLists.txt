@@ -29,6 +29,10 @@ set_target_properties(UDPConnection PROPERTIES VERSION ${UDPConnection_VERSION})
 
 target_compile_features(UDPConnection PUBLIC cxx_std_17)
 target_link_libraries(UDPConnection PUBLIC pthread)
+if(WIN32)
+    target_link_libraries(UDPConnection PUBLIC Ws2_32)
+    target_link_libraries(UDPConnection PUBLIC Iphlpapi)
+endif()
 
 target_include_directories(UDPConnection PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/RingBuffer/src")

@@ -20,17 +20,29 @@
 // OS-based networking macros
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
 #include <winsock2.h>
+#include <Ws2ipdef.h>
+#include <In6addr.h>
 
-#define CleanupSocket(x) closesocket(x)
+#define UDPC_CLEANUPSOCKET(x) closesocket(x)
+#define UDPC_SOCKETTYPE SOCKET
+#define UDPC_IPV6_SOCKADDR_TYPE SOCKADDR_IN6
+#define UDPC_IPV6_ADDR_TYPE IN6_ADDR
+#define UDPC_IPV6_ADDR_SUB(addr) addr.u.Byte
+#define UDPC_SOCKET_RETURN_ERROR(socket) (socket == INVALID_SOCKET)
 #elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define CleanupSocket(x) close(x)
+#define UDPC_CLEANUPSOCKET(x) close(x)
+#define UDPC_SOCKETTYPE int
+#define UDPC_IPV6_SOCKADDR_TYPE struct sockaddr_in6
+#define UDPC_IPV6_ADDR_TYPE struct in6_addr
+#define UDPC_IPV6_ADDR_SUB(addr) addr.s6_addr
+#define UDPC_SOCKET_RETURN_ERROR(socket) (socket <= 0)
 #else
-#define CleanupSocket(x) ((void)0)
+#define UDPC_CLEANUPSOCKET(x) ((void)0)
 #endif
 
 // other defines
@@ -51,7 +63,7 @@ typedef struct UDPC_Context *UDPC_HContext;
 typedef enum { UDPC_SILENT, UDPC_ERROR, UDPC_WARNING, UDPC_VERBOSE, UDPC_INFO } UDPC_LoggingType;
 
 typedef struct {
-    struct in6_addr addr;
+    UDPC_IPV6_ADDR_TYPE addr;
     uint32_t scope_id;
     uint16_t port;
 } UDPC_ConnectionId;
@@ -72,9 +84,9 @@ typedef struct {
 } UDPC_PacketInfo;
 
 /// port should be in native byte order (not network/big-endian)
-UDPC_ConnectionId UDPC_create_id(struct in6_addr addr, uint16_t port);
+UDPC_ConnectionId UDPC_create_id(UDPC_IPV6_ADDR_TYPE addr, uint16_t port);
 
-UDPC_ConnectionId UDPC_create_id_full(struct in6_addr addr, uint32_t scope_id, uint16_t port);
+UDPC_ConnectionId UDPC_create_id_full(UDPC_IPV6_ADDR_TYPE addr, uint32_t scope_id, uint16_t port);
 
 UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
 
@@ -107,12 +119,12 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx);
 
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
-const char *UDPC_atostr(UDPC_HContext ctx, struct in6_addr addr);
+const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr);
 
 /// addrStr must be a valid ipv6 address or a valid ipv4 address
-struct in6_addr UDPC_strtoa(const char *addrStr);
+UDPC_IPV6_ADDR_TYPE UDPC_strtoa(const char *addrStr);
 
-struct in6_addr UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out);
+UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out);
 
 #ifdef __cplusplus
 }
