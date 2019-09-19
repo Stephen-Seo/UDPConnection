@@ -128,54 +128,54 @@ private:
     template<typename... Targs>
     void log_impl(UDPC_LoggingType type, Targs... args) { // {{{
         switch(loggingType.load()) {
-        case UDPC_LoggingType::SILENT:
+        case UDPC_LoggingType::UDPC_SILENT:
             return;
-        case UDPC_LoggingType::ERROR:
-            if(type == UDPC_LoggingType::ERROR) {
+        case UDPC_LoggingType::UDPC_ERROR:
+            if(type == UDPC_LoggingType::UDPC_ERROR) {
                 std::cerr << "ERROR: ";
             } else {
                 return;
             }
             break;
-        case UDPC_LoggingType::WARNING:
+        case UDPC_LoggingType::UDPC_WARNING:
             switch(type) {
-            case UDPC_LoggingType::ERROR:
+            case UDPC_LoggingType::UDPC_ERROR:
                 std::cerr << "ERROR: ";
                 break;
-            case UDPC_LoggingType::WARNING:
+            case UDPC_LoggingType::UDPC_WARNING:
                 std::cerr << "WARNING: ";
                 break;
             default:
                 return;
             }
             break;
-        case UDPC_LoggingType::VERBOSE:
+        case UDPC_LoggingType::UDPC_VERBOSE:
             switch(type) {
-            case UDPC_LoggingType::ERROR:
+            case UDPC_LoggingType::UDPC_ERROR:
                 std::cerr << "ERROR: ";
                 break;
-            case UDPC_LoggingType::WARNING:
+            case UDPC_LoggingType::UDPC_WARNING:
                 std::cerr << "WARNING: ";
                 break;
-            case UDPC_LoggingType::VERBOSE:
+            case UDPC_LoggingType::UDPC_VERBOSE:
                 std::cerr << "VERBOSE: ";
                 break;
             default:
                 return;
             }
             break;
-        case UDPC_LoggingType::INFO:
+        case UDPC_LoggingType::UDPC_INFO:
             switch(type) {
-            case UDPC_LoggingType::ERROR:
+            case UDPC_LoggingType::UDPC_ERROR:
                 std::cerr << "ERROR: ";
                 break;
-            case UDPC_LoggingType::WARNING:
+            case UDPC_LoggingType::UDPC_WARNING:
                 std::cerr << "WARNING: ";
                 break;
-            case UDPC_LoggingType::VERBOSE:
+            case UDPC_LoggingType::UDPC_VERBOSE:
                 std::cerr << "VERBOSE: ";
                 break;
-            case UDPC_LoggingType::INFO:
+            case UDPC_LoggingType::UDPC_INFO:
                 std::cerr << "INFO: ";
                 break;
             default:
@@ -196,28 +196,28 @@ private:
     template<typename T, typename... Targs>
     void log_impl_next(UDPC_LoggingType type, T value, Targs... args) { // {{{
         switch(loggingType.load()) {
-        case UDPC_LoggingType::SILENT:
+        case UDPC_LoggingType::UDPC_SILENT:
             return;
-        case UDPC_LoggingType::ERROR:
-            if(type == UDPC_LoggingType::ERROR) {
+        case UDPC_LoggingType::UDPC_ERROR:
+            if(type == UDPC_LoggingType::UDPC_ERROR) {
                 std::cerr << value;
             }
             break;
-        case UDPC_LoggingType::WARNING:
-            if(type == UDPC_LoggingType::ERROR || type == UDPC_LoggingType::WARNING) {
+        case UDPC_LoggingType::UDPC_WARNING:
+            if(type == UDPC_LoggingType::UDPC_ERROR || type == UDPC_LoggingType::UDPC_WARNING) {
                 std::cerr << value;
             }
             break;
-        case UDPC_LoggingType::VERBOSE:
-            if(type == UDPC_LoggingType::ERROR || type == UDPC_LoggingType::WARNING
-                    || type == UDPC_LoggingType::VERBOSE) {
+        case UDPC_LoggingType::UDPC_VERBOSE:
+            if(type == UDPC_LoggingType::UDPC_ERROR || type == UDPC_LoggingType::UDPC_WARNING
+                    || type == UDPC_LoggingType::UDPC_VERBOSE) {
                 std::cerr << value;
             }
             break;
-        case UDPC_LoggingType::INFO:
-            if(type == UDPC_LoggingType::ERROR || type == UDPC_LoggingType::WARNING
-                    || type == UDPC_LoggingType::VERBOSE
-                    || type == UDPC_LoggingType::INFO) {
+        case UDPC_LoggingType::UDPC_INFO:
+            if(type == UDPC_LoggingType::UDPC_ERROR || type == UDPC_LoggingType::UDPC_WARNING
+                    || type == UDPC_LoggingType::UDPC_VERBOSE
+                    || type == UDPC_LoggingType::UDPC_INFO) {
                 std::cerr << value;
             }
             break;

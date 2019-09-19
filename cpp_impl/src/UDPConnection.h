@@ -48,7 +48,7 @@ extern "C" {
 struct UDPC_Context;
 typedef struct UDPC_Context *UDPC_HContext;
 
-typedef enum { SILENT, ERROR, WARNING, VERBOSE, INFO } UDPC_LoggingType;
+typedef enum { UDPC_SILENT, UDPC_ERROR, UDPC_WARNING, UDPC_VERBOSE, UDPC_INFO } UDPC_LoggingType;
 
 typedef struct {
     struct in6_addr addr;

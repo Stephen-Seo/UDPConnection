@@ -136,9 +136,9 @@ flags(),
 isAcceptNewConnections(true),
 protocolID(UDPC_DEFAULT_PROTOCOL_ID),
 #ifndef NDEBUG
-loggingType(INFO),
+loggingType(UDPC_INFO),
 #else
-loggingType(WARNING),
+loggingType(UDPC_WARNING),
 #endif
 atostrBufIndex(0),
 rng_engine(),
@@ -170,7 +170,7 @@ void UDPC::Context::update_impl() {
             if(temp_dt_fs >= UDPC::CONNECTION_TIMEOUT) {
                 removed.push_back(iter->first);
                 log(
-                    UDPC_LoggingType::VERBOSE,
+                    UDPC_LoggingType::UDPC_VERBOSE,
                     "Timed out connection with ",
                     UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                     ", port = ",
@@ -184,7 +184,7 @@ void UDPC::Context::update_impl() {
             if(iter->second.flags.test(1) && !iter->second.flags.test(2)) {
                 // good mode, bad rtt
                 log(
-                    UDPC_LoggingType::INFO,
+                    UDPC_LoggingType::UDPC_INFO,
                     "Switching to bad mode in connection with ",
                     UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                     ", port = ",
@@ -210,7 +210,7 @@ void UDPC::Context::update_impl() {
                     iter->second.toggleTimer = std::chrono::steady_clock::duration::zero();
                     iter->second.toggledTimer = std::chrono::steady_clock::duration::zero();
                     log(
-                        UDPC_LoggingType::INFO,
+                        UDPC_LoggingType::UDPC_INFO,
                         "Switching to good mode in connection with ",
                         UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                         ", port = ",
@@ -300,14 +300,14 @@ void UDPC::Context::update_impl() {
                     sizeof(struct sockaddr_in6));
                 if(sentBytes != 20) {
                     log(
-                        UDPC_LoggingType::ERROR,
+                        UDPC_LoggingType::UDPC_ERROR,
                         "Failed to send packet to initiate connection to ",
                         UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                         ", port = ",
                         iter->second.port);
                     continue;
                 } else {
-                    log(UDPC_LoggingType::INFO, "Sent initiate connection to ",
+                    log(UDPC_LoggingType::UDPC_INFO, "Sent initiate connection to ",
                         UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                         ", port = ",
                         iter->second.port);
@@ -342,7 +342,7 @@ void UDPC::Context::update_impl() {
                     sizeof(struct sockaddr_in6));
                 if(sentBytes != 20) {
                     log(
-                        UDPC_LoggingType::ERROR,
+                        UDPC_LoggingType::UDPC_ERROR,
                         "Failed to send packet to initiate connection to ",
                         UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                         ", port = ",
@@ -386,7 +386,7 @@ void UDPC::Context::update_impl() {
                 sizeof(struct sockaddr_in6));
             if(sentBytes != 20) {
                 log(
-                    UDPC_LoggingType::ERROR,
+                    UDPC_LoggingType::UDPC_ERROR,
                     "Failed to send heartbeat packet to ",
                     UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                     ", port = ",
@@ -445,7 +445,7 @@ void UDPC::Context::update_impl() {
                 sizeof(struct sockaddr_in6));
             if(sentBytes != 20 + pInfo.dataSize) {
                 log(
-                    UDPC_LoggingType::ERROR,
+                    UDPC_LoggingType::UDPC_ERROR,
                     "Failed to send packet to ",
                     UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                     ", port = ",
@@ -508,7 +508,7 @@ void UDPC::Context::update_impl() {
     } else if(bytes < 20) {
         // packet size is too small, invalid packet
         log(
-            UDPC_LoggingType::INFO,
+            UDPC_LoggingType::UDPC_INFO,
             "Received packet is smaller than header, ignoring packet from ",
             UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
             ", port = ",
@@ -520,7 +520,7 @@ void UDPC::Context::update_impl() {
     if(temp != protocolID) {
         // Invalid protocol id in packet
         log(
-            UDPC_LoggingType::INFO,
+            UDPC_LoggingType::UDPC_INFO,
             "Received packet has invalid protocol id, ignoring packet from ",
             UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
             ", port = ",
@@ -548,7 +548,7 @@ void UDPC::Context::update_impl() {
             // is receiving as server, connection did not already exist
             UDPC::ConnectionData newConnection(true, this, receivedData.sin6_addr, receivedData.sin6_scope_id, ntohs(receivedData.sin6_port));
             log(
-                UDPC_LoggingType::VERBOSE,
+                UDPC_LoggingType::UDPC_VERBOSE,
                 "Establishing connection with client ",
                 UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                 ", port = ",
@@ -580,7 +580,7 @@ void UDPC::Context::update_impl() {
             iter->second.id = conID;
             iter->second.flags.set(4);
             log(
-                UDPC_LoggingType::VERBOSE,
+                UDPC_LoggingType::UDPC_VERBOSE,
                 "Established connection with server ",
                 UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                 ", port = ",
@@ -601,7 +601,7 @@ void UDPC::Context::update_impl() {
 
     // packet is valid
     log(
-        UDPC_LoggingType::INFO,
+        UDPC_LoggingType::UDPC_INFO,
         "Received valid packet from ",
         UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
         ", port = ",
@@ -627,7 +627,7 @@ void UDPC::Context::update_impl() {
             iter->second.flags.set(2, iter->second.rtt <= UDPC::GOOD_RTT_LIMIT);
 
             log(
-                UDPC_LoggingType::INFO,
+                UDPC_LoggingType::UDPC_INFO,
                 "RTT: ",
                 UDPC::durationToFSec(iter->second.rtt) * 1000.0f,
                 " milliseconds");
@@ -660,7 +660,7 @@ void UDPC::Context::update_impl() {
                 if(duration > UDPC::PACKET_TIMEOUT_TIME) {
                     if(sentIter->dataSize <= 20) {
                         log(
-                            UDPC_LoggingType::INFO,
+                            UDPC_LoggingType::UDPC_INFO,
                             "Timed out packet has no payload (probably "
                             "heartbeat packet), ignoring it");
                         sentIter->flags |= 0x8;
@@ -695,7 +695,7 @@ void UDPC::Context::update_impl() {
             if((iter->second.ack & (0x80000000 >> (diff - 1))) != 0) {
                 // already received packet
                 log(
-                    UDPC_LoggingType::INFO,
+                    UDPC_LoggingType::UDPC_INFO,
                     "Received packet is already marked as received, ignoring it");
                 return;
             }
@@ -709,7 +709,7 @@ void UDPC::Context::update_impl() {
             if((iter->second.ack & (0x80000000 >> (diff - 1))) != 0) {
                 // already received packet
                 log(
-                    UDPC_LoggingType::INFO,
+                    UDPC_LoggingType::UDPC_INFO,
                     "Received packet is already marked as received, ignoring it");
                 return;
             }
@@ -724,14 +724,14 @@ void UDPC::Context::update_impl() {
     } else {
         // already received packet
         log(
-            UDPC_LoggingType::INFO,
+            UDPC_LoggingType::UDPC_INFO,
             "Received packet is already marked as received, ignoring it");
         return;
     }
 
     if(isOutOfOrder) {
         log(
-            UDPC_LoggingType::VERBOSE,
+            UDPC_LoggingType::UDPC_VERBOSE,
             "Received packet is out of order");
     }
 
@@ -751,7 +751,7 @@ void UDPC::Context::update_impl() {
 
         if(iter->second.receivedPkts.size() == iter->second.receivedPkts.capacity()) {
             log(
-                UDPC_LoggingType::WARNING,
+                UDPC_LoggingType::UDPC_WARNING,
                 "receivedPkts is full, removing oldest entry to make room");
             iter->second.receivedPkts.pop();
         }
@@ -759,7 +759,7 @@ void UDPC::Context::update_impl() {
         iter->second.receivedPkts.push(recPktInfo);
     } else if(bytes == 20) {
         log(
-            UDPC_LoggingType::VERBOSE,
+            UDPC_LoggingType::UDPC_VERBOSE,
             "Received packet has no payload (probably heartbeat packet)");
     }
 }
@@ -887,14 +887,14 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient) {
     UDPC::Context *ctx = new UDPC::Context(false);
     ctx->flags.set(1, isClient != 0);
 
-    ctx->log(UDPC_LoggingType::INFO, "Got listen addr ",
+    ctx->log(UDPC_LoggingType::UDPC_INFO, "Got listen addr ",
         UDPC_atostr((UDPC_HContext)ctx, listenId.addr));
 
     // create socket
     ctx->socketHandle = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
     if(ctx->socketHandle <= 0) {
         // TODO maybe different way of handling init fail
-        ctx->log(UDPC_LoggingType::ERROR, "Failed to create socket");
+        ctx->log(UDPC_LoggingType::UDPC_ERROR, "Failed to create socket");
         delete ctx;
         return nullptr;
     }
@@ -914,7 +914,7 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient) {
     if(bind(ctx->socketHandle, (const struct sockaddr *)&ctx->socketInfo,
             sizeof(struct sockaddr_in6)) < 0) {
         // TODO maybe different way of handling init fail
-        ctx->log(UDPC_LoggingType::ERROR, "Failed to bind socket");
+        ctx->log(UDPC_LoggingType::UDPC_ERROR, "Failed to bind socket");
         CleanupSocket(ctx->socketHandle);
         delete ctx;
         return nullptr;
@@ -940,13 +940,13 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient) {
     {
 #endif
         // TODO maybe different way of handling init fail
-        ctx->log(UDPC_LoggingType::ERROR, "Failed to set nonblocking on socket");
+        ctx->log(UDPC_LoggingType::UDPC_ERROR, "Failed to set nonblocking on socket");
         CleanupSocket(ctx->socketHandle);
         delete ctx;
         return nullptr;
     }
 
-    ctx->log(UDPC_LoggingType::INFO, "Initialized UDPC");
+    ctx->log(UDPC_LoggingType::UDPC_INFO, "Initialized UDPC");
 
     return (UDPC_HContext) ctx;
 }
@@ -960,7 +960,7 @@ UDPC_HContext UDPC_init_threaded_update(UDPC_ConnectionId listenId,
     ctx->flags.set(0);
     ctx->thread = std::thread(UDPC::threadedUpdate, ctx);
 
-    ctx->log(UDPC_LoggingType::INFO, "Initialized threaded UDPC");
+    ctx->log(UDPC_LoggingType::UDPC_INFO, "Initialized threaded UDPC");
 
     return (UDPC_HContext) ctx;
 }
@@ -992,7 +992,7 @@ void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connec
         return;
     }
 
-    c->log(UDPC_LoggingType::INFO, "client_initiate_connection: Got peer a = ",
+    c->log(UDPC_LoggingType::UDPC_INFO, "client_initiate_connection: Got peer a = ",
         UDPC_atostr((UDPC_HContext)ctx, connectionId.addr),
         ", p = ", connectionId.port);
 
@@ -1013,9 +1013,9 @@ void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connec
             addrConIter = insertResult.first;
         }
         addrConIter->second.insert(connectionId);
-        c->log(UDPC_LoggingType::VERBOSE, "client_initiate_connection: Initiating connection...");
+        c->log(UDPC_LoggingType::UDPC_VERBOSE, "client_initiate_connection: Initiating connection...");
     } else {
-        c->log(UDPC_LoggingType::ERROR, "client_initiate_connection: Already connected to peer");
+        c->log(UDPC_LoggingType::UDPC_ERROR, "client_initiate_connection: Already connected to peer");
     }
 }
 
@@ -1051,7 +1051,7 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
     auto iter = c->conMap.find(destinationId);
     if(iter == c->conMap.end()) {
         c->log(
-            UDPC_LoggingType::ERROR,
+            UDPC_LoggingType::UDPC_ERROR,
             "Failed to add packet to queue, no established connection "
             "with recipient");
         return;
@@ -1146,7 +1146,7 @@ uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id) {
 UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingType) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
-        return UDPC_LoggingType::SILENT;
+        return UDPC_LoggingType::UDPC_SILENT;
     }
     return static_cast<UDPC_LoggingType>(c->loggingType.exchange(loggingType));
 }

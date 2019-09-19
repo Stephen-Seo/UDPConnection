@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
         puts("ERROR: context is NULL");
         return 1;
     }
-    UDPC_set_logging_type(context, UDPC_LoggingType::INFO);
+    UDPC_set_logging_type(context, UDPC_LoggingType::UDPC_INFO);
     unsigned int tick = 0;
     while(true) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
