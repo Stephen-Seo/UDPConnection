@@ -31,8 +31,6 @@ static const UDPC_IPV6_ADDR_TYPE in6addr_loopback = UDPC_IPV6_ADDR_TYPE{{
 }};
 
 typedef int socklen_t;
-
-static const std::regex regex_numeric = std::regex("[0-9]+");
 #elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
 #include <sys/ioctl.h>
 #include <net/if.h>
@@ -40,8 +38,9 @@ static const std::regex regex_numeric = std::regex("[0-9]+");
 
 //static const std::regex ipv6_regex = std::regex(R"d((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])))d");
 static const std::regex ipv6_regex_nolink = std::regex(R"d((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])))d");
-static const std::regex ipv6_regex_linkonly = std::regex(R"d(fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,})d");
+static const std::regex ipv6_regex_linkonly = std::regex(R"d(fe80:(:[0-9a-fA-F]{0,4}){0,4}%([0-9a-zA-Z]+))d");
 static const std::regex ipv4_regex = std::regex(R"d((1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9])\.(1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9])\.(1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9])\.(1[0-9][0-9]|2[0-4][0-9]|25[0-5]|[1-9][0-9]|[0-9]))d");
+static const std::regex regex_numeric = std::regex("[0-9]+");
 
 UDPC::SentPktInfo::SentPktInfo() :
 id(0),
@@ -1672,10 +1671,11 @@ UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out) 
     }
 
     uint32_t scope_id;
-#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
     if(std::regex_match(linkName, regex_numeric)) {
         scope_id = std::atoi(linkName);
-    } else {
+    }
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+    else {
         scope_id = if_nametoindex(linkName);
         if(scope_id == 0) {
             checkSetOut(0);
@@ -1683,16 +1683,18 @@ UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out) 
         }
     }
 #elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
-    struct ifreq req{{0}, 0, 0};
-    std::strncpy(req.ifr_name, linkName, IFNAMSIZ);
-    int socketHandle = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
-    if(ioctl(socketHandle, SIOCGIFINDEX, &req) < 0) {
+    else {
+        struct ifreq req{{0}, 0, 0};
+        std::strncpy(req.ifr_name, linkName, IFNAMSIZ);
+        int socketHandle = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+        if(ioctl(socketHandle, SIOCGIFINDEX, &req) < 0) {
+            UDPC_CLEANUPSOCKET(socketHandle);
+            checkSetOut(0);
+            return in6addr_loopback;
+        }
+        scope_id = req.ifr_ifindex;
         UDPC_CLEANUPSOCKET(socketHandle);
-        checkSetOut(0);
-        return in6addr_loopback;
     }
-    scope_id = req.ifr_ifindex;
-    UDPC_CLEANUPSOCKET(socketHandle);
 #endif
 
     checkSetOut(scope_id);
