@@ -16,6 +16,8 @@
 #define UDPC_ATOSTR_BUFSIZE 40
 #define UDPC_ATOSTR_SIZE (UDPC_ATOSTR_BUFCOUNT * UDPC_ATOSTR_BUFSIZE)
 
+#define UDPC_CHECK_LOG(ctx, type, ...) if(ctx->willLog(type)){ctx->log(type, __VA_ARGS__);}
+
 #include <atomic>
 #include <bitset>
 #include <chrono>
@@ -113,6 +115,8 @@ struct ConnectionData {
 struct Context {
 public:
     Context(bool isThreaded);
+
+    bool willLog(UDPC_LoggingType);
 
     void log(UDPC_LoggingType) {}
 
