@@ -13,6 +13,7 @@
 #include <ios>
 #include <iomanip>
 #include <regex>
+#include <cstdlib>
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
 #include <netioapi.h>
@@ -90,7 +91,6 @@ port(0),
 sentPkts(),
 sendPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
 priorityPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
-receivedPkts(UDPC_RECEIVED_PKTS_MAX_SIZE),
 received(std::chrono::steady_clock::now()),
 sent(std::chrono::steady_clock::now()),
 rtt(std::chrono::steady_clock::duration::zero())
@@ -120,7 +120,6 @@ port(port),
 sentPkts(),
 sendPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
 priorityPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
-receivedPkts(UDPC_RECEIVED_PKTS_MAX_SIZE),
 received(std::chrono::steady_clock::now()),
 sent(std::chrono::steady_clock::now()),
 rtt(std::chrono::steady_clock::duration::zero())
@@ -157,9 +156,14 @@ loggingType(UDPC_INFO),
 loggingType(UDPC_WARNING),
 #endif
 atostrBufIndex(0),
+receivedPkts(UDPC_RECEIVED_PKTS_MAX_SIZE),
 rng_engine(),
 mutex()
 {
+    for(unsigned int i = 0; i < UDPC_ATOSTR_SIZE; ++i) {
+        atostrBuf[i] = 0;
+    }
+
     if(isThreaded) {
         flags.set(0);
     } else {
@@ -389,7 +393,10 @@ void UDPC::Context::update_impl() {
 
             UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
             destinationInfo.sin6_family = AF_INET6;
-            std::memcpy(UDPC_IPV6_ADDR_SUB(destinationInfo.sin6_addr), UDPC_IPV6_ADDR_SUB(iter->first.addr), 16);
+            std::memcpy(
+                UDPC_IPV6_ADDR_SUB(destinationInfo.sin6_addr),
+                UDPC_IPV6_ADDR_SUB(iter->first.addr),
+                16);
             destinationInfo.sin6_port = htons(iter->second.port);
             destinationInfo.sin6_flowinfo = 0;
             destinationInfo.sin6_scope_id = iter->first.scope_id;
@@ -411,6 +418,7 @@ void UDPC::Context::update_impl() {
             }
 
             UDPC_PacketInfo pInfo = UDPC::get_empty_pinfo();
+            pInfo.flags = 0x4;
             pInfo.sender.addr = in6addr_loopback;
             pInfo.receiver.addr = iter->first.addr;
             pInfo.sender.port = socketInfo.sin6_port;
@@ -450,8 +458,13 @@ void UDPC::Context::update_impl() {
 
             UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
             destinationInfo.sin6_family = AF_INET6;
-            std::memcpy(UDPC_IPV6_ADDR_SUB(destinationInfo.sin6_addr), UDPC_IPV6_ADDR_SUB(iter->first.addr), 16);
+            std::memcpy(
+                UDPC_IPV6_ADDR_SUB(destinationInfo.sin6_addr),
+                UDPC_IPV6_ADDR_SUB(iter->first.addr),
+                16);
             destinationInfo.sin6_port = htons(iter->second.port);
+            destinationInfo.sin6_flowinfo = 0;
+            destinationInfo.sin6_scope_id = iter->first.scope_id;
             long int sentBytes = sendto(
                 socketHandle,
                 buf.get(),
@@ -480,7 +493,7 @@ void UDPC::Context::update_impl() {
                 sentPInfo.sender.port = socketInfo.sin6_port;
                 sentPInfo.receiver.port = iter->second.port;
 
-                iter->second.sentPkts.push_back(std::move(pInfo));
+                iter->second.sentPkts.push_back(std::move(sentPInfo));
                 iter->second.cleanupSentPkts();
             } else {
                 // is not check-received, only id stored in data array
@@ -491,9 +504,9 @@ void UDPC::Context::update_impl() {
                 sentPInfo.receiver.addr = iter->first.addr;
                 sentPInfo.sender.port = socketInfo.sin6_port;
                 sentPInfo.receiver.port = iter->second.port;
-                *((uint32_t*)(sentPInfo.data + 8)) = iter->second.lseq - 1;
+                *((uint32_t*)(sentPInfo.data + 8)) = htonl(iter->second.lseq - 1);
 
-                iter->second.sentPkts.push_back(std::move(pInfo));
+                iter->second.sentPkts.push_back(std::move(sentPInfo));
                 iter->second.cleanupSentPkts();
             }
 
@@ -502,6 +515,7 @@ void UDPC::Context::update_impl() {
             sentPktInfo->id = iter->second.lseq - 1;
             iter->second.sentInfoMap.insert(std::make_pair(sentPktInfo->id, sentPktInfo));
         }
+        iter->second.sent = now;
     }
 
     // receive packet
@@ -785,14 +799,13 @@ void UDPC::Context::update_impl() {
         recPktInfo.sender.port = ntohs(receivedData.sin6_port);
         recPktInfo.receiver.port = ntohs(socketInfo.sin6_port);
 
-        if(iter->second.receivedPkts.size() == iter->second.receivedPkts.capacity()) {
+        if(!receivedPkts.push(recPktInfo)) {
             log(
                 UDPC_LoggingType::UDPC_WARNING,
                 "receivedPkts is full, removing oldest entry to make room");
-            iter->second.receivedPkts.pop();
+            receivedPkts.pop();
+            receivedPkts.push(recPktInfo);
         }
-
-        iter->second.receivedPkts.push(recPktInfo);
     } else if(bytes == 20) {
         log(
             UDPC_LoggingType::UDPC_VERBOSE,
@@ -903,7 +916,7 @@ void UDPC::threadedUpdate(Context *ctx) {
         ctx->update_impl();
         ctx->mutex.unlock();
         nextNow = std::chrono::steady_clock::now();
-        std::this_thread::sleep_for(std::chrono::milliseconds(33) - (nextNow - now));
+        std::this_thread::sleep_for(std::chrono::milliseconds(11) - (nextNow - now));
     }
 }
 
@@ -1095,7 +1108,7 @@ int UDPC_get_queue_send_available(UDPC_HContext ctx, UDPC_ConnectionId connectio
 }
 
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
-                     uint32_t isChecked, void *data, uint32_t size) {
+                     int isChecked, void *data, uint32_t size) {
     if(size == 0 || !data) {
         return;
     }
@@ -1123,7 +1136,7 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
     sendInfo.sender.port = c->socketInfo.sin6_port;
     sendInfo.receiver.addr = destinationId.addr;
     sendInfo.receiver.port = iter->second.port;
-    sendInfo.flags = (isChecked ? 0x0 : 0x4);
+    sendInfo.flags = (isChecked != 0 ? 0x0 : 0x4);
 
     iter->second.sendPkts.push(sendInfo);
 }
@@ -1193,6 +1206,36 @@ int UDPC_has_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
     return c->conMap.find(connectionId) == c->conMap.end() ? 0 : 1;
 }
 
+UDPC_ConnectionId* UDPC_get_list_connected(UDPC_HContext ctx, unsigned int *size) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return nullptr;
+    }
+
+    std::lock_guard<std::mutex> lock(c->mutex);
+
+    if(c->conMap.empty()) {
+        return nullptr;
+    }
+    if(size) {
+        *size = c->conMap.size();
+    }
+
+    UDPC_ConnectionId *list = (UDPC_ConnectionId*)std::malloc(
+            sizeof(UDPC_ConnectionId) * (c->conMap.size() + 1));
+    UDPC_ConnectionId *current = list;
+    for(auto iter = c->conMap.begin(); iter != c->conMap.end(); ++iter) {
+        *current = iter->first;
+        ++current;
+    }
+    *current = UDPC_ConnectionId{{0}, 0, 0};
+    return list;
+}
+
+void UDPC_free_list_connected(UDPC_ConnectionId *list) {
+    std::free(list);
+}
+
 uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
@@ -1210,16 +1253,39 @@ UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggi
     return static_cast<UDPC_LoggingType>(c->loggingType.exchange(loggingType));
 }
 
-UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx) {
+UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned int *remaining) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return UDPC::get_empty_pinfo();
     }
 
-    std::lock_guard<std::mutex> lock(c->mutex);
-
-    // TODO impl
+    auto opt_pinfo = c->receivedPkts.top_and_pop();
+    if(remaining) {
+        *remaining = c->receivedPkts.size();
+    }
+    if(opt_pinfo) {
+        return *opt_pinfo;
+    }
     return UDPC::get_empty_pinfo();
+}
+
+int UDPC_set_received_capacity(UDPC_HContext ctx, unsigned int newCapacity) {
+    if(newCapacity == 0) {
+        return 0;
+    }
+
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return 0;
+    }
+
+    unsigned int status = 0;
+    c->receivedPkts.changeCapacity(newCapacity, &status);
+    if(status == 1) {
+        c->log(UDPC_LoggingType::UDPC_WARNING,
+            "Received Queue: Previous size was truncated to new capacity");
+    }
+    return 1;
 }
 
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
@@ -1255,7 +1321,8 @@ const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr) {
             }
         }
 
-        if(UDPC_IPV6_ADDR_SUB(addr)[i] == 0 && (headIndex - index <= 1 || c->atostrBuf[index] == ':')) {
+        if(UDPC_IPV6_ADDR_SUB(addr)[i] == 0
+                && (headIndex - index <= 1 || c->atostrBuf[index] == ':')) {
             continue;
         } else {
             std::stringstream sstream;

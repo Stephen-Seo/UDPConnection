@@ -4,6 +4,7 @@
 #include <thread>
 #include <chrono>
 #include <regex>
+#include <vector>
 
 #include <UDPConnection.h>
 
@@ -15,6 +16,8 @@ void usage() {
     puts("-lp <port> - listen port");
     puts("-cl <addr> - connection addr (client only)");
     puts("-cp <port> - connection port (client only)");
+    puts("-t <tick_count>");
+    puts("-n - do not add payload to packets");
 }
 
 int main(int argc, char **argv) {
@@ -30,6 +33,7 @@ int main(int argc, char **argv) {
     const char *connectionAddr = nullptr;
     const char *connectionPort = nullptr;
     unsigned int tickLimit = 15;
+    bool noPayload = false;
     while(argc > 0) {
         if(std::strcmp(argv[0], "-c") == 0) {
             isClient = true;
@@ -51,6 +55,9 @@ int main(int argc, char **argv) {
             --argc; ++argv;
             tickLimit = std::atoi(argv[0]);
             printf("Set tick limit to %u\n", tickLimit);
+        } else if(std::strcmp(argv[0], "-n") == 0) {
+            noPayload = true;
+            puts("Disabling sending payload");
         } else {
             printf("ERROR: invalid argument \"%s\"\n", argv[0]);
             usage();
@@ -101,10 +108,42 @@ int main(int argc, char **argv) {
     }
     UDPC_set_logging_type(context, UDPC_LoggingType::UDPC_INFO);
     unsigned int tick = 0;
+    unsigned int temp = 0;
+    unsigned int temp2, temp3;
+    UDPC_ConnectionId *list = nullptr;
+    std::vector<unsigned int> sendIds;
+    UDPC_PacketInfo received;
     while(true) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         if(isClient && UDPC_has_connection(context, connectionId) == 0) {
             UDPC_client_initiate_connection(context, connectionId);
+        }
+        if(!noPayload) {
+            list = UDPC_get_list_connected(context, &temp);
+            if(list) {
+                if(sendIds.size() < temp) {
+                    sendIds.resize(temp, 0);
+                } else if(sendIds.size() > temp) {
+                    sendIds.resize(temp);
+                }
+                for(unsigned int i = 0; i < temp; ++i) {
+                    temp2 = UDPC_get_queue_send_available(context, list[i]);
+                    for(unsigned int j = 0; j < temp2; ++j) {
+                        temp3 = htonl(sendIds[i]++);
+                        UDPC_queue_send(context, list[i], 0, &temp3, sizeof(unsigned int));
+                    }
+                }
+                UDPC_free_list_connected(list);
+            }
+            do {
+                received = UDPC_get_received(context, &temp);
+                if(received.dataSize == sizeof(unsigned int)) {
+                    if((received.flags & 0x8) != 0) {
+                        temp2 = ntohl(*((unsigned int*)received.data));
+                        printf("Got out of order, data = %u\n", temp2);
+                    }
+                }
+            } while (temp > 0);
         }
         if(tick++ > tickLimit) {
             break;

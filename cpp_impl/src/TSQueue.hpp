@@ -28,7 +28,12 @@ class TSQueue {
     bool pop();
     std::optional<T> top_and_pop();
     void clear();
-    void changeCapacity(unsigned int newCapacity);
+    /*
+     * status ==
+     * 0 - success
+     * 1 - success, but previous size was reduced
+     */
+    void changeCapacity(unsigned int newCapacity, unsigned int *status);
     unsigned int size();
     unsigned int capacity();
     bool empty();
@@ -119,8 +124,15 @@ void TSQueue<T>::clear() {
 }
 
 template <typename T>
-void TSQueue<T>::changeCapacity(unsigned int newCapacity) {
+void TSQueue<T>::changeCapacity(unsigned int newCapacity, unsigned int *status) {
     std::lock_guard<std::mutex> lock(mutex);
+    if(status) {
+        if(rb.getSize() < newCapacity) {
+            *status = 1;
+        } else {
+            *status = 0;
+        }
+    }
     rb.changeCapacity(newCapacity);
 }
 

@@ -62,7 +62,7 @@ TEST(TSQueue, Usage)
     EXPECT_FALSE(q.push(temp));
     EXPECT_EQ(q.size(), 4);
 
-    q.changeCapacity(8);
+    q.changeCapacity(8, nullptr);
     EXPECT_EQ(q.size(), 4);
 
     temp = 10;
@@ -87,7 +87,7 @@ TEST(TSQueue, Usage)
 
     EXPECT_EQ(400, q.top());
 
-    q.changeCapacity(1);
+    q.changeCapacity(1, nullptr);
 
     // { 10 }
 

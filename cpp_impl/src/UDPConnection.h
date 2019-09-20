@@ -103,7 +103,7 @@ void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connec
 int UDPC_get_queue_send_available(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
-                     uint32_t isChecked, void *data, uint32_t size);
+                     int isChecked, void *data, uint32_t size);
 
 int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);
 
@@ -111,11 +111,17 @@ int UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, bool
 
 int UDPC_has_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
+UDPC_ConnectionId* UDPC_get_list_connected(UDPC_HContext ctx, unsigned int *size);
+
+void UDPC_free_list_connected(UDPC_ConnectionId *list);
+
 uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id);
 
 UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingType);
 
-UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx);
+UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned int *remaining);
+
+int UDPC_set_received_capacity(UDPC_HContext ctx, unsigned int newCapacity);
 
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
