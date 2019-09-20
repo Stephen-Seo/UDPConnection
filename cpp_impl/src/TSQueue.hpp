@@ -27,6 +27,7 @@ class TSQueue {
     std::optional<T> top();
     bool pop();
     std::optional<T> top_and_pop();
+    std::optional<T> top_and_pop_and_rsize(unsigned int *rsize);
     void clear();
     /*
      * status ==
@@ -113,6 +114,20 @@ std::optional<T> TSQueue<T>::top_and_pop() {
     if(!rb.empty()) {
         value = rb.top();
         rb.pop();
+    }
+    return value;
+}
+
+template <typename T>
+std::optional<T> TSQueue<T>::top_and_pop_and_rsize(unsigned int *rsize) {
+    std::lock_guard<std::mutex> lock(mutex);
+    std::optional<T> value = std::nullopt;
+    if(!rb.empty()) {
+        value = rb.top();
+        rb.pop();
+    }
+    if(rsize) {
+        *rsize = rb.getSize();
     }
     return value;
 }

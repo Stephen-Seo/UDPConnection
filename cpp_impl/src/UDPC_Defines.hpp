@@ -237,7 +237,6 @@ public:
     /*
      * 0 - is threaded
      * 1 - is client
-     * 2 - is accepting new connections
      */
     std::bitset<32> flags;
     std::atomic_bool isAcceptNewConnections;

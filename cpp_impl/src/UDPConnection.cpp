@@ -169,7 +169,6 @@ mutex()
     } else {
         flags.reset(0);
     }
-    flags.set(2);
 
     rng_engine.seed(std::chrono::system_clock::now().time_since_epoch().count());
 
@@ -611,7 +610,7 @@ void UDPC::Context::update_impl() {
 
     UDPC_ConnectionId identifier{receivedData.sin6_addr, receivedData.sin6_scope_id, ntohs(receivedData.sin6_port)};
 
-    if(isConnect && flags.test(2)) {
+    if(isConnect && isAcceptNewConnections.load()) {
         // is connect packet and is accepting new connections
         if(!flags.test(1)
                 && conMap.find(identifier) == conMap.end()) {
@@ -936,7 +935,7 @@ void UDPC::threadedUpdate(Context *ctx) {
         ctx->update_impl();
         ctx->mutex.unlock();
         nextNow = std::chrono::steady_clock::now();
-        std::this_thread::sleep_for(std::chrono::milliseconds(11) - (nextNow - now));
+        std::this_thread::sleep_for(std::chrono::milliseconds(8) - (nextNow - now));
     }
 }
 
@@ -1279,10 +1278,7 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned int *remaining) {
         return UDPC::get_empty_pinfo();
     }
 
-    auto opt_pinfo = c->receivedPkts.top_and_pop();
-    if(remaining) {
-        *remaining = c->receivedPkts.size();
-    }
+    auto opt_pinfo = c->receivedPkts.top_and_pop_and_rsize(remaining);
     if(opt_pinfo) {
         return *opt_pinfo;
     }
