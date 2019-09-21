@@ -20,8 +20,13 @@
 // OS-based networking macros
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
 #include <winsock2.h>
-#include <Ws2ipdef.h>
-#include <In6addr.h>
+# ifdef UDPC_PLATFORM_MINGW
+#  include <ws2ipdef.h>
+#  include <in6addr.h>
+# else
+#  include <Ws2ipdef.h>
+#  include <In6addr.h>
+# endif
 
 #define UDPC_CLEANUPSOCKET(x) closesocket(x)
 #define UDPC_SOCKETTYPE SOCKET
