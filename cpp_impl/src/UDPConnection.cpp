@@ -97,6 +97,13 @@ rtt(std::chrono::steady_clock::duration::zero())
 {
     flags.set(0);
     flags.reset(1);
+
+    if(sodium_init() >= 0) {
+        crypto_sign_keypair(pk, sk);
+        flags.reset(5);
+    } else {
+        flags.set(5);
+    }
 }
 
 UDPC::ConnectionData::ConnectionData(
@@ -130,6 +137,13 @@ rtt(std::chrono::steady_clock::duration::zero())
         flags.set(4);
     } else {
         lseq = 1;
+    }
+
+    if(sodium_init() >= 0) {
+        crypto_sign_keypair(pk, sk);
+        flags.reset(5);
+    } else {
+        flags.set(5);
     }
 }
 
@@ -314,7 +328,8 @@ void UDPC::Context::update_impl() {
                 }
                 iter->second.sent = now;
 
-                std::unique_ptr<char[]> buf = std::make_unique<char[]>(20);
+                std::unique_ptr<char[]> buf = std::make_unique<char[]>(
+                    UDPC_CON_HEADER_SIZE);
                 UDPC::preparePacket(
                     buf.get(),
                     protocolID,
@@ -322,7 +337,9 @@ void UDPC::Context::update_impl() {
                     0,
                     0xFFFFFFFF,
                     nullptr,
-                    0x1);
+                    0x1,
+                    iter->second.pk,
+                    iter->second.sk);
 
                 UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
                 destinationInfo.sin6_family = AF_INET6;
@@ -333,11 +350,11 @@ void UDPC::Context::update_impl() {
                 long int sentBytes = sendto(
                     socketHandle,
                     buf.get(),
-                    20,
+                    UDPC_CON_HEADER_SIZE,
                     0,
                     (struct sockaddr*) &destinationInfo,
                     sizeof(UDPC_IPV6_SOCKADDR_TYPE));
-                if(sentBytes != 20) {
+                if(sentBytes != UDPC_CON_HEADER_SIZE) {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_ERROR,
                         "Failed to send packet to initiate connection to ",
@@ -356,7 +373,8 @@ void UDPC::Context::update_impl() {
                 iter->second.flags.reset(3);
                 iter->second.sent = now;
 
-                std::unique_ptr<char[]> buf = std::make_unique<char[]>(20);
+                std::unique_ptr<char[]> buf = std::make_unique<char[]>(
+                    UDPC_CON_HEADER_SIZE);
                 UDPC::preparePacket(
                     buf.get(),
                     protocolID,
@@ -364,7 +382,9 @@ void UDPC::Context::update_impl() {
                     iter->second.rseq,
                     iter->second.ack,
                     &iter->second.lseq,
-                    0x1);
+                    0x1,
+                    iter->second.pk,
+                    iter->second.sk);
 
                 UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
                 destinationInfo.sin6_family = AF_INET6;
@@ -375,11 +395,11 @@ void UDPC::Context::update_impl() {
                 long int sentBytes = sendto(
                     socketHandle,
                     buf.get(),
-                    20,
+                    UDPC_CON_HEADER_SIZE,
                     0,
                     (struct sockaddr*) &destinationInfo,
                     sizeof(UDPC_IPV6_SOCKADDR_TYPE));
-                if(sentBytes != 20) {
+                if(sentBytes != UDPC_CON_HEADER_SIZE) {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_ERROR,
                         "Failed to send packet to initiate connection to ",
@@ -400,7 +420,8 @@ void UDPC::Context::update_impl() {
                 continue;
             }
 
-            std::unique_ptr<char[]> buf = std::make_unique<char[]>(20);
+            std::unique_ptr<char[]> buf = std::make_unique<char[]>(
+                UDPC_FULL_HEADER_SIZE);
             UDPC::preparePacket(
                 buf.get(),
                 protocolID,
@@ -408,7 +429,9 @@ void UDPC::Context::update_impl() {
                 iter->second.rseq,
                 iter->second.ack,
                 &iter->second.lseq,
-                0);
+                0,
+                iter->second.pk,
+                iter->second.sk);
 
             UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
             destinationInfo.sin6_family = AF_INET6;
@@ -422,11 +445,11 @@ void UDPC::Context::update_impl() {
             long int sentBytes = sendto(
                 socketHandle,
                 buf.get(),
-                20,
+                UDPC_FULL_HEADER_SIZE,
                 0,
                 (struct sockaddr*) &destinationInfo,
                 sizeof(UDPC_IPV6_SOCKADDR_TYPE));
-            if(sentBytes != 20) {
+            if(sentBytes != UDPC_FULL_HEADER_SIZE) {
                 UDPC_CHECK_LOG(this,
                     UDPC_LoggingType::UDPC_ERROR,
                     "Failed to send heartbeat packet to ",
@@ -440,7 +463,7 @@ void UDPC::Context::update_impl() {
             pInfo.flags = 0x4;
             pInfo.sender.addr = in6addr_loopback;
             pInfo.receiver.addr = iter->first.addr;
-            pInfo.sender.port = socketInfo.sin6_port;
+            pInfo.sender.port = ntohs(socketInfo.sin6_port);
             pInfo.receiver.port = iter->second.port;
             *((uint32_t*)(pInfo.data + 8)) = htonl(iter->second.lseq - 1);
 
@@ -464,7 +487,7 @@ void UDPC::Context::update_impl() {
                 pInfo = std::move(iter->second.sendPkts.top().value());
                 iter->second.sendPkts.pop();
             }
-            std::unique_ptr<char[]> buf = std::make_unique<char[]>(20 + pInfo.dataSize);
+            std::unique_ptr<char[]> buf = std::make_unique<char[]>(UDPC_FULL_HEADER_SIZE + pInfo.dataSize);
             UDPC::preparePacket(
                 buf.get(),
                 protocolID,
@@ -472,8 +495,10 @@ void UDPC::Context::update_impl() {
                 iter->second.rseq,
                 iter->second.ack,
                 &iter->second.lseq,
-                (pInfo.flags & 0x4) | (isResending ? 0x8 : 0));
-            std::memcpy(buf.get() + 20, pInfo.data, pInfo.dataSize);
+                (pInfo.flags & 0x4) | (isResending ? 0x8 : 0),
+                iter->second.pk,
+                iter->second.sk);
+            std::memcpy(buf.get() + UDPC_FULL_HEADER_SIZE, pInfo.data, pInfo.dataSize);
 
             UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
             destinationInfo.sin6_family = AF_INET6;
@@ -487,11 +512,11 @@ void UDPC::Context::update_impl() {
             long int sentBytes = sendto(
                 socketHandle,
                 buf.get(),
-                pInfo.dataSize + 20,
+                pInfo.dataSize + UDPC_FULL_HEADER_SIZE,
                 0,
                 (struct sockaddr*) &destinationInfo,
                 sizeof(UDPC_IPV6_SOCKADDR_TYPE));
-            if(sentBytes != 20 + pInfo.dataSize) {
+            if(sentBytes != UDPC_FULL_HEADER_SIZE + pInfo.dataSize) {
                 UDPC_CHECK_LOG(this,
                     UDPC_LoggingType::UDPC_ERROR,
                     "Failed to send packet to ",
@@ -504,12 +529,12 @@ void UDPC::Context::update_impl() {
             if((pInfo.flags & 0x4) == 0) {
                 // is check-received, store data in case packet gets lost
                 UDPC_PacketInfo sentPInfo = UDPC::get_empty_pinfo();
-                std::memcpy(sentPInfo.data, buf.get(), 20 + pInfo.dataSize);
+                std::memcpy(sentPInfo.data, buf.get(), UDPC_FULL_HEADER_SIZE + pInfo.dataSize);
                 sentPInfo.flags = 0;
-                sentPInfo.dataSize = 20 + pInfo.dataSize;
+                sentPInfo.dataSize = UDPC_FULL_HEADER_SIZE + pInfo.dataSize;
                 sentPInfo.sender.addr = in6addr_loopback;
                 sentPInfo.receiver.addr = iter->first.addr;
-                sentPInfo.sender.port = socketInfo.sin6_port;
+                sentPInfo.sender.port = ntohs(socketInfo.sin6_port);
                 sentPInfo.receiver.port = iter->second.port;
 
                 iter->second.sentPkts.push_back(std::move(sentPInfo));
@@ -521,7 +546,7 @@ void UDPC::Context::update_impl() {
                 sentPInfo.dataSize = 0;
                 sentPInfo.sender.addr = in6addr_loopback;
                 sentPInfo.receiver.addr = iter->first.addr;
-                sentPInfo.sender.port = socketInfo.sin6_port;
+                sentPInfo.sender.port = ntohs(socketInfo.sin6_port);
                 sentPInfo.receiver.port = iter->second.port;
                 *((uint32_t*)(sentPInfo.data + 8)) = htonl(iter->second.lseq - 1);
 
@@ -559,31 +584,23 @@ void UDPC::Context::update_impl() {
                 "Error receiving packet, ", error);
         }
         return;
-    } else if(bytes < 20) {
-        // packet size is too small, invalid packet
-        UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_INFO,
-            "Received packet is smaller than header, ignoring packet from ",
-            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-            ", port = ",
-            receivedData.sin6_port);
-        return;
     }
 #else
     if(bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
         // no packet was received
         return;
-    } else if(bytes < 20) {
+    }
+#endif
+    else if(bytes < UDPC_MIN_HEADER_SIZE) {
         // packet size is too small, invalid packet
         UDPC_CHECK_LOG(this,
             UDPC_LoggingType::UDPC_INFO,
             "Received packet is smaller than header, ignoring packet from ",
             UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
             ", port = ",
-            receivedData.sin6_port);
+            ntohs(receivedData.sin6_port));
         return;
     }
-#endif
 
     uint32_t temp = ntohl(*((uint32_t*)recvBuf));
     if(temp != protocolID) {
@@ -608,6 +625,28 @@ void UDPC::Context::update_impl() {
     bool isResending = conID & UDPC_ID_RESENDING;
     conID &= 0x0FFFFFFF;
 
+    if(isConnect && bytes != UDPC_CON_HEADER_SIZE) {
+        // invalid packet size
+        UDPC_CHECK_LOG(this,
+            UDPC_LoggingType::UDPC_INFO,
+            "Got connect packet of invalid size from ",
+            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+            ", port = ",
+            ntohs(receivedData.sin6_port),
+            ", ignoring");
+        return;
+    } else if (!isConnect && bytes < (int)UDPC_FULL_HEADER_SIZE) {
+        // packet is too small
+        UDPC_CHECK_LOG(this,
+            UDPC_LoggingType::UDPC_INFO,
+            "Got non-connect packet of invalid size from ",
+            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+            ", port = ",
+            ntohs(receivedData.sin6_port),
+            ", ignoring");
+        return;
+    }
+
     UDPC_ConnectionId identifier{receivedData.sin6_addr, receivedData.sin6_scope_id, ntohs(receivedData.sin6_port)};
 
     if(isConnect && isAcceptNewConnections.load()) {
@@ -616,6 +655,18 @@ void UDPC::Context::update_impl() {
                 && conMap.find(identifier) == conMap.end()) {
             // is receiving as server, connection did not already exist
             UDPC::ConnectionData newConnection(true, this, receivedData.sin6_addr, receivedData.sin6_scope_id, ntohs(receivedData.sin6_port));
+            if(newConnection.flags.test(5)) {
+                UDPC_CHECK_LOG(this,
+                    UDPC_LoggingType::UDPC_ERROR,
+                    "Failed to init ConnectionData instance (libsodium init "
+                    "fail) while server establishing connection with ",
+                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    ", port = ",
+                    ntohs(receivedData.sin6_port));
+                return;
+            }
+            std::memcpy(newConnection.peer_pk, recvBuf + UDPC_MIN_HEADER_SIZE,
+                crypto_sign_PUBLICKEYBYTES);
             UDPC_CHECK_LOG(this,
                 UDPC_LoggingType::UDPC_VERBOSE,
                 "Establishing connection with client ",
@@ -648,6 +699,8 @@ void UDPC::Context::update_impl() {
             iter->second.flags.reset(3);
             iter->second.id = conID;
             iter->second.flags.set(4);
+            std::memcpy(iter->second.peer_pk, recvBuf + UDPC_MIN_HEADER_SIZE,
+                crypto_sign_PUBLICKEYBYTES);
             UDPC_CHECK_LOG(this,
                 UDPC_LoggingType::UDPC_VERBOSE,
                 "Established connection with server ",
@@ -666,6 +719,23 @@ void UDPC::Context::update_impl() {
         return;
     } else if(isPing) {
         iter->second.flags.set(0);
+    }
+
+    // verify signature of header
+    if(crypto_sign_verify_detached(
+        (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE),
+        (unsigned char*)recvBuf,
+        UDPC_MIN_HEADER_SIZE,
+        iter->second.peer_pk) != 0) {
+        UDPC_CHECK_LOG(
+            this,
+            UDPC_LoggingType::UDPC_VERBOSE,
+            "Failed to verify received packet from",
+            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+            ", port = ",
+            ntohs(receivedData.sin6_port),
+            ", ignoring");
+        return;
     }
 
     // packet is valid
@@ -727,7 +797,7 @@ void UDPC::Context::update_impl() {
                         && "Every entry in sentPkts must have a corresponding entry in sentInfoMap");
                 auto duration = now - sentInfoIter->second->sentTime;
                 if(duration > UDPC::PACKET_TIMEOUT_TIME) {
-                    if(sentIter->dataSize <= 20) {
+                    if(sentIter->dataSize <= UDPC_FULL_HEADER_SIZE) {
                         UDPC_CHECK_LOG(this,
                             UDPC_LoggingType::UDPC_INFO,
                             "Timed out packet has no payload (probably "
@@ -737,8 +807,8 @@ void UDPC::Context::update_impl() {
                     }
 
                     UDPC_PacketInfo resendingData = UDPC::get_empty_pinfo();
-                    resendingData.dataSize = sentIter->dataSize - 20;
-                    std::memcpy(resendingData.data, sentIter->data + 20, resendingData.dataSize);
+                    resendingData.dataSize = sentIter->dataSize - UDPC_FULL_HEADER_SIZE;
+                    std::memcpy(resendingData.data, sentIter->data + UDPC_FULL_HEADER_SIZE, resendingData.dataSize);
                     resendingData.flags = 0;
                     iter->second.priorityPkts.push(resendingData);
                 }
@@ -804,7 +874,7 @@ void UDPC::Context::update_impl() {
             "Received packet is out of order");
     }
 
-    if(bytes > 20) {
+    if(bytes > (int)UDPC_FULL_HEADER_SIZE) {
         UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
         std::memcpy(recPktInfo.data, recvBuf, bytes);
         recPktInfo.dataSize = bytes;
@@ -825,7 +895,7 @@ void UDPC::Context::update_impl() {
             receivedPkts.pop();
             receivedPkts.push(recPktInfo);
         }
-    } else if(bytes == 20) {
+    } else if(bytes == UDPC_FULL_HEADER_SIZE) {
         UDPC_CHECK_LOG(this,
             UDPC_LoggingType::UDPC_VERBOSE,
             "Received packet has no payload (probably heartbeat packet)");
@@ -858,9 +928,10 @@ bool UDPC::isBigEndian() {
     return *isBigEndian;
 }
 
-void UDPC::preparePacket(char *data, uint32_t protocolID, uint32_t conID,
-                         uint32_t rseq, uint32_t ack, uint32_t *seqID,
-                         int flags) {
+void UDPC::preparePacket(
+        char *data, uint32_t protocolID, uint32_t conID, uint32_t rseq,
+        uint32_t ack, uint32_t *seqID, int flags,
+        const unsigned char *pk, const unsigned char *sk) {
     uint32_t temp;
 
     temp = htonl(protocolID);
@@ -883,6 +954,17 @@ void UDPC::preparePacket(char *data, uint32_t protocolID, uint32_t conID,
     std::memcpy(data + 12, &temp, 4);
     temp = htonl(ack);
     std::memcpy(data + 16, &temp, 4);
+
+    if((flags & 0x1) != 0) {
+        std::memcpy(data + UDPC_MIN_HEADER_SIZE, pk, crypto_sign_PUBLICKEYBYTES);
+    } else {
+        crypto_sign_detached(
+            (unsigned char*)(data + UDPC_MIN_HEADER_SIZE), // destination of detached sig
+            nullptr,                                       // unused length, assume max
+            (unsigned char*)data,                          // header to sign
+            UDPC_MIN_HEADER_SIZE,                          // size of header
+            sk);                                           // secret key
+    }
 }
 
 uint32_t UDPC::generateConnectionID(Context &ctx) {
@@ -957,6 +1039,14 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient) {
 
     UDPC_CHECK_LOG(ctx, UDPC_LoggingType::UDPC_INFO, "Got listen addr ",
         UDPC_atostr((UDPC_HContext)ctx, listenId.addr));
+
+    // initialize libsodium
+    if(sodium_init() < 0) {
+        UDPC_CHECK_LOG(ctx, UDPC_LoggingType::UDPC_ERROR,
+            "Failed to initialize libsodium");
+        delete ctx;
+        return nullptr;
+    }
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
     // Initialize Winsock
@@ -1090,6 +1180,16 @@ void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connec
     std::lock_guard<std::mutex> lock(c->mutex);
 
     UDPC::ConnectionData newCon(false, c, connectionId.addr, connectionId.scope_id, connectionId.port);
+    if(newCon.flags.test(5)) {
+        UDPC_CHECK_LOG(c,
+            UDPC_LoggingType::UDPC_ERROR,
+            "Failed to init ConnectionData instance (libsodium init "
+            "fail) while client establishing connection with ",
+            UDPC_atostr((UDPC_HContext)c, connectionId.addr),
+            ", port = ",
+            connectionId.port);
+        return;
+    }
     newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
 
     if(c->conMap.find(connectionId) == c->conMap.end()) {
@@ -1152,7 +1252,7 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
     std::memcpy(sendInfo.data, data, size);
     sendInfo.dataSize = size;
     sendInfo.sender.addr = in6addr_loopback;
-    sendInfo.sender.port = c->socketInfo.sin6_port;
+    sendInfo.sender.port = ntohs(c->socketInfo.sin6_port);
     sendInfo.receiver.addr = destinationId.addr;
     sendInfo.receiver.port = iter->second.port;
     sendInfo.flags = (isChecked != 0 ? 0x0 : 0x4);

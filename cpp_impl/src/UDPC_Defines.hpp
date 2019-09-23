@@ -35,6 +35,12 @@
 #include "TSQueue.hpp"
 #include "UDPConnection.h"
 
+#include <sodium.h>
+
+#define UDPC_MIN_HEADER_SIZE 20
+#define UDPC_CON_HEADER_SIZE (UDPC_MIN_HEADER_SIZE + crypto_sign_PUBLICKEYBYTES)
+#define UDPC_FULL_HEADER_SIZE (UDPC_MIN_HEADER_SIZE + crypto_sign_BYTES)
+
 namespace UDPC {
 
 static const auto ONE_SECOND = std::chrono::seconds(1);
@@ -89,6 +95,7 @@ struct ConnectionData {
      * 2 - is good rtt
      * 3 - initiating connection
      * 4 - is id set
+     * 5 - error initializing keys for public key encryption
      */
     std::bitset<32> flags;
     uint32_t id;
@@ -110,6 +117,9 @@ struct ConnectionData {
     std::chrono::steady_clock::time_point received;
     std::chrono::steady_clock::time_point sent;
     std::chrono::steady_clock::duration rtt;
+    unsigned char sk[crypto_sign_SECRETKEYBYTES];
+    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+    unsigned char peer_pk[crypto_sign_PUBLICKEYBYTES];
 }; // struct ConnectionData
 
 struct Context {
@@ -277,7 +287,8 @@ bool isBigEndian();
  *   - 0x8 - resending
  */
 void preparePacket(char *data, uint32_t protocolID, uint32_t conID,
-                   uint32_t rseq, uint32_t ack, uint32_t *seqID, int flags);
+                   uint32_t rseq, uint32_t ack, uint32_t *seqID, int flags,
+                   const unsigned char *pk, const unsigned char *sk);
 
 uint32_t generateConnectionID(Context &ctx);
 

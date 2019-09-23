@@ -40,6 +40,12 @@ if(WIN32)
     endif()
 endif()
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBSODIUM REQUIRED libsodium)
+target_link_libraries(UDPConnection PUBLIC ${LIBSODIUM_LIBRARIES})
+target_include_directories(UDPConnection PUBLIC ${LIBSODIUM_INCLUDE_DIRS})
+target_compile_options(UDPConnection PUBLIC ${LIBSODIUM_CFLAGS_OTHER})
+
 target_include_directories(UDPConnection PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/RingBuffer/src")
 
