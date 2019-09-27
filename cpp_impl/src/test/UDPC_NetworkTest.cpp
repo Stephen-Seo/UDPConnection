@@ -126,12 +126,10 @@ int main(int argc, char **argv) {
                 } else if(sendIds.size() > temp) {
                     sendIds.resize(temp);
                 }
-                for(unsigned int i = 0; i < temp; ++i) {
-                    temp2 = UDPC_get_queue_send_available(context, list[i]);
-                    for(unsigned int j = 0; j < temp2; ++j) {
-                        temp3 = htonl(sendIds[i]++);
-                        UDPC_queue_send(context, list[i], 0, &temp3, sizeof(unsigned int));
-                    }
+                temp2 = UDPC_get_queue_send_available(context);
+                for(unsigned int i = 0; i < temp2; ++i) {
+                    temp3 = htonl(sendIds[i % temp]++);
+                    UDPC_queue_send(context, list[i % temp], 0, &temp3, sizeof(unsigned int));
                 }
                 UDPC_free_list_connected(list);
             }

@@ -4,7 +4,7 @@
 
 #define UDPC_CONTEXT_IDENTIFIER 0x902F4DB3
 #define UDPC_SENT_PKTS_MAX_SIZE 33
-#define UDPC_QUEUED_PKTS_MAX_SIZE 32
+#define UDPC_QUEUED_PKTS_MAX_SIZE 64
 #define UDPC_RECEIVED_PKTS_MAX_SIZE 64
 
 #define UDPC_ID_CONNECT 0x80000000
@@ -110,8 +110,8 @@ struct ConnectionData {
     uint32_t scope_id;
     uint16_t port; // in native order
     std::deque<UDPC_PacketInfo> sentPkts;
-    TSQueue<UDPC_PacketInfo> sendPkts;
-    TSQueue<UDPC_PacketInfo> priorityPkts;
+    std::deque<UDPC_PacketInfo> sendPkts;
+    std::deque<UDPC_PacketInfo> priorityPkts;
     // pkt id to pkt shared_ptr
     std::unordered_map<uint32_t, SentPktInfo::Ptr> sentInfoMap;
     std::chrono::steady_clock::time_point received;
@@ -266,6 +266,7 @@ public:
     // id to ipv6 address and port (as UDPC_ConnectionId)
     std::unordered_map<uint32_t, UDPC_ConnectionId> idMap;
     TSQueue<UDPC_PacketInfo> receivedPkts;
+    TSQueue<UDPC_PacketInfo> cSendPkts;
 
     std::default_random_engine rng_engine;
 

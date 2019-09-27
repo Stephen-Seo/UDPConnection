@@ -105,7 +105,7 @@ void UDPC_update(UDPC_HContext ctx);
 
 void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
-int UDPC_get_queue_send_available(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
+int UDPC_get_queue_send_available(UDPC_HContext ctx);
 
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
                      int isChecked, void *data, uint32_t size);

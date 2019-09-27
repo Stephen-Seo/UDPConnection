@@ -37,7 +37,9 @@ class TSQueue {
     void changeCapacity(unsigned int newCapacity, unsigned int *status);
     unsigned int size();
     unsigned int capacity();
+    unsigned int remaining_capacity();
     bool empty();
+    bool full();
 
   private:
     std::mutex mutex;
@@ -166,10 +168,24 @@ unsigned int TSQueue<T>::capacity() {
 }
 
 template <typename T>
+unsigned int TSQueue<T>::remaining_capacity() {
+    std::lock_guard<std::mutex> lock(mutex);
+    unsigned int remaining = rb.getCapacity() - rb.getSize();
+    return remaining;
+}
+
+template <typename T>
 bool TSQueue<T>::empty() {
     // No lock required, since this is calling size() that uses a lock
     unsigned int size = this->size();
     return size == 0;
+}
+
+template <typename T>
+bool TSQueue<T>::full() {
+    // No lock required, calling remaining_capacity() that uses a lock
+    unsigned int remaining = remaining_capacity();
+    return remaining == 0;
 }
 
 #endif
