@@ -223,6 +223,15 @@ void TSLQueue<T>::clear() {
 }
 
 template <typename T>
+bool TSLQueue<T>::empty() {
+    while(iterWrapperCount.use_count() > 1) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    std::lock_guard lock(mutex);
+    return container.empty();
+}
+
+template <typename T>
 template <bool isConst, bool isRev>
 TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::TSLQIterWrapper(
         std::conditional_t<isConst, const std::list<T>, std::list<T>> *container,
