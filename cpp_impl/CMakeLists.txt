@@ -56,6 +56,7 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
         set(UDPC_UnitTest_SOURCES
             src/test/UDPC_UnitTest.cpp
             src/test/TestTSQueue.cpp
+            src/test/TestTSLQueue.cpp
             src/test/TestUDPC.cpp
         )
         add_executable(UnitTest ${UDPC_UnitTest_SOURCES})
