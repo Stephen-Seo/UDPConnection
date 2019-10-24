@@ -51,6 +51,9 @@ class TSLQueue {
         bool prev();
         std::optional<T> current();
 
+        TSLQIterWrapper<isConst, isRev>& operator++();
+        TSLQIterWrapper<isConst, isRev>& operator--();
+
       private:
         std::conditional_t<isConst, const std::list<T>, std::list<T>>
             *containerPtr;
@@ -331,6 +334,20 @@ std::optional<T> TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::current() {
     }
 
     return *iter;
+}
+
+template <typename T>
+template <bool isConst, bool isRev>
+typename TSLQueue<T>::template TSLQIterWrapper<isConst, isRev>& TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::operator++() {
+    next();
+    return *this;
+}
+
+template <typename T>
+template <bool isConst, bool isRev>
+typename TSLQueue<T>::template TSLQIterWrapper<isConst, isRev>& TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::operator--() {
+    prev();
+    return *this;
 }
 
 template <typename T>
