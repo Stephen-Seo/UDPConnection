@@ -50,6 +50,8 @@ class TSLQueue {
         bool next();
         bool prev();
         std::optional<T> current();
+        /// can only be used when isRev is false
+        bool remove();
 
         TSLQIterWrapper<isConst, isRev>& operator++();
         TSLQIterWrapper<isConst, isRev>& operator--();
@@ -329,18 +331,32 @@ template <bool isConst, bool isRev>
 std::optional<T> TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::current() {
     if(!isValid()) {
         return std::nullopt;
+    } else if constexpr (isRev) {
+        if(containerPtr->rend() == iter) {
+            return std::nullopt;
+        }
     } else {
-        if constexpr (isRev) {
-            if(containerPtr->rend() == iter) {
-                return std::nullopt;
-            }
-        } else {
-            if(containerPtr->end() == iter) {
-                return std::nullopt;
-            }
+        if(containerPtr->end() == iter) {
+            return std::nullopt;
         }
     }
     return *iter;
+}
+
+template <typename T>
+template <bool isConst, bool isRev>
+bool TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::remove() {
+    if(!isValid()) {
+        return false;
+    } else if constexpr(isRev) {
+        return false;
+    } else {
+        if(containerPtr->end() == iter) {
+            return false;
+        }
+    }
+    iter = containerPtr->erase(iter);
+    return true;
 }
 
 template <typename T>

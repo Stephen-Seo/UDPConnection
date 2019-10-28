@@ -149,4 +149,69 @@ TEST(TSLQueue, Usage) {
         ASSERT_TRUE(opt.has_value());
         EXPECT_EQ(opt.value(), 1);
     }
+
+    {
+        // remove center (2), result: 1, 3
+        auto iter = q.iter();
+        opt = iter.current();
+        ASSERT_TRUE(opt.has_value());
+        EXPECT_EQ(opt.value(), 1);
+
+        EXPECT_TRUE(iter.next());
+        opt = iter.current();
+        ASSERT_TRUE(opt.has_value());
+        EXPECT_EQ(opt.value(), 2);
+
+        EXPECT_TRUE(iter.remove());
+        opt = iter.current();
+        ASSERT_TRUE(opt.has_value());
+        EXPECT_EQ(opt.value(), 3);
+
+        EXPECT_FALSE(iter.next());
+        opt = iter.current();
+        ASSERT_FALSE(opt.has_value());
+        EXPECT_FALSE(iter.remove());
+    }
+
+    {
+        // remove first (1), result: 3
+        auto iter = q.iter();
+        opt = iter.current();
+        ASSERT_TRUE(opt.has_value());
+        EXPECT_EQ(opt.value(), 1);
+
+        EXPECT_TRUE(iter.remove());
+        opt = iter.current();
+        ASSERT_TRUE(opt.has_value());
+        EXPECT_EQ(opt.value(), 3);
+
+        EXPECT_FALSE(iter.next());
+        opt = iter.current();
+        ASSERT_FALSE(opt.has_value());
+        EXPECT_FALSE(iter.remove());
+    }
+
+    {
+        // remove (3), result: empty
+        auto iter = q.iter();
+        opt = iter.current();
+        ASSERT_TRUE(opt.has_value());
+        EXPECT_EQ(opt.value(), 3);
+
+        EXPECT_TRUE(iter.remove());
+        opt = iter.current();
+        EXPECT_FALSE(opt.has_value());
+        EXPECT_FALSE(iter.remove());
+    }
+
+    {
+        auto iter = q.iter();
+        opt = iter.current();
+        EXPECT_FALSE(opt.has_value());
+    }
+    {
+        auto riter = q.riter();
+        opt = riter.current();
+        EXPECT_FALSE(opt.has_value());
+    }
 }
