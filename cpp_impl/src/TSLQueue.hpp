@@ -6,11 +6,10 @@
 #include <thread>
 #include <chrono>
 #include <optional>
+#include <cassert>
 
 #include <list>
 #include <type_traits>
-
-// definition
 
 template <typename T>
 class TSLQueue {
@@ -25,7 +24,7 @@ class TSLQueue {
     TSLQueue(TSLQueue &&other);
     TSLQueue &operator=(TSLQueue &&other);
 
-    bool push(const T &data);
+    void push(const T &data);
     bool push_nb(const T &data);
     std::optional<T> top();
     std::optional<T> top_nb();
@@ -35,64 +34,41 @@ class TSLQueue {
     void clear();
 
     bool empty();
-
-    template <bool isConst, bool isRev>
-    class TSLQIterWrapper {
-      public:
-        TSLQIterWrapper(
-            std::conditional_t<isConst, const std::list<T>, std::list<T>> *container,
-            std::weak_ptr<void> iterValid,
-            std::shared_ptr<char> iterWrapperCount
-        );
-
-        bool isValid() const;
-
-        bool next();
-        bool prev();
-        std::optional<T> current();
-        /// can only be used when isRev is false
-        bool remove();
-
-        TSLQIterWrapper<isConst, isRev>& operator++();
-        TSLQIterWrapper<isConst, isRev>& operator--();
-
-        bool set(T &&newValue);
-
-      private:
-        std::conditional_t<isConst, const std::list<T>, std::list<T>>
-            *containerPtr;
-        std::conditional_t<isRev,
-            std::conditional_t<isConst,
-                typename std::list<T>::const_reverse_iterator,
-                typename std::list<T>::reverse_iterator>,
-            std::conditional_t<isConst,
-                typename std::list<T>::const_iterator,
-                typename std::list<T>::iterator>>
-                    iter;
-
-        std::weak_ptr<void> iterValid;
-        std::shared_ptr<char> iterWrapperCount;
-    };
-
-    TSLQIterWrapper<false, false> iter();
-    TSLQIterWrapper<false, true> riter();
-    TSLQIterWrapper<true, false> citer();
-    TSLQIterWrapper<true, true> criter();
+    unsigned long long size();
 
   private:
+    struct TSLQNode {
+        TSLQNode() = default;
+        // disable copy
+        TSLQNode(TSLQNode& other) = delete;
+        TSLQNode& operator=(TSLQNode& other) = delete;
+        // enable move
+        TSLQNode(TSLQNode&& other) = default;
+        TSLQNode& operator=(TSLQNode&& other) = default;
+
+        std::shared_ptr<TSLQNode> next;
+        std::weak_ptr<TSLQNode> prev;
+        std::unique_ptr<T> data;
+    };
+
     std::shared_ptr<char> iterValid;
     std::shared_ptr<char> iterWrapperCount;
     std::mutex mutex;
-    std::list<T> container;
+    std::shared_ptr<TSLQNode> head;
+    std::shared_ptr<TSLQNode> tail;
+    unsigned long long msize;
 };
-
-// implementation
 
 template <typename T>
 TSLQueue<T>::TSLQueue() :
     iterValid(std::make_shared<char>()),
-    iterWrapperCount(std::make_shared<char>())
+    iterWrapperCount(std::make_shared<char>()),
+    head(std::make_shared<TSLQNode>()),
+    tail(std::make_shared<TSLQNode>()),
+    msize(0)
 {
+    head->next = tail;
+    tail->prev = head;
 }
 
 template <typename T>
@@ -105,23 +81,38 @@ TSLQueue<T>::TSLQueue(TSLQueue &&other) :
     iterWrapperCount(std::make_shared<char>())
 {
     std::lock_guard lock(other.mutex);
-    container = std::move(other.container);
+    head = std::move(other.head);
+    tail = std::move(other.tail);
+    msize = std::move(other.msize);
 }
 
 template <typename T>
 TSLQueue<T> & TSLQueue<T>::operator=(TSLQueue &&other) {
+    iterValid = std::make_shared<char>();
+    iterWrapperCount = std::make_shared<char>();
     std::scoped_lock lock(mutex, other.mutex);
-    container = std::move(other.container);
+    head = std::move(other.head);
+    tail = std::move(other.tail);
+    msize = std::move(other.msize);
 }
 
 template <typename T>
-bool TSLQueue<T>::push(const T &data) {
+void TSLQueue<T>::push(const T &data) {
     while(iterWrapperCount.use_count() > 1) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     std::lock_guard lock(mutex);
-    container.push_back(data);
-    return true;
+    auto newNode = std::make_shared<TSLQNode>();
+    newNode->data = std::make_unique<T>(data);
+
+    auto last = tail->prev.lock();
+    assert(last);
+
+    newNode->prev = last;
+    newNode->next = tail;
+    last->next = newNode;
+    tail->prev = newNode;
+    ++msize;
 }
 
 template <typename T>
@@ -129,7 +120,18 @@ bool TSLQueue<T>::push_nb(const T &data) {
     if(iterWrapperCount.use_count() > 1) {
         return false;
     } else if(mutex.try_lock()) {
-        container.push_back(data);
+        auto newNode = std::make_shared<TSLQNode>();
+        newNode->data = std::make_unique<T>(data);
+
+        auto last = tail->prev.lock();
+        assert(last);
+
+        newNode->prev = last;
+        newNode->next = tail;
+        last->next = newNode;
+        tail->prev = newNode;
+        ++msize;
+
         mutex.unlock();
         return true;
     } else {
@@ -143,10 +145,11 @@ std::optional<T> TSLQueue<T>::top() {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     std::lock_guard lock(mutex);
-    if(container.empty()) {
-        return std::nullopt;
+    if(head->next != tail) {
+        assert(head->next->data);
+        return *head->next->data.get();
     } else {
-        return container.front();
+        return std::nullopt;
     }
 }
 
@@ -155,7 +158,11 @@ std::optional<T> TSLQueue<T>::top_nb() {
     if(iterWrapperCount.use_count() > 1) {
         return std::nullopt;
     } else if(mutex.try_lock()) {
-        std::optional<T> ret = container.front();
+        std::optional<T> ret = std::nullopt;
+        if(head->next != tail) {
+            assert(head->next->data);
+            ret = *head->next->data.get();
+        }
         mutex.unlock();
         return ret;
     } else {
@@ -169,10 +176,15 @@ bool TSLQueue<T>::pop() {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     std::lock_guard lock(mutex);
-    if(container.empty()) {
+    if(head->next == tail) {
         return false;
     } else {
-        container.pop_front();
+        auto& newNext = head->next->next;
+        newNext->prev = head;
+        head->next = newNext;
+        assert(msize > 0);
+        --msize;
+
         iterValid = std::make_shared<char>();
         iterWrapperCount = std::make_shared<char>();
         return true;
@@ -186,9 +198,16 @@ std::optional<T> TSLQueue<T>::top_and_pop() {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     std::lock_guard lock(mutex);
-    if(!container.empty()) {
-        ret = container.front();
-        container.pop_front();
+    if(head->next != tail) {
+        assert(head->next->data);
+        ret = *head->next->data.get();
+
+        auto& newNext = head->next->next;
+        newNext->prev = head;
+        head->next = newNext;
+        assert(msize > 0);
+        --msize;
+
         iterValid = std::make_shared<char>();
         iterWrapperCount = std::make_shared<char>();
     }
@@ -202,17 +221,24 @@ std::optional<T> TSLQueue<T>::top_and_pop_and_empty(bool *isEmpty) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     std::lock_guard lock(mutex);
-    if(container.empty()) {
+    if(head->next == tail) {
         if(isEmpty) {
             *isEmpty = true;
         }
     } else {
-        ret = container.front();
-        container.pop_front();
+        assert(head->next->data);
+        ret = *head->next->data.get();
+
+        auto& newNext = head->next->next;
+        newNext->prev = head;
+        head->next = newNext;
+        assert(msize > 0);
+        --msize;
+
         iterValid = std::make_shared<char>();
         iterWrapperCount = std::make_shared<char>();
         if(isEmpty) {
-            *isEmpty = container.empty();
+            *isEmpty = head->next == tail;
         }
     }
     return ret;
@@ -224,7 +250,11 @@ void TSLQueue<T>::clear() {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     std::lock_guard lock(mutex);
-    container.clear();
+
+    head->next = tail;
+    tail->prev = head;
+    msize = 0;
+
     iterValid = std::make_shared<char>();
     iterWrapperCount = std::make_shared<char>();
 }
@@ -235,180 +265,16 @@ bool TSLQueue<T>::empty() {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     std::lock_guard lock(mutex);
-    return container.empty();
+    return head->next == tail;
 }
 
 template <typename T>
-template <bool isConst, bool isRev>
-TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::TSLQIterWrapper(
-        std::conditional_t<isConst, const std::list<T>, std::list<T>> *container,
-        std::weak_ptr<void> iterValid,
-        std::shared_ptr<char> iterWrapperCount) :
-            containerPtr(container),
-            iterValid(iterValid),
-            iterWrapperCount(iterWrapperCount) {
-    if constexpr (isRev) {
-        if constexpr (isConst) {
-            iter = containerPtr->crbegin();
-        } else {
-            iter = containerPtr->rbegin();
-        }
-    } else {
-        if constexpr (isConst) {
-            iter = containerPtr->cbegin();
-        } else {
-            iter = containerPtr->begin();
-        }
+unsigned long long TSLQueue<T>::size() {
+    while(iterWrapperCount.use_count() > 1) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-}
-
-template <typename T>
-template <bool isConst, bool isRev>
-bool TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::isValid() const {
-    return !iterValid.expired();
-}
-
-template <typename T>
-template <bool isConst, bool isRev>
-bool TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::next() {
-    if(!isValid()) {
-        return false;
-    }
-
-    if constexpr (isRev) {
-        if(containerPtr->rend() == iter) {
-            iterValid.reset();
-            return false;
-        } else {
-            ++iter;
-            if(containerPtr->rend() == iter) {
-                return false;
-            }
-        }
-    } else {
-        if(containerPtr->end() == iter) {
-            iterValid.reset();
-            return false;
-        } else {
-            ++iter;
-            if(containerPtr->end() == iter) {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
-template <typename T>
-template <bool isConst, bool isRev>
-bool TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::prev() {
-    if(!isValid()) {
-        return false;
-    }
-
-    if constexpr (isRev) {
-        if(containerPtr->rbegin() == iter) {
-            iterValid.reset();
-            return false;
-        } else {
-            --iter;
-        }
-    } else {
-        if(containerPtr->begin() == iter) {
-            iterValid.reset();
-            return false;
-        } else {
-            --iter;
-        }
-    }
-
-    return true;
-}
-
-template <typename T>
-template <bool isConst, bool isRev>
-std::optional<T> TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::current() {
-    if(!isValid()) {
-        return std::nullopt;
-    } else if constexpr (isRev) {
-        if(containerPtr->rend() == iter) {
-            return std::nullopt;
-        }
-    } else {
-        if(containerPtr->end() == iter) {
-            return std::nullopt;
-        }
-    }
-    return *iter;
-}
-
-template <typename T>
-template <bool isConst, bool isRev>
-bool TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::remove() {
-    if(!isValid()) {
-        return false;
-    } else if constexpr(isRev) {
-        return false;
-    } else {
-        if(containerPtr->end() == iter) {
-            return false;
-        }
-    }
-    iter = containerPtr->erase(iter);
-    return true;
-}
-
-template <typename T>
-template <bool isConst, bool isRev>
-typename TSLQueue<T>::template TSLQIterWrapper<isConst, isRev>& TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::operator++() {
-    next();
-    return *this;
-}
-
-template <typename T>
-template <bool isConst, bool isRev>
-typename TSLQueue<T>::template TSLQIterWrapper<isConst, isRev>& TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::operator--() {
-    prev();
-    return *this;
-}
-
-template <typename T>
-template <bool isConst, bool isRev>
-bool TSLQueue<T>::TSLQIterWrapper<isConst, isRev>::set(T &&newValue) {
-    if constexpr(isConst) {
-        return false;
-    } else {
-        if(!isValid()) {
-            return false;
-        }
-        *iter = std::forward<T>(newValue);
-        return true;
-    }
-}
-
-template <typename T>
-typename TSLQueue<T>::template TSLQIterWrapper<false, false> TSLQueue<T>::iter() {
     std::lock_guard lock(mutex);
-    return TSLQIterWrapper<false, false>(&container, iterValid, iterWrapperCount);
-}
-
-template <typename T>
-typename TSLQueue<T>::template TSLQIterWrapper<false, true> TSLQueue<T>::riter() {
-    std::lock_guard lock(mutex);
-    return TSLQIterWrapper<false, true>(&container, iterValid, iterWrapperCount);
-}
-
-template <typename T>
-typename TSLQueue<T>::template TSLQIterWrapper<true, false> TSLQueue<T>::citer() {
-    std::lock_guard lock(mutex);
-    return TSLQIterWrapper<true, false>(&container, iterValid, iterWrapperCount);
-}
-
-template <typename T>
-typename TSLQueue<T>::template TSLQIterWrapper<true, true> TSLQueue<T>::criter() {
-    std::lock_guard lock(mutex);
-    return TSLQIterWrapper<true, true>(&container, iterValid, iterWrapperCount);
+    return msize;
 }
 
 #endif

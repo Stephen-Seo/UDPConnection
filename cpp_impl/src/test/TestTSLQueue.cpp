@@ -1,217 +1,118 @@
 #include <gtest/gtest.h>
 
-#include <iostream>
+#include <future>
+#include <functional>
 
 #include "TSLQueue.hpp"
 
-TEST(TSLQueue, Usage) {
+TEST(TSLQueue, PushTopPopSize) {
     TSLQueue<int> q;
-    bool isEmpty;
-    std::optional<int> opt;
 
-    // init
+    EXPECT_FALSE(q.top().has_value());
+
+    for(int i = 0; i < 10; ++i) {
+        EXPECT_EQ(i, q.size());
+        q.push(i);
+    }
+
+    for(int i = 0; i < 10; ++i) {
+        auto v = q.top();
+        ASSERT_TRUE(v.has_value());
+        EXPECT_EQ(v.value(), i);
+        EXPECT_EQ(10 - i, q.size());
+        EXPECT_TRUE(q.pop());
+    }
+    EXPECT_EQ(q.size(), 0);
+
     EXPECT_FALSE(q.pop());
+}
 
-    opt = q.top_and_pop();
-    EXPECT_FALSE(opt.has_value());
+TEST(TSLQueue, PushNB_TopNB_TopAndPop_Size) {
+    TSLQueue<int> q;
 
-    opt = q.top_and_pop_and_empty(&isEmpty);
-    EXPECT_FALSE(opt.has_value());
-    EXPECT_TRUE(isEmpty);
+    for(int i = 0; i < 10; ++i) {
+        EXPECT_EQ(q.size(), i);
+        EXPECT_TRUE(q.push_nb(i));
+    }
 
+    for(int i = 0; i < 10; ++i) {
+        auto v = q.top_nb();
+        ASSERT_TRUE(v.has_value());
+        EXPECT_EQ(v.value(), i);
+        EXPECT_EQ(q.size(), 10 - i);
+        v = q.top_and_pop();
+        ASSERT_TRUE(v.has_value());
+        EXPECT_EQ(v.value(), i);
+    }
+
+    {
+        auto v = q.top_nb();
+        ASSERT_FALSE(v.has_value());
+    }
+    {
+        auto v = q.top_and_pop();
+        ASSERT_FALSE(v.has_value());
+    }
+    EXPECT_EQ(q.size(), 0);
+}
+
+TEST(TSLQueue, Push_TopAndPopAndEmpty_Size) {
+    TSLQueue<int> q;
+
+    for(int i = 0; i < 10; ++i) {
+        EXPECT_EQ(q.size(), i);
+        q.push(i);
+    }
+
+    bool isEmpty;
+    for(int i = 0; i < 10; ++i) {
+        EXPECT_EQ(q.size(), 10 - i);
+        auto v = q.top_and_pop_and_empty(&isEmpty);
+        ASSERT_TRUE(v.has_value());
+        EXPECT_EQ(v.value(), i);
+        EXPECT_EQ(i == 9, isEmpty);
+    }
+    EXPECT_EQ(q.size(), 0);
+}
+
+TEST(TSLQueue, PushClearEmptySize) {
+    TSLQueue<int> q;
+
+    for(int i = 0; i < 10; ++i) {
+        EXPECT_EQ(q.size(), i);
+        q.push(i);
+    }
+    EXPECT_EQ(q.size(), 10);
+
+    EXPECT_FALSE(q.empty());
+    q.clear();
     EXPECT_TRUE(q.empty());
+    EXPECT_EQ(q.size(), 0);
+}
 
-    // push 1, 2, 3
-    q.push(1);
+TEST(TSLQueue, Concurrent) {
+    TSLQueue<int> q;
+
+    const auto add_fn = [] (TSLQueue<int> *q, int i) -> void {
+        q->push(i);
+    };
+
+    std::future<void> futures[100];
+    for(int i = 0; i < 100; ++i) {
+        futures[i] = std::async(std::launch::async, add_fn, &q, i);
+    }
+    for(int i = 0; i < 100; ++i) {
+        futures[i].wait();
+    }
+
     EXPECT_FALSE(q.empty());
-    opt = q.top();
-    ASSERT_TRUE(opt.has_value());
-    EXPECT_EQ(opt.value(), 1);
-
-    q.push_nb(2);
-    EXPECT_FALSE(q.empty());
-    opt = q.top_nb();
-    ASSERT_TRUE(opt.has_value());
-    EXPECT_EQ(opt.value(), 1);
-
-    q.push(3);
-    EXPECT_FALSE(q.empty());
-    opt = q.top();
-    ASSERT_TRUE(opt.has_value());
-    EXPECT_EQ(opt.value(), 1);
-
-    // iterators
-    {
-        auto citer = q.citer();
-        opt = citer.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 1);
-        EXPECT_FALSE(citer.set(111));
-
-        EXPECT_TRUE(citer.next());
-        opt = citer.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 2);
-
-        EXPECT_TRUE(citer.next());
-        opt = citer.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 3);
-
-        EXPECT_FALSE(citer.next());
-        opt = citer.current();
-        EXPECT_FALSE(opt.has_value());
-
-        EXPECT_TRUE(citer.isValid());
-        EXPECT_FALSE(citer.next());
-        EXPECT_FALSE(citer.isValid());
+    for(int i = 0; i < 100; ++i) {
+        EXPECT_EQ(q.size(), 100 - i);
+        auto v = q.top_and_pop();
+        ASSERT_TRUE(v.has_value());
+        EXPECT_GE(v.value(), 0);
+        EXPECT_LE(v.value(), 100);
+        EXPECT_EQ(i == 99, q.empty());
     }
-    {
-        auto criter = q.criter();
-        opt = criter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 3);
-        EXPECT_FALSE(criter.set(333));
-
-        EXPECT_TRUE(criter.next());
-        opt = criter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 2);
-
-        EXPECT_TRUE(criter.next());
-        opt = criter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 1);
-
-        EXPECT_FALSE(criter.next());
-        opt = criter.current();
-        EXPECT_FALSE(opt.has_value());
-    }
-    {
-        // values changed to 10, 20, 30
-        auto iter = q.iter();
-        opt = iter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 1);
-        EXPECT_TRUE(iter.set(10));
-        opt = iter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 10);
-
-        EXPECT_TRUE(iter.next());
-        opt = iter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 2);
-        EXPECT_TRUE(iter.set(20));
-        opt = iter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 20);
-
-        EXPECT_TRUE(iter.next());
-        opt = iter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 3);
-        EXPECT_TRUE(iter.set(30));
-        opt = iter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 30);
-
-        EXPECT_FALSE(iter.next());
-        opt = iter.current();
-        EXPECT_FALSE(opt.has_value());
-    }
-    {
-        // values changed to 1, 2, 3
-        auto riter = q.riter();
-        opt = riter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 30);
-        EXPECT_TRUE(riter.set(3));
-        opt = riter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 3);
-
-        EXPECT_TRUE(riter.next());
-        opt = riter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 20);
-        EXPECT_TRUE(riter.set(2));
-        opt = riter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 2);
-
-        EXPECT_TRUE(riter.next());
-        opt = riter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 10);
-        EXPECT_TRUE(riter.set(1));
-        opt = riter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 1);
-    }
-
-    {
-        // remove center (2), result: 1, 3
-        auto iter = q.iter();
-        opt = iter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 1);
-
-        EXPECT_TRUE(iter.next());
-        opt = iter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 2);
-
-        EXPECT_TRUE(iter.remove());
-        opt = iter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 3);
-
-        EXPECT_FALSE(iter.next());
-        opt = iter.current();
-        ASSERT_FALSE(opt.has_value());
-        EXPECT_FALSE(iter.remove());
-    }
-
-    {
-        // remove first (1), result: 3
-        auto iter = q.iter();
-        opt = iter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 1);
-
-        EXPECT_TRUE(iter.remove());
-        opt = iter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 3);
-
-        EXPECT_FALSE(iter.next());
-        opt = iter.current();
-        ASSERT_FALSE(opt.has_value());
-        EXPECT_FALSE(iter.remove());
-    }
-
-    {
-        // remove (3), result: empty
-        auto iter = q.iter();
-        opt = iter.current();
-        ASSERT_TRUE(opt.has_value());
-        EXPECT_EQ(opt.value(), 3);
-
-        EXPECT_TRUE(iter.remove());
-        opt = iter.current();
-        EXPECT_FALSE(opt.has_value());
-        EXPECT_FALSE(iter.remove());
-    }
-
-    {
-        auto iter = q.iter();
-        opt = iter.current();
-        EXPECT_FALSE(opt.has_value());
-    }
-    {
-        auto riter = q.riter();
-        opt = riter.current();
-        EXPECT_FALSE(opt.has_value());
-    }
+    EXPECT_EQ(q.size(), 0);
 }
