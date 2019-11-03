@@ -116,3 +116,76 @@ TEST(TSLQueue, Concurrent) {
     }
     EXPECT_EQ(q.size(), 0);
 }
+
+TEST(TSLQueue, Iterator) {
+    TSLQueue<int> q;
+
+    for(int i = 0; i < 10; ++i) {
+        q.push(i);
+    }
+
+    {
+        // iteration
+        auto iter = q.begin();
+        int i = 0;
+        auto op = iter.current();
+        while(op.has_value()) {
+            EXPECT_EQ(op.value(), i++);
+            if(i < 10) {
+                EXPECT_TRUE(iter.next());
+            } else {
+                EXPECT_FALSE(iter.next());
+            }
+            op = iter.current();
+        }
+
+        // test that lock is held by iterator
+        EXPECT_FALSE(q.push_nb(10));
+        op = q.top_nb();
+        EXPECT_FALSE(op.has_value());
+
+        // backwards iteration
+        EXPECT_TRUE(iter.prev());
+        op = iter.current();
+        while(op.has_value()) {
+            EXPECT_EQ(op.value(), --i);
+            if(i > 0) {
+                EXPECT_TRUE(iter.prev());
+            } else {
+                EXPECT_FALSE(iter.prev());
+            }
+            op = iter.current();
+        }
+    }
+
+    {
+        // iter remove
+        auto iter = q.begin();
+        EXPECT_TRUE(iter.next());
+        EXPECT_TRUE(iter.next());
+        EXPECT_TRUE(iter.next());
+        EXPECT_TRUE(iter.remove());
+
+        auto op = iter.current();
+        EXPECT_TRUE(op.has_value());
+        EXPECT_EQ(op.value(), 4);
+
+        EXPECT_TRUE(iter.prev());
+        op = iter.current();
+        EXPECT_TRUE(op.has_value());
+        EXPECT_EQ(op.value(), 2);
+    }
+
+    // check that "3" was removed from queue
+    int i = 0;
+    std::optional<int> op;
+    while(!q.empty()) {
+        op = q.top();
+        EXPECT_TRUE(op.has_value());
+        EXPECT_EQ(i++, op.value());
+        if(i == 3) {
+            ++i;
+        }
+        EXPECT_TRUE(q.pop());
+    }
+}
