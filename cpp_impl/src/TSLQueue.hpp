@@ -74,7 +74,7 @@ class TSLQueue {
     private:
         std::lock_guard<std::mutex> lock;
         std::weak_ptr<TSLQNode> currentNode;
-        unsigned long long *msize;
+        unsigned long long *const msize;
 
     };
 
