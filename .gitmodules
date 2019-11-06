@@ -1,3 +1,0 @@
-[submodule "cpp_impl/RingBuffer"]
-	path = cpp_impl/RingBuffer
-	url = https://github.com/Stephen-Seo/RingBuffer.git

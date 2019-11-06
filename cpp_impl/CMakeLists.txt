@@ -3,12 +3,6 @@ project(UDPConnection)
 
 set(UDPConnection_VERSION 1.0)
 
-if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/RingBuffer/src)
-    message(FATAL_ERROR "RingBuffer is missing!\nPlease update the \
-RingBuffer submodule by running 'git submodule init' and 'git submodule \
-update'!")
-endif()
-
 set(UDPConnection_SOURCES
     src/UDPConnection.cpp
 )
@@ -46,16 +40,12 @@ target_link_libraries(UDPConnection PUBLIC ${LIBSODIUM_LIBRARIES})
 target_include_directories(UDPConnection PUBLIC ${LIBSODIUM_INCLUDE_DIRS})
 target_compile_options(UDPConnection PUBLIC ${LIBSODIUM_CFLAGS_OTHER})
 
-target_include_directories(UDPConnection PUBLIC
-    "${CMAKE_CURRENT_SOURCE_DIR}/RingBuffer/src")
-
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
 
     find_package(GTest QUIET)
     if(GTEST_FOUND)
         set(UDPC_UnitTest_SOURCES
             src/test/UDPC_UnitTest.cpp
-            src/test/TestTSQueue.cpp
             src/test/TestTSLQueue.cpp
             src/test/TestUDPC.cpp
         )
