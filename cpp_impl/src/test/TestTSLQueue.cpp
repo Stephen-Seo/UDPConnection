@@ -188,4 +188,49 @@ TEST(TSLQueue, Iterator) {
         }
         EXPECT_TRUE(q.pop());
     }
+
+    // remove from start
+    q.push(0);
+    q.push(1);
+    q.push(2);
+    q.push(3);
+    {
+        auto iter = q.begin();
+        EXPECT_TRUE(iter.remove());
+    }
+    i = 1;
+    while(!q.empty()) {
+        op = q.top();
+        EXPECT_TRUE(op.has_value());
+        EXPECT_EQ(i++, op.value());
+        EXPECT_TRUE(q.pop());
+    }
+
+    // remove from end
+    q.push(0);
+    q.push(1);
+    q.push(2);
+    q.push(3);
+    {
+        auto iter = q.begin();
+        while(true) {
+            EXPECT_TRUE(iter.next());
+            op = iter.current();
+            EXPECT_TRUE(op.has_value());
+            if(op.value() == 3) {
+                EXPECT_FALSE(iter.remove());
+                break;
+            }
+        }
+    }
+    i = 0;
+    while(!q.empty()) {
+        op = q.top();
+        EXPECT_TRUE(op.has_value());
+        EXPECT_EQ(i++, op.value());
+        EXPECT_TRUE(q.pop());
+        if(i == 3) {
+            EXPECT_TRUE(q.empty());
+        }
+    }
 }
