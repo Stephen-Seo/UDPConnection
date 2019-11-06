@@ -33,6 +33,7 @@
 #include <iostream>
 
 #include "TSQueue.hpp"
+#include "TSLQueue.hpp"
 #include "UDPConnection.h"
 
 #include <sodium.h>
@@ -153,6 +154,9 @@ private:
         case UDPC_LoggingType::UDPC_INFO:
             std::cerr << "INFO: ";
             break;
+        case UDPC_LoggingType::UDPC_DEBUG:
+            std::cerr << "DEBUG: ";
+            break;
         default:
             return;
         }
@@ -197,8 +201,8 @@ public:
     std::unordered_map<struct in6_addr, std::unordered_set<UDPC_ConnectionId, ConnectionIdHasher>, IPV6_Hasher> addrConMap;
     // id to ipv6 address and port (as UDPC_ConnectionId)
     std::unordered_map<uint32_t, UDPC_ConnectionId> idMap;
-    TSQueue<UDPC_PacketInfo> receivedPkts;
-    TSQueue<UDPC_PacketInfo> cSendPkts;
+    TSLQueue<UDPC_PacketInfo> receivedPkts;
+    TSLQueue<UDPC_PacketInfo> cSendPkts;
 
     std::default_random_engine rng_engine;
 

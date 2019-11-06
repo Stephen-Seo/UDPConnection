@@ -30,10 +30,11 @@ class TSLQueue {
     bool pop();
     std::optional<T> top_and_pop();
     std::optional<T> top_and_pop_and_empty(bool *isEmpty);
+    std::optional<T> top_and_pop_and_rsize(unsigned long *rsize);
     void clear();
 
     bool empty();
-    unsigned long long size();
+    unsigned long size();
 
   private:
     struct TSLQNode {
@@ -63,7 +64,7 @@ class TSLQueue {
     public:
         TSLQIter(std::mutex &mutex,
                  std::weak_ptr<TSLQNode> currentNode,
-                 unsigned long long *msize);
+                 unsigned long *msize);
         ~TSLQIter();
 
         std::optional<T> current();
@@ -74,7 +75,7 @@ class TSLQueue {
     private:
         std::lock_guard<std::mutex> lock;
         std::weak_ptr<TSLQNode> currentNode;
-        unsigned long long *const msize;
+        unsigned long *const msize;
 
     };
 
@@ -85,7 +86,7 @@ class TSLQueue {
     std::mutex mutex;
     std::shared_ptr<TSLQNode> head;
     std::shared_ptr<TSLQNode> tail;
-    unsigned long long msize;
+    unsigned long msize;
 };
 
 template <typename T>
@@ -244,6 +245,31 @@ std::optional<T> TSLQueue<T>::top_and_pop_and_empty(bool *isEmpty) {
 }
 
 template <typename T>
+std::optional<T> TSLQueue<T>::top_and_pop_and_rsize(unsigned long *rsize) {
+    std::optional<T> ret = std::nullopt;
+    std::lock_guard lock(mutex);
+    if(head->next == tail) {
+        if(rsize) {
+            *rsize = 0;
+        }
+    } else {
+        assert(head->next->data);
+        ret = *head->next->data.get();
+
+        auto& newNext = head->next->next;
+        newNext->prev = head;
+        head->next = newNext;
+        assert(msize > 0);
+        --msize;
+
+        if(rsize) {
+            *rsize = msize;
+        }
+    }
+    return ret;
+}
+
+template <typename T>
 void TSLQueue<T>::clear() {
     std::lock_guard lock(mutex);
 
@@ -259,7 +285,7 @@ bool TSLQueue<T>::empty() {
 }
 
 template <typename T>
-unsigned long long TSLQueue<T>::size() {
+unsigned long TSLQueue<T>::size() {
     std::lock_guard lock(mutex);
     return msize;
 }
@@ -277,7 +303,7 @@ bool TSLQueue<T>::TSLQNode::isNormal() const {
 template <typename T>
 TSLQueue<T>::TSLQIter::TSLQIter(std::mutex &mutex,
                                 std::weak_ptr<TSLQNode> currentNode,
-                                unsigned long long *msize) :
+                                unsigned long *msize) :
 lock(mutex),
 currentNode(currentNode),
 msize(msize)

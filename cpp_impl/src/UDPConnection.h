@@ -65,7 +65,7 @@ extern "C" {
 struct UDPC_Context;
 typedef struct UDPC_Context *UDPC_HContext;
 
-typedef enum { UDPC_SILENT, UDPC_ERROR, UDPC_WARNING, UDPC_VERBOSE, UDPC_INFO } UDPC_LoggingType;
+typedef enum { UDPC_SILENT, UDPC_ERROR, UDPC_WARNING, UDPC_INFO, UDPC_VERBOSE, UDPC_DEBUG } UDPC_LoggingType;
 
 typedef struct {
     UDPC_IPV6_ADDR_TYPE addr;
@@ -105,10 +105,10 @@ void UDPC_update(UDPC_HContext ctx);
 
 void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
-int UDPC_get_queue_send_available(UDPC_HContext ctx);
-
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
                      int isChecked, void *data, uint32_t size);
+
+unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx);
 
 int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);
 
@@ -124,9 +124,7 @@ uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id);
 
 UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingType);
 
-UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned int *remaining);
-
-int UDPC_set_received_capacity(UDPC_HContext ctx, unsigned int newCapacity);
+UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);
 
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 

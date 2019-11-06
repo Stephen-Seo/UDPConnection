@@ -8,6 +8,8 @@
 
 #include <UDPConnection.h>
 
+#define QUEUED_MAX_SIZE 32
+
 static const std::regex ipv6_regex_linkonly = std::regex(R"d(fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,})d");
 
 void usage() {
@@ -18,6 +20,7 @@ void usage() {
     puts("-cp <port> - connection port (client only)");
     puts("-t <tick_count>");
     puts("-n - do not add payload to packets");
+    puts("-l (silent|error|warning|info|verbose|debug) - log level, default debug");
 }
 
 int main(int argc, char **argv) {
@@ -34,6 +37,7 @@ int main(int argc, char **argv) {
     const char *connectionPort = nullptr;
     unsigned int tickLimit = 15;
     bool noPayload = false;
+    UDPC_LoggingType logLevel = UDPC_LoggingType::UDPC_DEBUG;
     while(argc > 0) {
         if(std::strcmp(argv[0], "-c") == 0) {
             isClient = true;
@@ -58,6 +62,26 @@ int main(int argc, char **argv) {
         } else if(std::strcmp(argv[0], "-n") == 0) {
             noPayload = true;
             puts("Disabling sending payload");
+        } else if(std::strcmp(argv[0], "-l") == 0) {
+            --argc; ++argv;
+            if(std::strcmp(argv[0], "silent") == 0) {
+                logLevel = UDPC_LoggingType::UDPC_SILENT;
+            } else if(std::strcmp(argv[0], "error") == 0) {
+                logLevel = UDPC_LoggingType::UDPC_ERROR;
+            } else if(std::strcmp(argv[0], "warning") == 0) {
+                logLevel = UDPC_LoggingType::UDPC_WARNING;
+            } else if(std::strcmp(argv[0], "info") == 0) {
+                logLevel = UDPC_LoggingType::UDPC_INFO;
+            } else if(std::strcmp(argv[0], "verbose") == 0) {
+                logLevel = UDPC_LoggingType::UDPC_VERBOSE;
+            } else if(std::strcmp(argv[0], "debug") == 0) {
+                logLevel = UDPC_LoggingType::UDPC_DEBUG;
+            } else {
+                printf("ERROR: invalid argument \"%s\", expected "
+                    "silent|error|warning|info|verbose|debug", argv[0]);
+                usage();
+                return 1;
+            }
         } else {
             printf("ERROR: invalid argument \"%s\"\n", argv[0]);
             usage();
@@ -106,10 +130,11 @@ int main(int argc, char **argv) {
         puts("ERROR: context is NULL");
         return 1;
     }
-    UDPC_set_logging_type(context, UDPC_LoggingType::UDPC_INFO);
+    UDPC_set_logging_type(context, logLevel);
     unsigned int tick = 0;
     unsigned int temp = 0;
     unsigned int temp2, temp3;
+    unsigned long size;
     UDPC_ConnectionId *list = nullptr;
     std::vector<unsigned int> sendIds;
     UDPC_PacketInfo received;
@@ -126,7 +151,8 @@ int main(int argc, char **argv) {
                 } else if(sendIds.size() > temp) {
                     sendIds.resize(temp);
                 }
-                temp2 = UDPC_get_queue_send_available(context);
+                size = UDPC_get_queue_send_current_size(context);
+                temp2 = size < QUEUED_MAX_SIZE ? QUEUED_MAX_SIZE - size : 0;
                 for(unsigned int i = 0; i < temp2; ++i) {
                     temp3 = htonl(sendIds[i % temp]++);
                     UDPC_queue_send(context, list[i % temp], 0, &temp3, sizeof(unsigned int));
@@ -134,14 +160,14 @@ int main(int argc, char **argv) {
                 UDPC_free_list_connected(list);
             }
             do {
-                received = UDPC_get_received(context, &temp);
+                received = UDPC_get_received(context, &size);
                 if(received.dataSize == sizeof(unsigned int)) {
                     if((received.flags & 0x8) != 0) {
                         temp2 = ntohl(*((unsigned int*)received.data));
                         printf("Got out of order, data = %u\n", temp2);
                     }
                 }
-            } while (temp > 0);
+            } while (size > 0);
         }
         if(tick++ > tickLimit) {
             break;

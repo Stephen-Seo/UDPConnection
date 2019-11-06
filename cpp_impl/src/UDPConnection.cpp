@@ -165,13 +165,13 @@ flags(),
 isAcceptNewConnections(true),
 protocolID(UDPC_DEFAULT_PROTOCOL_ID),
 #ifndef NDEBUG
-loggingType(UDPC_INFO),
+loggingType(UDPC_DEBUG),
 #else
 loggingType(UDPC_WARNING),
 #endif
 atostrBufIndex(0),
-receivedPkts(UDPC_RECEIVED_PKTS_MAX_SIZE),
-cSendPkts(UDPC_QUEUED_PKTS_MAX_SIZE),
+receivedPkts(),
+cSendPkts(),
 rng_engine(),
 mutex()
 {
@@ -199,12 +199,21 @@ bool UDPC::Context::willLog(UDPC_LoggingType type) {
     case UDPC_LoggingType::UDPC_WARNING:
         return type == UDPC_LoggingType::UDPC_ERROR
             || type == UDPC_LoggingType::UDPC_WARNING;
+    case UDPC_LoggingType::UDPC_INFO:
+        return type == UDPC_LoggingType::UDPC_ERROR
+            || type == UDPC_LoggingType::UDPC_WARNING
+            || type == UDPC_LoggingType::UDPC_INFO;
     case UDPC_LoggingType::UDPC_VERBOSE:
         return type == UDPC_LoggingType::UDPC_ERROR
             || type == UDPC_LoggingType::UDPC_WARNING
+            || type == UDPC_LoggingType::UDPC_INFO
             || type == UDPC_LoggingType::UDPC_VERBOSE;
-    case UDPC_LoggingType::UDPC_INFO:
-        return type != UDPC_LoggingType::UDPC_SILENT;
+    case UDPC_LoggingType::UDPC_DEBUG:
+        return type == UDPC_LoggingType::UDPC_ERROR
+            || type == UDPC_LoggingType::UDPC_WARNING
+            || type == UDPC_LoggingType::UDPC_INFO
+            || type == UDPC_LoggingType::UDPC_VERBOSE
+            || type == UDPC_LoggingType::UDPC_DEBUG;
     default:
         return false;
     }
@@ -238,7 +247,7 @@ void UDPC::Context::update_impl() {
             if(iter->second.flags.test(1) && !iter->second.flags.test(2)) {
                 // good mode, bad rtt
                 UDPC_CHECK_LOG(this,
-                    UDPC_LoggingType::UDPC_INFO,
+                    UDPC_LoggingType::UDPC_VERBOSE,
                     "Switching to bad mode in connection with ",
                     UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                     ", port = ",
@@ -264,7 +273,7 @@ void UDPC::Context::update_impl() {
                     iter->second.toggleTimer = std::chrono::steady_clock::duration::zero();
                     iter->second.toggledTimer = std::chrono::steady_clock::duration::zero();
                     UDPC_CHECK_LOG(this,
-                        UDPC_LoggingType::UDPC_INFO,
+                        UDPC_LoggingType::UDPC_VERBOSE,
                         "Switching to good mode in connection with ",
                         UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                         ", port = ",
@@ -315,13 +324,33 @@ void UDPC::Context::update_impl() {
 
     // move queued in cSendPkts to existing connection's sendPkts
     {
-        unsigned int rsize = 0;
-        do {
-            auto next = cSendPkts.top_and_pop_and_rsize(&rsize);
+        auto sendIter = cSendPkts.begin();
+        while(true) {
+            auto next = sendIter.current();
             if(next) {
                 if(auto iter = conMap.find(next.value().receiver);
                         iter != conMap.end()) {
+                    if(iter->second.sendPkts.size() >= UDPC_QUEUED_PKTS_MAX_SIZE) {
+                        UDPC_CHECK_LOG(this,
+                            UDPC_LoggingType::UDPC_DEBUG,
+                            "Not queueing packet to ",
+                            UDPC_atostr((UDPC_HContext)this,
+                                next.value().receiver.addr),
+                            ", port = ",
+                            next.value().receiver.port,
+                            ", connection's queue reached max size");
+                        if(sendIter.next()) {
+                            continue;
+                        } else {
+                            break;
+                        }
+                    }
                     iter->second.sendPkts.push_back(next.value());
+                    if(sendIter.remove()) {
+                        continue;
+                    } else {
+                        break;
+                    }
                 } else {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_WARNING,
@@ -332,9 +361,16 @@ void UDPC::Context::update_impl() {
                         ", port = ",
                         next.value().receiver.port,
                         " due to connection not existing");
+                    if(sendIter.remove()) {
+                        continue;
+                    } else {
+                        break;
+                    }
                 }
+            } else {
+                break;
             }
-        } while(rsize != 0);
+        }
     }
 
     // update send (only if triggerSend flag is set)
@@ -618,7 +654,7 @@ void UDPC::Context::update_impl() {
     else if(bytes < UDPC_MIN_HEADER_SIZE) {
         // packet size is too small, invalid packet
         UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_INFO,
+            UDPC_LoggingType::UDPC_VERBOSE,
             "Received packet is smaller than header, ignoring packet from ",
             UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
             ", port = ",
@@ -630,7 +666,7 @@ void UDPC::Context::update_impl() {
     if(temp != protocolID) {
         // Invalid protocol id in packet
         UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_INFO,
+            UDPC_LoggingType::UDPC_VERBOSE,
             "Received packet has invalid protocol id, ignoring packet from ",
             UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
             ", port = ",
@@ -652,7 +688,7 @@ void UDPC::Context::update_impl() {
     if(isConnect && bytes != UDPC_CON_HEADER_SIZE) {
         // invalid packet size
         UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_INFO,
+            UDPC_LoggingType::UDPC_VERBOSE,
             "Got connect packet of invalid size from ",
             UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
             ", port = ",
@@ -662,7 +698,7 @@ void UDPC::Context::update_impl() {
     } else if (!isConnect && bytes < (int)UDPC_FULL_HEADER_SIZE) {
         // packet is too small
         UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_INFO,
+            UDPC_LoggingType::UDPC_VERBOSE,
             "Got non-connect packet of invalid size from ",
             UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
             ", port = ",
@@ -692,7 +728,7 @@ void UDPC::Context::update_impl() {
             std::memcpy(newConnection.peer_pk, recvBuf + UDPC_MIN_HEADER_SIZE,
                 crypto_sign_PUBLICKEYBYTES);
             UDPC_CHECK_LOG(this,
-                UDPC_LoggingType::UDPC_VERBOSE,
+                UDPC_LoggingType::UDPC_INFO,
                 "Establishing connection with client ",
                 UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                 ", port = ",
@@ -726,7 +762,7 @@ void UDPC::Context::update_impl() {
             std::memcpy(iter->second.peer_pk, recvBuf + UDPC_MIN_HEADER_SIZE,
                 crypto_sign_PUBLICKEYBYTES);
             UDPC_CHECK_LOG(this,
-                UDPC_LoggingType::UDPC_VERBOSE,
+                UDPC_LoggingType::UDPC_INFO,
                 "Established connection with server ",
                 UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                 ", port = ",
@@ -753,7 +789,7 @@ void UDPC::Context::update_impl() {
         iter->second.peer_pk) != 0) {
         UDPC_CHECK_LOG(
             this,
-            UDPC_LoggingType::UDPC_VERBOSE,
+            UDPC_LoggingType::UDPC_INFO,
             "Failed to verify received packet from",
             UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
             ", port = ",
@@ -764,7 +800,7 @@ void UDPC::Context::update_impl() {
 
     // packet is valid
     UDPC_CHECK_LOG(this,
-        UDPC_LoggingType::UDPC_INFO,
+        UDPC_LoggingType::UDPC_VERBOSE,
         "Received valid packet from ",
         UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
         ", port = ",
@@ -790,7 +826,7 @@ void UDPC::Context::update_impl() {
             iter->second.flags.set(2, iter->second.rtt <= UDPC::GOOD_RTT_LIMIT);
 
             UDPC_CHECK_LOG(this,
-                UDPC_LoggingType::UDPC_INFO,
+                UDPC_LoggingType::UDPC_VERBOSE,
                 "RTT: ",
                 UDPC::durationToFSec(iter->second.rtt) * 1000.0f,
                 " milliseconds");
@@ -823,7 +859,7 @@ void UDPC::Context::update_impl() {
                 if(duration > UDPC::PACKET_TIMEOUT_TIME) {
                     if(sentIter->dataSize <= UDPC_FULL_HEADER_SIZE) {
                         UDPC_CHECK_LOG(this,
-                            UDPC_LoggingType::UDPC_INFO,
+                            UDPC_LoggingType::UDPC_VERBOSE,
                             "Timed out packet has no payload (probably "
                             "heartbeat packet), ignoring it");
                         sentIter->flags |= 0x8;
@@ -858,7 +894,7 @@ void UDPC::Context::update_impl() {
             if((iter->second.ack & (0x80000000 >> (diff - 1))) != 0) {
                 // already received packet
                 UDPC_CHECK_LOG(this,
-                    UDPC_LoggingType::UDPC_INFO,
+                    UDPC_LoggingType::UDPC_VERBOSE,
                     "Received packet is already marked as received, ignoring it");
                 return;
             }
@@ -872,7 +908,7 @@ void UDPC::Context::update_impl() {
             if((iter->second.ack & (0x80000000 >> (diff - 1))) != 0) {
                 // already received packet
                 UDPC_CHECK_LOG(this,
-                    UDPC_LoggingType::UDPC_INFO,
+                    UDPC_LoggingType::UDPC_VERBOSE,
                     "Received packet is already marked as received, ignoring it");
                 return;
             }
@@ -887,14 +923,14 @@ void UDPC::Context::update_impl() {
     } else {
         // already received packet
         UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_INFO,
+            UDPC_LoggingType::UDPC_VERBOSE,
             "Received packet is already marked as received, ignoring it");
         return;
     }
 
     if(isOutOfOrder) {
         UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_VERBOSE,
+            UDPC_LoggingType::UDPC_INFO,
             "Received packet is out of order");
     }
 
@@ -912,13 +948,7 @@ void UDPC::Context::update_impl() {
         recPktInfo.sender.port = ntohs(receivedData.sin6_port);
         recPktInfo.receiver.port = ntohs(socketInfo.sin6_port);
 
-        if(!receivedPkts.push(recPktInfo)) {
-            UDPC_CHECK_LOG(this,
-                UDPC_LoggingType::UDPC_WARNING,
-                "receivedPkts is full, removing oldest entry to make room");
-            receivedPkts.pop();
-            receivedPkts.push(recPktInfo);
-        }
+        receivedPkts.push(recPktInfo);
     } else if(bytes == UDPC_FULL_HEADER_SIZE) {
         UDPC_CHECK_LOG(this,
             UDPC_LoggingType::UDPC_VERBOSE,
@@ -1228,19 +1258,10 @@ void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connec
             addrConIter = insertResult.first;
         }
         addrConIter->second.insert(connectionId);
-        UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_VERBOSE, "client_initiate_connection: Initiating connection...");
+        UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_INFO, "client_initiate_connection: Initiating connection...");
     } else {
         UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_ERROR, "client_initiate_connection: Already connected to peer");
     }
-}
-
-int UDPC_get_queue_send_available(UDPC_HContext ctx) {
-    UDPC::Context *c = UDPC::verifyContext(ctx);
-    if(!c) {
-        return 0;
-    }
-
-    return c->cSendPkts.remaining_capacity();
 }
 
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
@@ -1251,15 +1272,6 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
 
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
-        return;
-    } else if(c->cSendPkts.full()) {
-        UDPC_CHECK_LOG(c,
-            UDPC_LoggingType::UDPC_ERROR,
-            "Failed to queue packet to ",
-            UDPC_atostr(ctx, destinationId.addr),
-            ", port = ",
-            destinationId.port,
-            " because queue is full");
         return;
     }
 
@@ -1273,6 +1285,15 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
     sendInfo.flags = (isChecked != 0 ? 0x0 : 0x4);
 
     c->cSendPkts.push(sendInfo);
+}
+
+unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return 0;
+    }
+
+    return c->cSendPkts.size();
 }
 
 int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting) {
@@ -1386,7 +1407,7 @@ UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggi
     return static_cast<UDPC_LoggingType>(c->loggingType.exchange(loggingType));
 }
 
-UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned int *remaining) {
+UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return UDPC::get_empty_pinfo();
@@ -1397,25 +1418,6 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned int *remaining) {
         return *opt_pinfo;
     }
     return UDPC::get_empty_pinfo();
-}
-
-int UDPC_set_received_capacity(UDPC_HContext ctx, unsigned int newCapacity) {
-    if(newCapacity == 0) {
-        return 0;
-    }
-
-    UDPC::Context *c = UDPC::verifyContext(ctx);
-    if(!c) {
-        return 0;
-    }
-
-    unsigned int status = 0;
-    c->receivedPkts.changeCapacity(newCapacity, &status);
-    if(status == 1) {
-        UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_WARNING,
-            "Received Queue: Previous size was truncated to new capacity");
-    }
-    return 1;
 }
 
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
