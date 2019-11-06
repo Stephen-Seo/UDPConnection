@@ -123,6 +123,7 @@ TEST(TSLQueue, Iterator) {
     for(int i = 0; i < 10; ++i) {
         q.push(i);
     }
+    EXPECT_EQ(q.size(), 10);
 
     {
         // iteration
@@ -175,6 +176,7 @@ TEST(TSLQueue, Iterator) {
         EXPECT_TRUE(op.has_value());
         EXPECT_EQ(op.value(), 2);
     }
+    EXPECT_EQ(q.size(), 9);
 
     // check that "3" was removed from queue
     int i = 0;
@@ -194,10 +196,12 @@ TEST(TSLQueue, Iterator) {
     q.push(1);
     q.push(2);
     q.push(3);
+    EXPECT_EQ(q.size(), 4);
     {
         auto iter = q.begin();
         EXPECT_TRUE(iter.remove());
     }
+    EXPECT_EQ(q.size(), 3);
     i = 1;
     while(!q.empty()) {
         op = q.top();
@@ -211,6 +215,7 @@ TEST(TSLQueue, Iterator) {
     q.push(1);
     q.push(2);
     q.push(3);
+    EXPECT_EQ(q.size(), 4);
     {
         auto iter = q.begin();
         while(true) {
@@ -223,6 +228,7 @@ TEST(TSLQueue, Iterator) {
             }
         }
     }
+    EXPECT_EQ(q.size(), 3);
     i = 0;
     while(!q.empty()) {
         op = q.top();

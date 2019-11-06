@@ -62,7 +62,8 @@ class TSLQueue {
     class TSLQIter {
     public:
         TSLQIter(std::mutex &mutex,
-                 std::weak_ptr<TSLQNode> currentNode);
+                 std::weak_ptr<TSLQNode> currentNode,
+                 unsigned long long *msize);
         ~TSLQIter();
 
         std::optional<T> current();
@@ -73,6 +74,8 @@ class TSLQueue {
     private:
         std::lock_guard<std::mutex> lock;
         std::weak_ptr<TSLQNode> currentNode;
+        unsigned long long *msize;
+
     };
 
   public:
@@ -273,9 +276,11 @@ bool TSLQueue<T>::TSLQNode::isNormal() const {
 
 template <typename T>
 TSLQueue<T>::TSLQIter::TSLQIter(std::mutex &mutex,
-                                std::weak_ptr<TSLQNode> currentNode) :
+                                std::weak_ptr<TSLQNode> currentNode,
+                                unsigned long long *msize) :
 lock(mutex),
-currentNode(currentNode)
+currentNode(currentNode),
+msize(msize)
 {
 }
 
@@ -335,12 +340,15 @@ bool TSLQueue<T>::TSLQIter::remove() {
     currentNode->next->prev = parent;
     parent->next = currentNode->next;
 
+    assert(*msize > 0);
+    --(*msize);
+
     return parent->next->isNormal();
 }
 
 template <typename T>
 typename TSLQueue<T>::TSLQIter TSLQueue<T>::begin() {
-    return TSLQIter(mutex, head->next);
+    return TSLQIter(mutex, head->next, &msize);
 }
 
 #endif
