@@ -72,12 +72,12 @@ struct ConnectionIdHasher {
 };
 
 struct IPV6_Hasher {
-    std::size_t operator()(const struct in6_addr& addr) const;
+    std::size_t operator()(const UDPC_IPV6_ADDR_TYPE& addr) const;
 };
 
 struct ConnectionData {
     ConnectionData();
-    ConnectionData(bool isServer, Context *ctx, struct in6_addr addr, uint32_t scope_id, uint16_t port);
+    ConnectionData(bool isServer, Context *ctx, UDPC_IPV6_ADDR_TYPE addr, uint32_t scope_id, uint16_t port);
 
     // copy
     ConnectionData(const ConnectionData& other) = delete;
@@ -106,7 +106,7 @@ struct ConnectionData {
     std::chrono::steady_clock::duration toggleT;
     std::chrono::steady_clock::duration toggleTimer;
     std::chrono::steady_clock::duration toggledTimer;
-    struct in6_addr addr; // in network order
+    UDPC_IPV6_ADDR_TYPE addr; // in network order
     uint32_t scope_id;
     uint16_t port; // in native order
     std::deque<UDPC_PacketInfo> sentPkts;
@@ -191,13 +191,13 @@ public:
     char atostrBuf[UDPC_ATOSTR_SIZE];
 
     UDPC_SOCKETTYPE socketHandle;
-    struct sockaddr_in6 socketInfo;
+    UDPC_IPV6_SOCKADDR_TYPE socketInfo;
 
     std::chrono::steady_clock::time_point lastUpdated;
     // ipv6 address and port (as UDPC_ConnectionId) to ConnectionData
     std::unordered_map<UDPC_ConnectionId, ConnectionData, ConnectionIdHasher> conMap;
     // ipv6 address to all connected UDPC_ConnectionId
-    std::unordered_map<struct in6_addr, std::unordered_set<UDPC_ConnectionId, ConnectionIdHasher>, IPV6_Hasher> addrConMap;
+    std::unordered_map<UDPC_IPV6_ADDR_TYPE, std::unordered_set<UDPC_ConnectionId, ConnectionIdHasher>, IPV6_Hasher> addrConMap;
     // id to ipv6 address and port (as UDPC_ConnectionId)
     std::unordered_map<uint32_t, UDPC_ConnectionId> idMap;
     TSLQueue<UDPC_PacketInfo> receivedPkts;
@@ -242,6 +242,6 @@ void threadedUpdate(Context *ctx);
 
 bool operator ==(const UDPC_ConnectionId& a, const UDPC_ConnectionId& b);
 
-bool operator ==(const struct in6_addr& a, const struct in6_addr& b);
+bool operator ==(const UDPC_IPV6_ADDR_TYPE& a, const UDPC_IPV6_ADDR_TYPE& b);
 
 #endif
