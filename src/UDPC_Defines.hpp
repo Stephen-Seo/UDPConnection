@@ -97,7 +97,7 @@ struct ConnectionData {
      * 4 - is id set
      * 5 - error initializing keys for public key encryption
      */
-    std::bitset<32> flags;
+    std::bitset<8> flags;
     uint32_t id;
     uint32_t lseq;
     uint32_t rseq;
@@ -183,8 +183,9 @@ public:
      * 0 - is threaded
      * 1 - is client
      */
-    std::bitset<32> flags;
+    std::bitset<8> flags;
     std::atomic_bool isAcceptNewConnections;
+    std::atomic_bool isReceivingEvents;
     std::atomic_uint32_t protocolID;
     std::atomic_uint_fast8_t loggingType;
     std::atomic_uint32_t atostrBufIndex;
@@ -202,6 +203,10 @@ public:
     std::unordered_map<uint32_t, UDPC_ConnectionId> idMap;
     TSLQueue<UDPC_PacketInfo> receivedPkts;
     TSLQueue<UDPC_PacketInfo> cSendPkts;
+    // handled internally
+    TSLQueue<UDPC_Event> internalEvents;
+    // handled via interface, if isReceivingEvents is true
+    TSLQueue<UDPC_Event> externalEvents;
 
     std::default_random_engine rng_engine;
 

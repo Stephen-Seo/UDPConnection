@@ -21,6 +21,7 @@ void usage() {
     puts("-t <tick_count>");
     puts("-n - do not add payload to packets");
     puts("-l (silent|error|warning|info|verbose|debug) - log level, default debug");
+    puts("-e - enable receiving events");
 }
 
 int main(int argc, char **argv) {
@@ -38,6 +39,7 @@ int main(int argc, char **argv) {
     unsigned int tickLimit = 15;
     bool noPayload = false;
     UDPC_LoggingType logLevel = UDPC_LoggingType::UDPC_DEBUG;
+    bool isReceivingEvents = false;
     while(argc > 0) {
         if(std::strcmp(argv[0], "-c") == 0) {
             isClient = true;
@@ -82,6 +84,9 @@ int main(int argc, char **argv) {
                 usage();
                 return 1;
             }
+        } else if(std::strcmp(argv[0], "-e") == 0) {
+            isReceivingEvents = true;
+            puts("Enabled isReceivingEvents");
         } else {
             printf("ERROR: invalid argument \"%s\"\n", argv[0]);
             usage();
@@ -131,6 +136,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     UDPC_set_logging_type(context, logLevel);
+    UDPC_set_receiving_events(context, isReceivingEvents ? 1 : 0);
     unsigned int tick = 0;
     unsigned int temp = 0;
     unsigned int temp2, temp3;
@@ -138,6 +144,7 @@ int main(int argc, char **argv) {
     UDPC_ConnectionId *list = nullptr;
     std::vector<unsigned int> sendIds;
     UDPC_PacketInfo received;
+    UDPC_Event event;
     while(true) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         if(isClient && UDPC_has_connection(context, connectionId) == 0) {
@@ -169,6 +176,34 @@ int main(int argc, char **argv) {
                 }
             } while (size > 0);
         }
+        do {
+            event = UDPC_get_event(context, &size);
+            if(event.type == UDPC_ET_NONE) {
+                break;
+            }
+            const char *typeString;
+            switch(event.type) {
+            case UDPC_ET_CONNECTED:
+                typeString = "CONNECTED";
+                break;
+            case UDPC_ET_DISCONNECTED:
+                typeString = "DISCONNECTED";
+                break;
+            case UDPC_ET_GOOD_MODE:
+                typeString = "GOOD_MODE";
+                break;
+            case UDPC_ET_BAD_MODE:
+                typeString = "BAD_MODE";
+                break;
+            default:
+                typeString = "INVALID_TYPE";
+                break;
+            }
+            printf("Got event %s: %s %u\n",
+                typeString,
+                UDPC_atostr(context, event.conId.addr),
+                event.conId.port);
+        } while(size > 0);
         if(tick++ > tickLimit) {
             break;
         }

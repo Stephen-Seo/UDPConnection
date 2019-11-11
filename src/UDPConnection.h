@@ -88,6 +88,22 @@ typedef struct {
     UDPC_ConnectionId receiver;
 } UDPC_PacketInfo;
 
+typedef enum {
+    UDPC_ET_NONE,
+    UDPC_ET_REQUEST_CONNECT,
+    UDPC_ET_REQUEST_DISCONNECT,
+    UDPC_ET_CONNECTED,
+    UDPC_ET_DISCONNECTED,
+    UDPC_ET_GOOD_MODE,
+    UDPC_ET_BAD_MODE
+} UDPC_EventType;
+
+typedef struct {
+    UDPC_EventType type;
+    UDPC_ConnectionId conId;
+    int dropAllWithAddr;
+} UDPC_Event;
+
 /// port should be in native byte order (not network/big-endian)
 UDPC_ConnectionId UDPC_create_id(UDPC_IPV6_ADDR_TYPE addr, uint16_t port);
 
@@ -112,7 +128,7 @@ unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx);
 
 int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);
 
-int UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, bool dropAllWithAddr);
+void UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, int dropAllWithAddr);
 
 int UDPC_has_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
@@ -120,9 +136,19 @@ UDPC_ConnectionId* UDPC_get_list_connected(UDPC_HContext ctx, unsigned int *size
 
 void UDPC_free_list_connected(UDPC_ConnectionId *list);
 
+uint32_t UDPC_get_protocol_id(UDPC_HContext ctx);
+
 uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id);
 
+UDPC_LoggingType UDPC_get_logging_type(UDPC_HContext ctx);
+
 UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingType);
+
+int UPDC_get_receiving_events(UDPC_HContext ctx);
+
+int UDPC_set_receiving_events(UDPC_HContext ctx, int isReceivingEvents);
+
+UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining);
 
 UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);
 

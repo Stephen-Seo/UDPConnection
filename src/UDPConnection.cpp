@@ -163,6 +163,7 @@ UDPC::Context::Context(bool isThreaded) :
 _contextIdentifier(UDPC_CONTEXT_IDENTIFIER),
 flags(),
 isAcceptNewConnections(true),
+isReceivingEvents(false),
 protocolID(UDPC_DEFAULT_PROTOCOL_ID),
 #ifndef NDEBUG
 loggingType(UDPC_DEBUG),
@@ -225,6 +226,113 @@ void UDPC::Context::update_impl() {
     std::chrono::steady_clock::duration temp_dt_fs;
     lastUpdated = now;
 
+    // handle internalEvents
+    do {
+        auto optE = internalEvents.top_and_pop();
+        if(optE.has_value()) {
+            switch(optE.value().type) {
+            case UDPC_ET_REQUEST_CONNECT:
+            {
+                UDPC::ConnectionData newCon(
+                    false,
+                    this,
+                    optE.value().conId.addr,
+                    optE.value().conId.scope_id,
+                    optE.value().conId.port);
+                if(newCon.flags.test(5)) {
+                    UDPC_CHECK_LOG(this,
+                        UDPC_LoggingType::UDPC_ERROR,
+                        "Failed to init ConnectionData instance (libsodium "
+                        "init fail) while client establishing connection with ",
+                        UDPC_atostr((UDPC_HContext)this, optE.value().conId.addr),
+                        " port ",
+                        optE.value().conId.port);
+                    continue;
+                }
+                newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
+
+                if(conMap.find(optE.value().conId) == conMap.end()) {
+                    conMap.insert(std::make_pair(
+                        optE.value().conId,
+                        std::move(newCon)));
+                    auto addrConIter = addrConMap.find(optE.value().conId.addr);
+                    if(addrConIter == addrConMap.end()) {
+                        auto insertResult = addrConMap.insert(std::make_pair(
+                            optE.value().conId.addr,
+                            std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher>{}));
+                        assert(insertResult.second &&
+                            "new connection insert into addrConMap must not fail");
+                        addrConIter = insertResult.first;
+                    }
+                    addrConIter->second.insert(optE.value().conId);
+                    UDPC_CHECK_LOG(this,
+                        UDPC_LoggingType::UDPC_INFO,
+                        "Client initiating connection to ",
+                        UDPC_atostr((UDPC_HContext)this, optE.value().conId.addr),
+                        " port ",
+                        optE.value().conId.port,
+                        " ...");
+                } else {
+                    UDPC_CHECK_LOG(this,
+                        UDPC_LoggingType::UDPC_WARNING,
+                        "Client initiate connection, already connected to peer ",
+                        UDPC_atostr((UDPC_HContext)this, optE.value().conId.addr),
+                        " port ",
+                        optE.value().conId.port);
+                }
+            }
+                break;
+            case UDPC_ET_REQUEST_DISCONNECT:
+                if(optE.value().dropAllWithAddr != 0) {
+                    // drop all connections with same address
+                    auto addrConIter = addrConMap.find(optE.value().conId.addr);
+                    if(addrConIter != addrConMap.end()) {
+                        for(auto identIter = addrConIter->second.begin();
+                                identIter != addrConIter->second.end();
+                                ++identIter) {
+                            auto conIter = conMap.find(*identIter);
+                            assert(conIter != conMap.end() &&
+                                "conMap must have connection listed in addrConMap");
+                            if(conIter->second.flags.test(4)) {
+                                idMap.erase(conIter->second.id);
+                            }
+                            if(isReceivingEvents.load()) {
+                                externalEvents.push(UDPC_Event{
+                                    UDPC_ET_DISCONNECTED, conIter->first, false});
+                            }
+                            conMap.erase(conIter);
+                        }
+                        addrConMap.erase(addrConIter);
+                    }
+                } else {
+                    // drop only specific connection with addr and port
+                    auto iter = conMap.find(optE.value().conId);
+                    if(iter != conMap.end()) {
+                        if(iter->second.flags.test(4)) {
+                            idMap.erase(iter->second.id);
+                        }
+                        auto addrConIter = addrConMap.find(optE.value().conId.addr);
+                        if(addrConIter != addrConMap.end()) {
+                            addrConIter->second.erase(optE.value().conId);
+                            if(addrConIter->second.empty()) {
+                                addrConMap.erase(addrConIter);
+                            }
+                        }
+                        if(isReceivingEvents.load()) {
+                            externalEvents.push(UDPC_Event{
+                                UDPC_ET_DISCONNECTED, iter->first, false});
+                        }
+                        conMap.erase(iter);
+                    }
+                }
+                break;
+            default:
+                assert(!"internalEvents got invalid type");
+                break;
+            }
+        }
+    } while(!internalEvents.empty());
+
     {
         // check timed out, check good/bad mode with rtt, remove timed out
         std::vector<UDPC_ConnectionId> removed;
@@ -257,6 +365,10 @@ void UDPC::Context::update_impl() {
                     iter->second.toggleT *= 2;
                 }
                 iter->second.toggledTimer = std::chrono::steady_clock::duration::zero();
+                if(isReceivingEvents.load()) {
+                    externalEvents.push(UDPC_Event{
+                        UDPC_ET_BAD_MODE, iter->first, false});
+                }
             } else if(iter->second.flags.test(1)) {
                 // good mode, good rtt
                 if(iter->second.toggleTimer >= UDPC::TEN_SECONDS) {
@@ -279,6 +391,10 @@ void UDPC::Context::update_impl() {
                         ", port = ",
                         iter->second.port);
                     iter->second.flags.set(1);
+                    if(isReceivingEvents.load()) {
+                        externalEvents.push(UDPC_Event{
+                            UDPC_ET_GOOD_MODE, iter->first, false});
+                    }
                 }
             } else {
                 // bad mode, bad rtt
@@ -317,6 +433,10 @@ void UDPC::Context::update_impl() {
             if(cIter->second.flags.test(4)) {
                 idMap.erase(cIter->second.id);
             }
+            if(isReceivingEvents.load()) {
+                externalEvents.push(UDPC_Event{
+                    UDPC_ET_DISCONNECTED, *iter, false});
+            }
 
             conMap.erase(cIter);
         }
@@ -325,6 +445,7 @@ void UDPC::Context::update_impl() {
     // move queued in cSendPkts to existing connection's sendPkts
     {
         auto sendIter = cSendPkts.begin();
+        std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher> dropped;
         while(true) {
             auto next = sendIter.current();
             if(next) {
@@ -352,15 +473,18 @@ void UDPC::Context::update_impl() {
                         break;
                     }
                 } else {
-                    UDPC_CHECK_LOG(this,
-                        UDPC_LoggingType::UDPC_WARNING,
-                        "Dropped queued packet to ",
-                        UDPC_atostr(
-                            (UDPC_HContext)this,
-                            next.value().receiver.addr),
-                        ", port = ",
-                        next.value().receiver.port,
-                        " due to connection not existing");
+                    if(dropped.find(next.value().receiver) == dropped.end()) {
+                        UDPC_CHECK_LOG(this,
+                            UDPC_LoggingType::UDPC_WARNING,
+                            "Dropped queued packets to ",
+                            UDPC_atostr(
+                                (UDPC_HContext)this,
+                                next.value().receiver.addr),
+                            ", port = ",
+                            next.value().receiver.port,
+                            " due to connection not existing");
+                        dropped.insert(next.value().receiver);
+                    }
                     if(sendIter.remove()) {
                         continue;
                     } else {
@@ -749,7 +873,12 @@ void UDPC::Context::update_impl() {
                 addrConIter = insertResult.first;
             }
             addrConIter->second.insert(identifier);
-            // TODO trigger event server established connection with client
+            if(isReceivingEvents.load()) {
+                externalEvents.push(UDPC_Event{
+                    UDPC_ET_CONNECTED,
+                    identifier,
+                    false});
+            }
         } else if (flags.test(1)) {
             // is client
             auto iter = conMap.find(identifier);
@@ -768,7 +897,12 @@ void UDPC::Context::update_impl() {
                 ", port = ",
                 ntohs(receivedData.sin6_port),
                 ", got id = ", conID);
-            // TODO trigger event client established connection with server
+            if(isReceivingEvents.load()) {
+                externalEvents.push(UDPC_Event{
+                    UDPC_ET_CONNECTED,
+                    identifier,
+                    false});
+            }
         }
         return;
     }
@@ -1227,41 +1361,7 @@ void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connec
         return;
     }
 
-    UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_INFO, "client_initiate_connection: Got peer a = ",
-        UDPC_atostr((UDPC_HContext)ctx, connectionId.addr),
-        ", p = ", connectionId.port);
-
-    std::lock_guard<std::mutex> lock(c->mutex);
-
-    UDPC::ConnectionData newCon(false, c, connectionId.addr, connectionId.scope_id, connectionId.port);
-    if(newCon.flags.test(5)) {
-        UDPC_CHECK_LOG(c,
-            UDPC_LoggingType::UDPC_ERROR,
-            "Failed to init ConnectionData instance (libsodium init "
-            "fail) while client establishing connection with ",
-            UDPC_atostr((UDPC_HContext)c, connectionId.addr),
-            ", port = ",
-            connectionId.port);
-        return;
-    }
-    newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
-
-    if(c->conMap.find(connectionId) == c->conMap.end()) {
-        c->conMap.insert(std::make_pair(connectionId, std::move(newCon)));
-        auto addrConIter = c->addrConMap.find(connectionId.addr);
-        if(addrConIter == c->addrConMap.end()) {
-            auto insertResult = c->addrConMap.insert(std::make_pair(
-                    connectionId.addr,
-                    std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher>{}
-                ));
-            assert(insertResult.second);
-            addrConIter = insertResult.first;
-        }
-        addrConIter->second.insert(connectionId);
-        UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_INFO, "client_initiate_connection: Initiating connection...");
-    } else {
-        UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_ERROR, "client_initiate_connection: Already connected to peer");
-    }
+    c->internalEvents.push(UDPC_Event{UDPC_ET_REQUEST_CONNECT, connectionId, false});
 }
 
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
@@ -1304,49 +1404,14 @@ int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting) {
     return c->isAcceptNewConnections.exchange(isAccepting == 0 ? false : true);
 }
 
-int UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, bool dropAllWithAddr) {
+void UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, int dropAllWithAddr) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
-        return 0;
+        return;
     }
 
-    std::lock_guard<std::mutex> lock(c->mutex);
-
-    if(dropAllWithAddr) {
-        auto addrConIter = c->addrConMap.find(connectionId.addr);
-        if(addrConIter != c->addrConMap.end()) {
-            for(auto identIter = addrConIter->second.begin();
-                    identIter != addrConIter->second.end();
-                    ++identIter) {
-                auto conIter = c->conMap.find(*identIter);
-                assert(conIter != c->conMap.end());
-                if(conIter->second.flags.test(4)) {
-                    c->idMap.erase(conIter->second.id);
-                }
-                c->conMap.erase(conIter);
-            }
-            c->addrConMap.erase(addrConIter);
-            return 1;
-        }
-    } else {
-        auto iter = c->conMap.find(connectionId);
-        if(iter != c->conMap.end()) {
-            if(iter->second.flags.test(4)) {
-                c->idMap.erase(iter->second.id);
-            }
-            auto addrConIter = c->addrConMap.find(connectionId.addr);
-            if(addrConIter != c->addrConMap.end()) {
-                addrConIter->second.erase(connectionId);
-                if(addrConIter->second.empty()) {
-                    c->addrConMap.erase(addrConIter);
-                }
-            }
-            c->conMap.erase(iter);
-            return 1;
-        }
-    }
-
-    return 0;
+    c->internalEvents.push(UDPC_Event{UDPC_ET_REQUEST_DISCONNECT, connectionId, dropAllWithAddr});
+    return;
 }
 
 int UDPC_has_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
@@ -1390,13 +1455,30 @@ void UDPC_free_list_connected(UDPC_ConnectionId *list) {
     std::free(list);
 }
 
+uint32_t UDPC_get_protocol_id(UDPC_HContext ctx) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return 0;
+    }
+
+    return c->protocolID.load();
+}
+
 uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {
         return 0;
     }
-    std::lock_guard<std::mutex> lock(c->mutex);
+
     return c->protocolID.exchange(id);
+}
+
+UDPC_LoggingType UDPC_get_logging_type(UDPC_HContext ctx) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return UDPC_LoggingType::UDPC_SILENT;
+    }
+    return static_cast<UDPC_LoggingType>(c->loggingType.load());
 }
 
 UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingType) {
@@ -1405,6 +1487,38 @@ UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggi
         return UDPC_LoggingType::UDPC_SILENT;
     }
     return static_cast<UDPC_LoggingType>(c->loggingType.exchange(loggingType));
+}
+
+int UDPC_get_receiving_events(UDPC_HContext ctx) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return 0;
+    }
+
+    return c->isReceivingEvents.load() ? 1 : 0;
+}
+
+int UDPC_set_receiving_events(UDPC_HContext ctx, int isReceivingEvents) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return 0;
+    }
+
+    return c->isReceivingEvents.exchange(isReceivingEvents != 0);
+}
+
+UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return UDPC_Event{UDPC_ET_NONE, UDPC_create_id_anyaddr(0), 0};
+    }
+
+    auto optE = c->externalEvents.top_and_pop_and_rsize(remaining);
+    if(optE) {
+        return optE.value();
+    } else {
+        return UDPC_Event{UDPC_ET_NONE, UDPC_create_id_anyaddr(0), 0};
+    }
 }
 
 UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining) {
