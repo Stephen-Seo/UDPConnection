@@ -214,6 +214,8 @@ public:
     std::atomic_bool threadRunning;
     std::mutex mutex;
 
+    std::chrono::milliseconds threadedSleepTime;
+
 }; // struct Context
 
 Context *verifyContext(UDPC_HContext ctx);

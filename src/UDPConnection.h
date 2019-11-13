@@ -114,8 +114,13 @@ UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
 UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port);
 
 UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient);
-UDPC_HContext UDPC_init_threaded_update(UDPC_ConnectionId listenId,
-                                int isClient);
+UDPC_HContext UDPC_init_threaded_update(
+    UDPC_ConnectionId listenId,
+    int isClient);
+UDPC_HContext UDPC_init_threaded_update_ms(
+    UDPC_ConnectionId listenId,
+    int isClient,
+    int updateMS);
 
 void UDPC_destroy(UDPC_HContext ctx);
 

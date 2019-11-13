@@ -1205,7 +1205,7 @@ void UDPC::threadedUpdate(Context *ctx) {
         ctx->update_impl();
         ctx->mutex.unlock();
         nextNow = std::chrono::steady_clock::now();
-        std::this_thread::sleep_for(std::chrono::milliseconds(8) - (nextNow - now));
+        std::this_thread::sleep_for(ctx->threadedSleepTime - (nextNow - now));
     }
 }
 
@@ -1336,6 +1336,28 @@ UDPC_HContext UDPC_init_threaded_update(UDPC_ConnectionId listenId,
         return nullptr;
     }
     ctx->flags.set(0);
+    ctx->threadedSleepTime = std::chrono::milliseconds(8);
+    ctx->thread = std::thread(UDPC::threadedUpdate, ctx);
+
+    UDPC_CHECK_LOG(ctx, UDPC_LoggingType::UDPC_INFO, "Initialized threaded UDPC");
+
+    return (UDPC_HContext) ctx;
+}
+
+UDPC_HContext UDPC_init_threaded_update_ms(
+        UDPC_ConnectionId listenId, int isClient, int updateMS) {
+    UDPC::Context *ctx = (UDPC::Context *)UDPC_init(listenId, isClient);
+    if(!ctx) {
+        return nullptr;
+    }
+    ctx->flags.set(0);
+    if(updateMS < 4) {
+        ctx->threadedSleepTime = std::chrono::milliseconds(4);
+    } else if(updateMS > 333) {
+        ctx->threadedSleepTime = std::chrono::milliseconds(333);
+    } else {
+        ctx->threadedSleepTime = std::chrono::milliseconds(updateMS);
+    }
     ctx->thread = std::thread(UDPC::threadedUpdate, ctx);
 
     UDPC_CHECK_LOG(ctx, UDPC_LoggingType::UDPC_INFO, "Initialized threaded UDPC");
