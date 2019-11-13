@@ -1,16 +1,12 @@
-#include <cstring>
-#include <string>
-#include <cstdio>
-#include <thread>
-#include <chrono>
-#include <regex>
-#include <vector>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <threads.h>
 
 #include <UDPConnection.h>
 
 #define QUEUED_MAX_SIZE 32
-
-static const std::regex ipv6_regex_linkonly = std::regex(R"d(fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,})d");
+#define SEND_IDS_SIZE 64
 
 void usage() {
     puts("[-c | -s] - client or server (default server)");
@@ -24,6 +20,13 @@ void usage() {
     puts("-e - enable receiving events");
 }
 
+void sleep_seconds(unsigned int seconds) {
+    struct timespec duration;
+    duration.tv_sec = seconds;
+    duration.tv_nsec = 0;
+    thrd_sleep(&duration, NULL);
+}
+
 int main(int argc, char **argv) {
     --argc; ++argv;
     if(argc == 0) {
@@ -31,61 +34,61 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    bool isClient = false;
-    const char *listenAddr = nullptr;
-    const char *listenPort = nullptr;
-    const char *connectionAddr = nullptr;
-    const char *connectionPort = nullptr;
+    int isClient = 0;
+    const char *listenAddr = NULL;
+    const char *listenPort = NULL;
+    const char *connectionAddr = NULL;
+    const char *connectionPort = NULL;
     unsigned int tickLimit = 15;
-    bool noPayload = false;
-    UDPC_LoggingType logLevel = UDPC_LoggingType::UDPC_DEBUG;
-    bool isReceivingEvents = false;
+    int noPayload = 0;
+    UDPC_LoggingType logLevel = UDPC_DEBUG;
+    int isReceivingEvents = 0;
     while(argc > 0) {
-        if(std::strcmp(argv[0], "-c") == 0) {
-            isClient = true;
-        } else if(std::strcmp(argv[0], "-s") == 0) {
-            isClient = false;
-        } else if(std::strcmp(argv[0], "-ll") == 0 && argc > 1) {
+        if(strcmp(argv[0], "-c") == 0) {
+            isClient = 1;
+        } else if(strcmp(argv[0], "-s") == 0) {
+            isClient = 0;
+        } else if(strcmp(argv[0], "-ll") == 0 && argc > 1) {
             --argc; ++argv;
             listenAddr = argv[0];
-        } else if(std::strcmp(argv[0], "-lp") == 0 && argc > 1) {
+        } else if(strcmp(argv[0], "-lp") == 0 && argc > 1) {
             --argc; ++argv;
             listenPort = argv[0];
-        } else if(std::strcmp(argv[0], "-cl") == 0 && argc > 1) {
+        } else if(strcmp(argv[0], "-cl") == 0 && argc > 1) {
             --argc; ++argv;
             connectionAddr = argv[0];
-        } else if(std::strcmp(argv[0], "-cp") == 0 && argc > 1) {
+        } else if(strcmp(argv[0], "-cp") == 0 && argc > 1) {
             --argc; ++argv;
             connectionPort = argv[0];
-        } else if(std::strcmp(argv[0], "-t") == 0 && argc > 1) {
+        } else if(strcmp(argv[0], "-t") == 0 && argc > 1) {
             --argc; ++argv;
-            tickLimit = std::atoi(argv[0]);
+            tickLimit = atoi(argv[0]);
             printf("Set tick limit to %u\n", tickLimit);
-        } else if(std::strcmp(argv[0], "-n") == 0) {
-            noPayload = true;
+        } else if(strcmp(argv[0], "-n") == 0) {
+            noPayload = 1;
             puts("Disabling sending payload");
-        } else if(std::strcmp(argv[0], "-l") == 0) {
+        } else if(strcmp(argv[0], "-l") == 0) {
             --argc; ++argv;
-            if(std::strcmp(argv[0], "silent") == 0) {
-                logLevel = UDPC_LoggingType::UDPC_SILENT;
-            } else if(std::strcmp(argv[0], "error") == 0) {
-                logLevel = UDPC_LoggingType::UDPC_ERROR;
-            } else if(std::strcmp(argv[0], "warning") == 0) {
-                logLevel = UDPC_LoggingType::UDPC_WARNING;
-            } else if(std::strcmp(argv[0], "info") == 0) {
-                logLevel = UDPC_LoggingType::UDPC_INFO;
-            } else if(std::strcmp(argv[0], "verbose") == 0) {
-                logLevel = UDPC_LoggingType::UDPC_VERBOSE;
-            } else if(std::strcmp(argv[0], "debug") == 0) {
-                logLevel = UDPC_LoggingType::UDPC_DEBUG;
+            if(strcmp(argv[0], "silent") == 0) {
+                logLevel = UDPC_SILENT;
+            } else if(strcmp(argv[0], "error") == 0) {
+                logLevel = UDPC_ERROR;
+            } else if(strcmp(argv[0], "warning") == 0) {
+                logLevel = UDPC_WARNING;
+            } else if(strcmp(argv[0], "info") == 0) {
+                logLevel = UDPC_INFO;
+            } else if(strcmp(argv[0], "verbose") == 0) {
+                logLevel = UDPC_VERBOSE;
+            } else if(strcmp(argv[0], "debug") == 0) {
+                logLevel = UDPC_DEBUG;
             } else {
                 printf("ERROR: invalid argument \"%s\", expected "
                     "silent|error|warning|info|verbose|debug", argv[0]);
                 usage();
                 return 1;
             }
-        } else if(std::strcmp(argv[0], "-e") == 0) {
-            isReceivingEvents = true;
+        } else if(strcmp(argv[0], "-e") == 0) {
+            isReceivingEvents = 1;
             puts("Enabled isReceivingEvents");
         } else {
             printf("ERROR: invalid argument \"%s\"\n", argv[0]);
@@ -112,51 +115,48 @@ int main(int argc, char **argv) {
 
     UDPC_ConnectionId listenId;
     UDPC_ConnectionId connectionId;
-    if(std::strcmp(listenAddr, "any") == 0) {
-        listenId = UDPC_create_id_anyaddr(std::atoi(listenPort));
-    } else if(std::regex_match(listenAddr, ipv6_regex_linkonly)) {
-        uint32_t scope_id;
-        auto addr = UDPC_strtoa_link(listenAddr, &scope_id);
-        listenId = UDPC_create_id_full(addr, scope_id, std::atoi(listenPort));
+    if(strcmp(listenAddr, "any") == 0) {
+        listenId = UDPC_create_id_anyaddr(atoi(listenPort));
     } else {
-        listenId = UDPC_create_id(UDPC_strtoa(listenAddr), std::atoi(listenPort));
+        listenId = UDPC_create_id(UDPC_strtoa(listenAddr), atoi(listenPort));
     }
     if(isClient) {
-        if(std::regex_match(connectionAddr, ipv6_regex_linkonly)) {
-            uint32_t scope_id;
-            auto addr = UDPC_strtoa_link(connectionAddr, &scope_id);
-            connectionId = UDPC_create_id_full(addr, scope_id, std::atoi(connectionPort));
-        } else {
-            connectionId = UDPC_create_id(UDPC_strtoa(connectionAddr), std::atoi(connectionPort));
-        }
+        connectionId = UDPC_create_id(UDPC_strtoa(connectionAddr), atoi(connectionPort));
     }
-    auto context = UDPC_init_threaded_update(listenId, isClient ? 1 : 0);
+    UDPC_HContext context = UDPC_init_threaded_update(listenId, isClient);
     if(!context) {
         puts("ERROR: context is NULL");
         return 1;
     }
     UDPC_set_logging_type(context, logLevel);
-    UDPC_set_receiving_events(context, isReceivingEvents ? 1 : 0);
+    UDPC_set_receiving_events(context, isReceivingEvents);
     unsigned int tick = 0;
     unsigned int temp = 0;
     unsigned int temp2, temp3;
     unsigned long size;
-    UDPC_ConnectionId *list = nullptr;
-    std::vector<unsigned int> sendIds;
+    UDPC_ConnectionId *list = NULL;
+    unsigned int sendIds[SEND_IDS_SIZE];
+    unsigned int sendIdsSize = 0;
     UDPC_PacketInfo received;
     UDPC_Event event;
-    while(true) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+    while(1) {
+        sleep_seconds(1);
         if(isClient && UDPC_has_connection(context, connectionId) == 0) {
             UDPC_client_initiate_connection(context, connectionId);
         }
         if(!noPayload) {
             list = UDPC_get_list_connected(context, &temp);
             if(list) {
-                if(sendIds.size() < temp) {
-                    sendIds.resize(temp, 0);
-                } else if(sendIds.size() > temp) {
-                    sendIds.resize(temp);
+                if(sendIdsSize < temp) {
+                    while(sendIdsSize < temp) {
+                        if(sendIdsSize == SEND_IDS_SIZE) {
+                            temp = SEND_IDS_SIZE;
+                            break;
+                        }
+                        sendIds[sendIdsSize++] = 0;
+                    }
+                } else if(sendIdsSize > temp) {
+                    sendIdsSize = temp;
                 }
                 size = UDPC_get_queue_send_current_size(context);
                 temp2 = size < QUEUED_MAX_SIZE ? QUEUED_MAX_SIZE - size : 0;
