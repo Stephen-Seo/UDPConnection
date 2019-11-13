@@ -199,3 +199,39 @@ TEST(UDPC, strtoa) {
     };
     EXPECT_EQ(UDPC_strtoa("10.1.2.3"), addr);
 }
+
+TEST(UDPC, create_id_easy) {
+    UDPC_ConnectionId conId;
+
+    // not link local
+    conId = UDPC_create_id_easy("::FFFF:7F00:1", 301);
+    for(unsigned int i = 0; i < 10; ++i) {
+        EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[i], 0);
+    }
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[10], 0xFF);
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[11], 0xFF);
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[12], 0x7F);
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[13], 0);
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[14], 0);
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[15], 0x1);
+
+    EXPECT_EQ(conId.scope_id, 0);
+    EXPECT_EQ(conId.port, 301);
+
+    // link local
+    conId = UDPC_create_id_easy("fe80::1234:5678:9%3", 123);
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[0], 0xFE);
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[1], 0x80);
+    for(unsigned int i = 2; i < 10; ++i) {
+        EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[i], 0);
+    }
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[10], 0x12);
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[11], 0x34);
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[12], 0x56);
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[13], 0x78);
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[14], 0);
+    EXPECT_EQ(UDPC_IPV6_ADDR_SUB(conId.addr)[15], 0x9);
+
+    EXPECT_EQ(conId.scope_id, 3);
+    EXPECT_EQ(conId.port, 123);
+}

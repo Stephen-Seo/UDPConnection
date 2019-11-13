@@ -118,10 +118,10 @@ int main(int argc, char **argv) {
     if(strcmp(listenAddr, "any") == 0) {
         listenId = UDPC_create_id_anyaddr(atoi(listenPort));
     } else {
-        listenId = UDPC_create_id(UDPC_strtoa(listenAddr), atoi(listenPort));
+        listenId = UDPC_create_id_easy(listenAddr, atoi(listenPort));
     }
     if(isClient) {
-        connectionId = UDPC_create_id(UDPC_strtoa(connectionAddr), atoi(connectionPort));
+        connectionId = UDPC_create_id_easy(connectionAddr, atoi(connectionPort));
     }
     UDPC_HContext context = UDPC_init_threaded_update(listenId, isClient);
     if(!context) {

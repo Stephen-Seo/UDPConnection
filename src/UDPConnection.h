@@ -111,6 +111,8 @@ UDPC_ConnectionId UDPC_create_id_full(UDPC_IPV6_ADDR_TYPE addr, uint32_t scope_i
 
 UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
 
+UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port);
+
 UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient);
 UDPC_HContext UDPC_init_threaded_update(UDPC_ConnectionId listenId,
                                 int isClient);
