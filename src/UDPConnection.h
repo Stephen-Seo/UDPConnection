@@ -54,6 +54,12 @@
 #define UDPC_PACKET_MAX_SIZE 8192
 #define UDPC_DEFAULT_PROTOCOL_ID 1357924680 // 0x50f04948
 
+#ifndef UDPC_LIBSODIUM_ENABLED
+# define crypto_sign_PUBLICKEYBYTES 1
+# define crypto_sign_SECRETKEYBYTES 1
+# define crypto_sign_BYTES 1
+#endif
+
 #ifdef __cplusplus
 #include <cstdint>
 extern "C" {
@@ -101,7 +107,10 @@ typedef enum {
 typedef struct {
     UDPC_EventType type;
     UDPC_ConnectionId conId;
-    int dropAllWithAddr;
+    union Value {
+        int dropAllWithAddr;
+        int enableLibSodium;
+    } v;
 } UDPC_Event;
 
 /// port should be in native byte order (not network/big-endian)
@@ -113,20 +122,22 @@ UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
 
 UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port);
 
-UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient);
+UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLibsodium);
 UDPC_HContext UDPC_init_threaded_update(
     UDPC_ConnectionId listenId,
-    int isClient);
+    int isClient,
+    int isUsingLibsodium);
 UDPC_HContext UDPC_init_threaded_update_ms(
     UDPC_ConnectionId listenId,
     int isClient,
-    int updateMS);
+    int updateMS,
+    int isUsingLibsodium);
 
 void UDPC_destroy(UDPC_HContext ctx);
 
 void UDPC_update(UDPC_HContext ctx);
 
-void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
+void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, int enableLibSodium);
 
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
                      int isChecked, void *data, uint32_t size);

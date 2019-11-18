@@ -14,6 +14,8 @@
 #include <iomanip>
 #include <regex>
 #include <cstdlib>
+#include <ctime>
+#include <iomanip>
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
 #include <netioapi.h>
@@ -76,7 +78,7 @@ bool operator ==(const UDPC_IPV6_ADDR_TYPE& a, const UDPC_IPV6_ADDR_TYPE& b) {
     return true;
 }
 
-UDPC::ConnectionData::ConnectionData() :
+UDPC::ConnectionData::ConnectionData(bool isUsingLibsodium) :
 flags(),
 id(0),
 lseq(0),
@@ -98,12 +100,24 @@ rtt(std::chrono::steady_clock::duration::zero())
     flags.set(0);
     flags.reset(1);
 
-    if(sodium_init() >= 0) {
-        crypto_sign_keypair(pk, sk);
-        flags.reset(5);
+#ifdef UDPC_LIBSODIUM_ENABLED
+    if(isUsingLibsodium) {
+        if(sodium_init() >= 0) {
+            crypto_sign_keypair(pk, sk);
+            flags.reset(5);
+            flags.set(6);
+        } else {
+            flags.set(5);
+            flags.reset(6);
+        }
     } else {
-        flags.set(5);
+        flags.reset(5);
+        flags.reset(6);
     }
+#else
+    flags.reset(5);
+    flags.reset(6);
+#endif
 }
 
 UDPC::ConnectionData::ConnectionData(
@@ -111,7 +125,8 @@ UDPC::ConnectionData::ConnectionData(
         Context *ctx,
         UDPC_IPV6_ADDR_TYPE addr,
         uint32_t scope_id,
-        uint16_t port) :
+        uint16_t port,
+        bool isUsingLibsodium) :
 flags(),
 id(0),
 lseq(0),
@@ -139,12 +154,24 @@ rtt(std::chrono::steady_clock::duration::zero())
         lseq = 1;
     }
 
-    if(sodium_init() >= 0) {
-        crypto_sign_keypair(pk, sk);
-        flags.reset(5);
+#ifdef UDPC_LIBSODIUM_ENABLED
+    if(isUsingLibsodium) {
+        if(sodium_init() >= 0) {
+            crypto_sign_keypair(pk, sk);
+            flags.reset(5);
+            flags.set(6);
+        } else {
+            flags.set(5);
+            flags.reset(6);
+        }
     } else {
-        flags.set(5);
+        flags.reset(5);
+        flags.reset(6);
     }
+#else
+    flags.reset(5);
+    flags.reset(6);
+#endif
 }
 
 void UDPC::ConnectionData::cleanupSentPkts() {
@@ -238,7 +265,12 @@ void UDPC::Context::update_impl() {
                     this,
                     optE.value().conId.addr,
                     optE.value().conId.scope_id,
-                    optE.value().conId.port);
+                    optE.value().conId.port,
+#ifdef UDPC_LIBSODIUM_ENABLED
+                    flags.test(2) && optE.value().v.enableLibSodium != 0);
+#else
+                    false);
+#endif
                 if(newCon.flags.test(5)) {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_ERROR,
@@ -250,6 +282,15 @@ void UDPC::Context::update_impl() {
                     continue;
                 }
                 newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
+                if(flags.test(2) && newCon.flags.test(6)) {
+                    std::stringstream ss;
+                    auto timeT = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+                    ss << std::put_time(std::gmtime(&timeT), "%c %Z");
+                    auto timeString = ss.str();
+                    newCon.verifyMessage = std::make_unique<char[]>(4 + timeString.size());
+                    *((uint32_t*)newCon.verifyMessage.get()) = timeString.size();
+                    std::memcpy(newCon.verifyMessage.get() + 4, timeString.c_str(), timeString.size());
+                }
 
                 if(conMap.find(optE.value().conId) == conMap.end()) {
                     conMap.insert(std::make_pair(
@@ -283,7 +324,7 @@ void UDPC::Context::update_impl() {
             }
                 break;
             case UDPC_ET_REQUEST_DISCONNECT:
-                if(optE.value().dropAllWithAddr != 0) {
+                if(optE.value().v.dropAllWithAddr != 0) {
                     // drop all connections with same address
                     auto addrConIter = addrConMap.find(optE.value().conId.addr);
                     if(addrConIter != addrConMap.end()) {
@@ -513,8 +554,44 @@ void UDPC::Context::update_impl() {
                 }
                 iter->second.sent = now;
 
-                std::unique_ptr<char[]> buf = std::make_unique<char[]>(
-                    UDPC_CON_HEADER_SIZE);
+                std::unique_ptr<char[]> buf;
+                unsigned int sendSize = 0;
+                if(flags.test(2) && iter->second.flags.test(6)) {
+#ifdef UDPC_LIBSODIUM_ENABLED
+                    assert(iter->second.verifyMessage
+                        && "Verify message should already exist");
+                    sendSize = UDPC_CCL_HEADER_SIZE + *((uint32_t*)iter->second.verifyMessage.get());
+                    buf = std::make_unique<char[]>(sendSize);
+                    // set type 1
+                    *((uint32_t*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = htonl(1);
+                    // set public key
+                    std::memcpy(
+                        buf.get() + UDPC_MIN_HEADER_SIZE + 4,
+                        iter->second.pk,
+                        crypto_sign_PUBLICKEYBYTES);
+                    // set verify message size
+                    uint32_t temp = htonl(*((uint32_t*)iter->second.verifyMessage.get()));
+                    std::memcpy(
+                        buf.get() + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES,
+                        &temp,
+                        4);
+                    // set verify message
+                    std::memcpy(
+                        buf.get() + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES + 4,
+                        iter->second.verifyMessage.get() + 4,
+                        *((uint32_t*)iter->second.verifyMessage.get()));
+                    // TODO impl presetting a known pubkey of peer
+#else
+                    assert(!"libsodium is disabled, invalid state");
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                        "libsodium is disabled, cannot send packet");
+                    continue;
+#endif
+                } else {
+                    sendSize = UDPC_CON_HEADER_SIZE;
+                    buf = std::make_unique<char[]>(sendSize);
+                    *((uint32_t*)(buf.get() + 20)) = 0;
+                }
                 UDPC::preparePacket(
                     buf.get(),
                     protocolID,
@@ -522,9 +599,7 @@ void UDPC::Context::update_impl() {
                     0,
                     0xFFFFFFFF,
                     nullptr,
-                    0x1,
-                    iter->second.pk,
-                    iter->second.sk);
+                    0x1);
 
                 UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
                 destinationInfo.sin6_family = AF_INET6;
@@ -535,11 +610,11 @@ void UDPC::Context::update_impl() {
                 long int sentBytes = sendto(
                     socketHandle,
                     buf.get(),
-                    UDPC_CON_HEADER_SIZE,
+                    sendSize,
                     0,
                     (struct sockaddr*) &destinationInfo,
                     sizeof(UDPC_IPV6_SOCKADDR_TYPE));
-                if(sentBytes != UDPC_CON_HEADER_SIZE) {
+                if(sentBytes != sendSize) {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_ERROR,
                         "Failed to send packet to initiate connection to ",
@@ -550,16 +625,45 @@ void UDPC::Context::update_impl() {
                 } else {
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_INFO, "Sent initiate connection to ",
                         UDPC_atostr((UDPC_HContext)this, iter->first.addr),
-                        ", port = ",
-                        iter->second.port);
+                        ", port = ", iter->second.port,
+                        flags.test(2) && iter->second.flags.test(6) ?
+                            ", libsodium enabled" : ", libsodium disabled");
                 }
             } else {
                 // is server, initiate connection to client
                 iter->second.flags.reset(3);
                 iter->second.sent = now;
 
-                std::unique_ptr<char[]> buf = std::make_unique<char[]>(
-                    UDPC_CON_HEADER_SIZE);
+                std::unique_ptr<char[]> buf;
+                unsigned int sendSize = 0;
+                if(flags.test(2) && iter->second.flags.test(6)) {
+#ifdef UDPC_LIBSODIUM_ENABLED
+                    sendSize = UDPC_CSR_HEADER_SIZE;
+                    buf = std::make_unique<char[]>(sendSize);
+                    // set type
+                    *((uint32_t*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = htonl(2);
+                    // set pubkey
+                    std::memcpy(buf.get() + UDPC_MIN_HEADER_SIZE + 4,
+                        iter->second.pk,
+                        crypto_sign_PUBLICKEYBYTES);
+                    // set detached sig
+                    assert(iter->second.verifyMessage &&
+                        "Detached sig in verifyMessage must exist");
+                    std::memcpy(
+                        buf.get() + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES,
+                        iter->second.verifyMessage.get(),
+                        crypto_sign_BYTES);
+#else
+                    assert(!"libsodium disabled, invalid state");
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                        "libsodium is disabled, cannot send packet");
+                    continue;
+#endif
+                } else {
+                    sendSize = UDPC_CON_HEADER_SIZE;
+                    buf = std::make_unique<char[]>(sendSize);
+                    *((uint32_t*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = 0;
+                }
                 UDPC::preparePacket(
                     buf.get(),
                     protocolID,
@@ -567,9 +671,7 @@ void UDPC::Context::update_impl() {
                     iter->second.rseq,
                     iter->second.ack,
                     &iter->second.lseq,
-                    0x1,
-                    iter->second.pk,
-                    iter->second.sk);
+                    0x1);
 
                 UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
                 destinationInfo.sin6_family = AF_INET6;
@@ -580,11 +682,11 @@ void UDPC::Context::update_impl() {
                 long int sentBytes = sendto(
                     socketHandle,
                     buf.get(),
-                    UDPC_CON_HEADER_SIZE,
+                    sendSize,
                     0,
                     (struct sockaddr*) &destinationInfo,
                     sizeof(UDPC_IPV6_SOCKADDR_TYPE));
-                if(sentBytes != UDPC_CON_HEADER_SIZE) {
+                if(sentBytes != sendSize) {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_ERROR,
                         "Failed to send packet to initiate connection to ",
@@ -593,6 +695,10 @@ void UDPC::Context::update_impl() {
                         iter->second.port);
                     continue;
                 }
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
+                    "Sent init pkt to client ",
+                    UDPC_atostr((UDPC_HContext)this, destinationInfo.sin6_addr),
+                    ", port ", iter->second.port);
             }
             continue;
         }
@@ -605,8 +711,17 @@ void UDPC::Context::update_impl() {
                 continue;
             }
 
-            std::unique_ptr<char[]> buf = std::make_unique<char[]>(
-                UDPC_FULL_HEADER_SIZE);
+            unsigned int sendSize = 0;
+            std::unique_ptr<char[]> buf;
+            if(flags.test(2) && iter->second.flags.test(6)) {
+                sendSize = UDPC_LSFULL_HEADER_SIZE;
+                buf = std::make_unique<char[]>(sendSize);
+                *((unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = 1;
+            } else {
+                sendSize = UDPC_NSFULL_HEADER_SIZE;
+                buf = std::make_unique<char[]>(sendSize);
+                *((unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = 0;
+            }
             UDPC::preparePacket(
                 buf.get(),
                 protocolID,
@@ -614,9 +729,27 @@ void UDPC::Context::update_impl() {
                 iter->second.rseq,
                 iter->second.ack,
                 &iter->second.lseq,
-                0,
-                iter->second.pk,
-                iter->second.sk);
+                0);
+            if(flags.test(2) && iter->second.flags.test(6)) {
+#ifdef UDPC_LIBSODIUM_ENABLED
+                if(crypto_sign_detached(
+                    (unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE + 1), nullptr,
+                    (unsigned char*)buf.get(), UDPC_MIN_HEADER_SIZE,
+                    iter->second.sk) != 0) {
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                        "Failed to sign packet for peer ",
+                        UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                        ", port ",
+                        iter->second.port);
+                    continue;
+                }
+#else
+                assert(!"libsodium disabled, invalid state");
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                    "libsodium is disabled, cannot send packet");
+                continue;
+#endif
+            }
 
             UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
             destinationInfo.sin6_family = AF_INET6;
@@ -630,11 +763,11 @@ void UDPC::Context::update_impl() {
             long int sentBytes = sendto(
                 socketHandle,
                 buf.get(),
-                UDPC_FULL_HEADER_SIZE,
+                sendSize,
                 0,
                 (struct sockaddr*) &destinationInfo,
                 sizeof(UDPC_IPV6_SOCKADDR_TYPE));
-            if(sentBytes != UDPC_FULL_HEADER_SIZE) {
+            if(sentBytes != sendSize) {
                 UDPC_CHECK_LOG(this,
                     UDPC_LoggingType::UDPC_ERROR,
                     "Failed to send heartbeat packet to ",
@@ -651,6 +784,7 @@ void UDPC::Context::update_impl() {
             pInfo.sender.port = ntohs(socketInfo.sin6_port);
             pInfo.receiver.port = iter->second.port;
             *((uint32_t*)(pInfo.data + 8)) = htonl(iter->second.lseq - 1);
+            pInfo.data[UDPC_MIN_HEADER_SIZE] = flags.test(2) && iter->second.flags.test(6) ? 1 : 0;
 
             iter->second.sentPkts.push_back(std::move(pInfo));
             iter->second.cleanupSentPkts();
@@ -671,7 +805,19 @@ void UDPC::Context::update_impl() {
                 pInfo = iter->second.sendPkts.front();
                 iter->second.sendPkts.pop_front();
             }
-            std::unique_ptr<char[]> buf = std::make_unique<char[]>(UDPC_FULL_HEADER_SIZE + pInfo.dataSize);
+
+            std::unique_ptr<char[]> buf;
+            unsigned int sendSize = 0;
+            if(flags.test(2) && iter->second.flags.test(6)) {
+                sendSize = UDPC_LSFULL_HEADER_SIZE + pInfo.dataSize;
+                buf = std::make_unique<char[]>(sendSize);
+                *((unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = 1;
+            } else {
+                sendSize = UDPC_NSFULL_HEADER_SIZE + pInfo.dataSize;
+                buf = std::make_unique<char[]>(sendSize);
+                *((unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = 0;
+            }
+
             UDPC::preparePacket(
                 buf.get(),
                 protocolID,
@@ -679,10 +825,32 @@ void UDPC::Context::update_impl() {
                 iter->second.rseq,
                 iter->second.ack,
                 &iter->second.lseq,
-                (pInfo.flags & 0x4) | (isResending ? 0x8 : 0),
-                iter->second.pk,
-                iter->second.sk);
-            std::memcpy(buf.get() + UDPC_FULL_HEADER_SIZE, pInfo.data, pInfo.dataSize);
+                (pInfo.flags & 0x4) | (isResending ? 0x8 : 0));
+
+            if(flags.test(2) && iter->second.flags.test(6)) {
+#ifdef UDPC_LIBSODIUM_ENABLED
+                if(crypto_sign_detached(
+                    (unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE + 1), nullptr,
+                    (unsigned char*)buf.get(), UDPC_MIN_HEADER_SIZE,
+                    iter->second.sk) != 0) {
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                        "Failed to sign packet for peer ",
+                        UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                        ", port ",
+                        iter->second.port);
+                    continue;
+                }
+#else
+                assert(!"libsodium disabled, invalid state");
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                    "libsodium is disabled, cannot send packet");
+                continue;
+#endif
+                std::memcpy(buf.get() + UDPC_LSFULL_HEADER_SIZE, pInfo.data, pInfo.dataSize);
+            } else {
+                std::memcpy(buf.get() + UDPC_NSFULL_HEADER_SIZE, pInfo.data, pInfo.dataSize);
+            }
+
 
             UDPC_IPV6_SOCKADDR_TYPE destinationInfo;
             destinationInfo.sin6_family = AF_INET6;
@@ -696,11 +864,11 @@ void UDPC::Context::update_impl() {
             long int sentBytes = sendto(
                 socketHandle,
                 buf.get(),
-                pInfo.dataSize + UDPC_FULL_HEADER_SIZE,
+                sendSize,
                 0,
                 (struct sockaddr*) &destinationInfo,
                 sizeof(UDPC_IPV6_SOCKADDR_TYPE));
-            if(sentBytes != UDPC_FULL_HEADER_SIZE + pInfo.dataSize) {
+            if(sentBytes != sendSize) {
                 UDPC_CHECK_LOG(this,
                     UDPC_LoggingType::UDPC_ERROR,
                     "Failed to send packet to ",
@@ -713,9 +881,9 @@ void UDPC::Context::update_impl() {
             if((pInfo.flags & 0x4) == 0) {
                 // is check-received, store data in case packet gets lost
                 UDPC_PacketInfo sentPInfo = UDPC::get_empty_pinfo();
-                std::memcpy(sentPInfo.data, buf.get(), UDPC_FULL_HEADER_SIZE + pInfo.dataSize);
+                std::memcpy(sentPInfo.data, buf.get(), sendSize);
                 sentPInfo.flags = 0;
-                sentPInfo.dataSize = UDPC_FULL_HEADER_SIZE + pInfo.dataSize;
+                sentPInfo.dataSize = sendSize;
                 sentPInfo.sender.addr = in6addr_loopback;
                 sentPInfo.receiver.addr = iter->first.addr;
                 sentPInfo.sender.port = ntohs(socketInfo.sin6_port);
@@ -809,7 +977,7 @@ void UDPC::Context::update_impl() {
     bool isResending = conID & UDPC_ID_RESENDING;
     conID &= 0x0FFFFFFF;
 
-    if(isConnect && bytes != UDPC_CON_HEADER_SIZE) {
+    if(isConnect && bytes < (int)(UDPC_CON_HEADER_SIZE)) {
         // invalid packet size
         UDPC_CHECK_LOG(this,
             UDPC_LoggingType::UDPC_VERBOSE,
@@ -819,7 +987,7 @@ void UDPC::Context::update_impl() {
             ntohs(receivedData.sin6_port),
             ", ignoring");
         return;
-    } else if (!isConnect && bytes < (int)UDPC_FULL_HEADER_SIZE) {
+    } else if (!isConnect && bytes < (int)UDPC_NSFULL_HEADER_SIZE) {
         // packet is too small
         UDPC_CHECK_LOG(this,
             UDPC_LoggingType::UDPC_VERBOSE,
@@ -833,12 +1001,56 @@ void UDPC::Context::update_impl() {
 
     UDPC_ConnectionId identifier{receivedData.sin6_addr, receivedData.sin6_scope_id, ntohs(receivedData.sin6_port)};
 
-    if(isConnect && isAcceptNewConnections.load()) {
+    uint32_t pktType = 0;
+    if(isConnect) {
+        pktType = ntohl(*((uint32_t*)(recvBuf + UDPC_MIN_HEADER_SIZE)));
+        switch(pktType) {
+        case 0: // client/server connect with libsodium disabled
+            break;
+        case 1: // client connect with libsodium enabled
+            break;
+        case 2: // server connect with libsodium enabled
+            break;
+        default:
+            UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                "Got invalid connect pktType from ",
+                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                ", port ", ntohs(receivedData.sin6_port));
+            return;
+        }
+    } else {
+        pktType = ((unsigned char*)recvBuf)[UDPC_MIN_HEADER_SIZE];
+        switch(pktType) {
+        case 0: // not signed
+            break;
+        case 1: // signed
+            break;
+        default:
+            UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                "Got invalid pktType from ",
+                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                ", port ", ntohs(receivedData.sin6_port));
+            return;
+        }
+    }
+
+    if(isConnect) {
         // is connect packet and is accepting new connections
         if(!flags.test(1)
-                && conMap.find(identifier) == conMap.end()) {
+                && conMap.find(identifier) == conMap.end()
+                && isAcceptNewConnections.load()) {
             // is receiving as server, connection did not already exist
-            UDPC::ConnectionData newConnection(true, this, receivedData.sin6_addr, receivedData.sin6_scope_id, ntohs(receivedData.sin6_port));
+            UDPC::ConnectionData newConnection(
+                true,
+                this,
+                receivedData.sin6_addr,
+                receivedData.sin6_scope_id,
+                ntohs(receivedData.sin6_port),
+#ifdef UDPC_LIBSODIUM_ENABLED
+                pktType == 1 && flags.test(2));
+#else
+                false);
+#endif
             if(newConnection.flags.test(5)) {
                 UDPC_CHECK_LOG(this,
                     UDPC_LoggingType::UDPC_ERROR,
@@ -849,15 +1061,34 @@ void UDPC::Context::update_impl() {
                     ntohs(receivedData.sin6_port));
                 return;
             }
-            std::memcpy(newConnection.peer_pk, recvBuf + UDPC_MIN_HEADER_SIZE,
-                crypto_sign_PUBLICKEYBYTES);
+            if(pktType == 1 && flags.test(2)) {
+#ifdef UDPC_LIBSODIUM_ENABLED
+                std::memcpy(
+                    newConnection.peer_pk,
+                    recvBuf + UDPC_MIN_HEADER_SIZE + 4,
+                    crypto_sign_PUBLICKEYBYTES);
+                newConnection.verifyMessage = std::make_unique<char[]>(crypto_sign_BYTES);
+                crypto_sign_detached(
+                    (unsigned char*)newConnection.verifyMessage.get(),
+                    nullptr,
+                    (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES + 4),
+                    ntohl(*((uint32_t*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES))), newConnection.sk);
+#else
+                assert(!"libsodium disabled, invalid state");
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                    "libsodium is disabled, cannot process received packet");
+                return;
+#endif
+            }
             UDPC_CHECK_LOG(this,
                 UDPC_LoggingType::UDPC_INFO,
                 "Establishing connection with client ",
                 UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                 ", port = ",
                 ntohs(receivedData.sin6_port),
-                ", giving client id = ", newConnection.id);
+                ", giving client id = ", newConnection.id,
+                pktType == 1 && flags.test(2) ?
+                    ", libsodium enabled" : ", libsodium disabled");
 
             idMap.insert(std::make_pair(newConnection.id, identifier));
             conMap.insert(std::make_pair(identifier, std::move(newConnection)));
@@ -883,20 +1114,50 @@ void UDPC::Context::update_impl() {
             // is client
             auto iter = conMap.find(identifier);
             if(iter == conMap.end() || !iter->second.flags.test(3)) {
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
+                    "client dropped pkt from ",
+                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    ", port ", ntohs(receivedData.sin6_port));
                 return;
             }
+
+            if(pktType == 2 && flags.test(2) && iter->second.flags.test(6)) {
+#ifdef UDPC_LIBSODIUM_ENABLED
+                std::memcpy(iter->second.peer_pk, recvBuf + UDPC_MIN_HEADER_SIZE + 4,
+                    crypto_sign_PUBLICKEYBYTES);
+                if(crypto_sign_verify_detached(
+                    (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES),
+                    (unsigned char*)(iter->second.verifyMessage.get() + 4),
+                    *((uint32_t*)(iter->second.verifyMessage.get())),
+                    iter->second.peer_pk) != 0) {
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                        "Failed to verify peer (server) ",
+                        UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                        ", port = ",
+                        ntohs(receivedData.sin6_port));
+                    return;
+                }
+#else
+                assert(!"libsodium disabled, invalid state");
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                    "libsodium is disabled, cannot process received packet");
+                return;
+#endif
+            } else if(pktType == 0 && iter->second.flags.test(6)) {
+                iter->second.flags.reset(6);
+            }
+
             iter->second.flags.reset(3);
             iter->second.id = conID;
             iter->second.flags.set(4);
-            std::memcpy(iter->second.peer_pk, recvBuf + UDPC_MIN_HEADER_SIZE,
-                crypto_sign_PUBLICKEYBYTES);
-            UDPC_CHECK_LOG(this,
-                UDPC_LoggingType::UDPC_INFO,
+            UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_INFO,
                 "Established connection with server ",
                 UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                 ", port = ",
                 ntohs(receivedData.sin6_port),
-                ", got id = ", conID);
+                ", got id = ", conID,
+                flags.test(2) && iter->second.flags.test(6) ?
+                    ", libsodium enabled" : ", libsodium disabled");
             if(isReceivingEvents.load()) {
                 externalEvents.push(UDPC_Event{
                     UDPC_ET_CONNECTED,
@@ -915,21 +1176,30 @@ void UDPC::Context::update_impl() {
         iter->second.flags.set(0);
     }
 
-    // verify signature of header
-    if(crypto_sign_verify_detached(
-        (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE),
-        (unsigned char*)recvBuf,
-        UDPC_MIN_HEADER_SIZE,
-        iter->second.peer_pk) != 0) {
-        UDPC_CHECK_LOG(
-            this,
-            UDPC_LoggingType::UDPC_INFO,
-            "Failed to verify received packet from",
-            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-            ", port = ",
-            ntohs(receivedData.sin6_port),
-            ", ignoring");
+    if(pktType == 1) {
+#ifdef UDPC_LIBSODIUM_ENABLED
+        // verify signature of header
+        if(crypto_sign_verify_detached(
+            (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 1),
+            (unsigned char*)recvBuf,
+            UDPC_MIN_HEADER_SIZE,
+            iter->second.peer_pk) != 0) {
+            UDPC_CHECK_LOG(
+                this,
+                UDPC_LoggingType::UDPC_INFO,
+                "Failed to verify received packet from",
+                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                ", port = ",
+                ntohs(receivedData.sin6_port),
+                ", ignoring");
+            return;
+        }
+#else
+        assert(!"libsodium disabled, invalid state");
+        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+            "libsodium is disabled, cannot process received packet");
         return;
+#endif
     }
 
     // packet is valid
@@ -991,7 +1261,9 @@ void UDPC::Context::update_impl() {
                         && "Every entry in sentPkts must have a corresponding entry in sentInfoMap");
                 auto duration = now - sentInfoIter->second->sentTime;
                 if(duration > UDPC::PACKET_TIMEOUT_TIME) {
-                    if(sentIter->dataSize <= UDPC_FULL_HEADER_SIZE) {
+                    bool pktSigned = sentIter->data[UDPC_MIN_HEADER_SIZE] == 1;
+                    if((pktSigned && sentIter->dataSize <= UDPC_LSFULL_HEADER_SIZE)
+                        || (!pktSigned && sentIter->dataSize <= UDPC_NSFULL_HEADER_SIZE)) {
                         UDPC_CHECK_LOG(this,
                             UDPC_LoggingType::UDPC_VERBOSE,
                             "Timed out packet has no payload (probably "
@@ -1001,8 +1273,17 @@ void UDPC::Context::update_impl() {
                     }
 
                     UDPC_PacketInfo resendingData = UDPC::get_empty_pinfo();
-                    resendingData.dataSize = sentIter->dataSize - UDPC_FULL_HEADER_SIZE;
-                    std::memcpy(resendingData.data, sentIter->data + UDPC_FULL_HEADER_SIZE, resendingData.dataSize);
+                    if(pktSigned) {
+                        resendingData.dataSize = sentIter->dataSize - UDPC_LSFULL_HEADER_SIZE;
+                        std::memcpy(resendingData.data,
+                            sentIter->data + UDPC_LSFULL_HEADER_SIZE,
+                            resendingData.dataSize);
+                    } else {
+                        resendingData.dataSize = sentIter->dataSize - UDPC_NSFULL_HEADER_SIZE;
+                        std::memcpy(resendingData.data,
+                            sentIter->data + UDPC_NSFULL_HEADER_SIZE,
+                            resendingData.dataSize);
+                    }
                     resendingData.flags = 0;
                     iter->second.priorityPkts.push_back(resendingData);
                 }
@@ -1068,7 +1349,8 @@ void UDPC::Context::update_impl() {
             "Received packet is out of order");
     }
 
-    if(bytes > (int)UDPC_FULL_HEADER_SIZE) {
+    if((pktType == 0 && bytes > (int)UDPC_NSFULL_HEADER_SIZE)
+            | (pktType == 1 && bytes > (int)UDPC_LSFULL_HEADER_SIZE)) {
         UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
         std::memcpy(recPktInfo.data, recvBuf, bytes);
         recPktInfo.dataSize = bytes;
@@ -1083,7 +1365,7 @@ void UDPC::Context::update_impl() {
         recPktInfo.receiver.port = ntohs(socketInfo.sin6_port);
 
         receivedPkts.push(recPktInfo);
-    } else if(bytes == UDPC_FULL_HEADER_SIZE) {
+    } else {
         UDPC_CHECK_LOG(this,
             UDPC_LoggingType::UDPC_VERBOSE,
             "Received packet has no payload (probably heartbeat packet)");
@@ -1118,8 +1400,7 @@ bool UDPC::isBigEndian() {
 
 void UDPC::preparePacket(
         char *data, uint32_t protocolID, uint32_t conID, uint32_t rseq,
-        uint32_t ack, uint32_t *seqID, int flags,
-        const unsigned char *pk, const unsigned char *sk) {
+        uint32_t ack, uint32_t *seqID, int flags) {
     uint32_t temp;
 
     temp = htonl(protocolID);
@@ -1142,17 +1423,6 @@ void UDPC::preparePacket(
     std::memcpy(data + 12, &temp, 4);
     temp = htonl(ack);
     std::memcpy(data + 16, &temp, 4);
-
-    if((flags & 0x1) != 0) {
-        std::memcpy(data + UDPC_MIN_HEADER_SIZE, pk, crypto_sign_PUBLICKEYBYTES);
-    } else {
-        crypto_sign_detached(
-            (unsigned char*)(data + UDPC_MIN_HEADER_SIZE), // destination of detached sig
-            nullptr,                                       // unused length, assume max
-            (unsigned char*)data,                          // header to sign
-            UDPC_MIN_HEADER_SIZE,                          // size of header
-            sk);                                           // secret key
-    }
 }
 
 uint32_t UDPC::generateConnectionID(Context &ctx) {
@@ -1233,19 +1503,32 @@ UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port) {
     return conId;
 }
 
-UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient) {
+UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLibsodium) {
     UDPC::Context *ctx = new UDPC::Context(false);
     ctx->flags.set(1, isClient != 0);
 
     UDPC_CHECK_LOG(ctx, UDPC_LoggingType::UDPC_INFO, "Got listen addr ",
         UDPC_atostr((UDPC_HContext)ctx, listenId.addr));
 
-    // initialize libsodium
-    if(sodium_init() < 0) {
+    if(isUsingLibsodium) {
+#ifdef UDPC_LIBSODIUM_ENABLED
+        // initialize libsodium
+        if(sodium_init() < 0) {
+            UDPC_CHECK_LOG(ctx, UDPC_LoggingType::UDPC_ERROR,
+                "Failed to initialize libsodium");
+            delete ctx;
+            return nullptr;
+        } else {
+            ctx->flags.set(2);
+        }
+#else
         UDPC_CHECK_LOG(ctx, UDPC_LoggingType::UDPC_ERROR,
-            "Failed to initialize libsodium");
+            "Cannot use libsodium, UDPC was compiled without libsodium support");
         delete ctx;
         return nullptr;
+#endif
+    } else {
+        ctx->flags.reset(2);
     }
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
@@ -1330,8 +1613,8 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient) {
 }
 
 UDPC_HContext UDPC_init_threaded_update(UDPC_ConnectionId listenId,
-                                int isClient) {
-    UDPC::Context *ctx = (UDPC::Context *)UDPC_init(listenId, isClient);
+                                int isClient, int isUsingLibsodium) {
+    UDPC::Context *ctx = (UDPC::Context *)UDPC_init(listenId, isClient, isUsingLibsodium);
     if(!ctx) {
         return nullptr;
     }
@@ -1345,8 +1628,10 @@ UDPC_HContext UDPC_init_threaded_update(UDPC_ConnectionId listenId,
 }
 
 UDPC_HContext UDPC_init_threaded_update_ms(
-        UDPC_ConnectionId listenId, int isClient, int updateMS) {
-    UDPC::Context *ctx = (UDPC::Context *)UDPC_init(listenId, isClient);
+        UDPC_ConnectionId listenId,
+        int isClient,int updateMS, int isUsingLibsodium) {
+    UDPC::Context *ctx = (UDPC::Context *)UDPC_init(
+        listenId, isClient, isUsingLibsodium);
     if(!ctx) {
         return nullptr;
     }
@@ -1389,13 +1674,20 @@ void UDPC_update(UDPC_HContext ctx) {
     c->update_impl();
 }
 
-void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
+void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, int enableLibSodium) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c || !c->flags.test(1)) {
         return;
     }
+#ifndef UDPC_LIBSODIUM_ENABLED
+    if(enableLibSodium) {
+        UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_ERROR,
+            "Cannot enable libsodium, UDPC was compiled without libsodium");
+        return;
+    }
+#endif
 
-    c->internalEvents.push(UDPC_Event{UDPC_ET_REQUEST_CONNECT, connectionId, false});
+    c->internalEvents.push(UDPC_Event{UDPC_ET_REQUEST_CONNECT, connectionId, enableLibSodium});
 }
 
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,

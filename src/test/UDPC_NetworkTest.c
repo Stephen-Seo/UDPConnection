@@ -18,6 +18,7 @@ void usage() {
     puts("-n - do not add payload to packets");
     puts("-l (silent|error|warning|info|verbose|debug) - log level, default debug");
     puts("-e - enable receiving events");
+    puts("-ls - enable libsodium");
 }
 
 void sleep_seconds(unsigned int seconds) {
@@ -43,6 +44,7 @@ int main(int argc, char **argv) {
     int noPayload = 0;
     UDPC_LoggingType logLevel = UDPC_DEBUG;
     int isReceivingEvents = 0;
+    int isLibSodiumEnabled = 0;
     while(argc > 0) {
         if(strcmp(argv[0], "-c") == 0) {
             isClient = 1;
@@ -90,6 +92,9 @@ int main(int argc, char **argv) {
         } else if(strcmp(argv[0], "-e") == 0) {
             isReceivingEvents = 1;
             puts("Enabled isReceivingEvents");
+        } else if(strcmp(argv[0], "-ls") == 0) {
+            isLibSodiumEnabled = 1;
+            puts("Enabled libsodium");
         } else {
             printf("ERROR: invalid argument \"%s\"\n", argv[0]);
             usage();
@@ -97,6 +102,10 @@ int main(int argc, char **argv) {
         }
 
         --argc; ++argv;
+    }
+
+    if(isLibSodiumEnabled == 0) {
+        puts("Disabled libsodium");
     }
 
     if(!listenAddr) {
@@ -123,7 +132,7 @@ int main(int argc, char **argv) {
     if(isClient) {
         connectionId = UDPC_create_id_easy(connectionAddr, atoi(connectionPort));
     }
-    UDPC_HContext context = UDPC_init_threaded_update(listenId, isClient);
+    UDPC_HContext context = UDPC_init_threaded_update(listenId, isClient, isLibSodiumEnabled);
     if(!context) {
         puts("ERROR: context is NULL");
         return 1;
@@ -142,7 +151,7 @@ int main(int argc, char **argv) {
     while(1) {
         sleep_seconds(1);
         if(isClient && UDPC_has_connection(context, connectionId) == 0) {
-            UDPC_client_initiate_connection(context, connectionId);
+            UDPC_client_initiate_connection(context, connectionId, isLibSodiumEnabled);
         }
         if(!noPayload) {
             list = UDPC_get_list_connected(context, &temp);

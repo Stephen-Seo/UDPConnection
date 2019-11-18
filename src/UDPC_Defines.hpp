@@ -38,8 +38,11 @@
 #include <sodium.h>
 
 #define UDPC_MIN_HEADER_SIZE 20
-#define UDPC_CON_HEADER_SIZE (UDPC_MIN_HEADER_SIZE + crypto_sign_PUBLICKEYBYTES)
-#define UDPC_FULL_HEADER_SIZE (UDPC_MIN_HEADER_SIZE + crypto_sign_BYTES)
+#define UDPC_CON_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+4)
+#define UDPC_CCL_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+4+crypto_sign_PUBLICKEYBYTES+4)
+#define UDPC_CSR_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+4+crypto_sign_PUBLICKEYBYTES+crypto_sign_BYTES)
+#define UDPC_LSFULL_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+1+crypto_sign_BYTES)
+#define UDPC_NSFULL_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+1)
 
 namespace UDPC {
 
@@ -76,8 +79,14 @@ struct IPV6_Hasher {
 };
 
 struct ConnectionData {
-    ConnectionData();
-    ConnectionData(bool isServer, Context *ctx, UDPC_IPV6_ADDR_TYPE addr, uint32_t scope_id, uint16_t port);
+    ConnectionData(bool isUsingLibsodium);
+    ConnectionData(
+        bool isServer,
+        Context *ctx,
+        UDPC_IPV6_ADDR_TYPE addr,
+        uint32_t scope_id,
+        uint16_t port,
+        bool isUsingLibsodium);
 
     // copy
     ConnectionData(const ConnectionData& other) = delete;
@@ -96,6 +105,7 @@ struct ConnectionData {
      * 3 - initiating connection
      * 4 - is id set
      * 5 - error initializing keys for public key encryption
+     * 6 - using libsodium for header verification
      */
     std::bitset<8> flags;
     uint32_t id;
@@ -120,6 +130,9 @@ struct ConnectionData {
     unsigned char sk[crypto_sign_SECRETKEYBYTES];
     unsigned char pk[crypto_sign_PUBLICKEYBYTES];
     unsigned char peer_pk[crypto_sign_PUBLICKEYBYTES];
+    // client - 4 byte string size, rest is string
+    // server - detached signature of size crypto_sign_BYTES
+    std::unique_ptr<char[]> verifyMessage;
 }; // struct ConnectionData
 
 struct Context {
@@ -182,6 +195,7 @@ public:
     /*
      * 0 - is threaded
      * 1 - is client
+     * 2 - libsodium enabled
      */
     std::bitset<8> flags;
     std::atomic_bool isAcceptNewConnections;
@@ -224,14 +238,13 @@ bool isBigEndian();
 
 /*
  * flags:
- *   - 0x1 - connect
- *   - 0x2 - ping
- *   - 0x4 - no_rec_chk
- *   - 0x8 - resending
+ *   0x1 - connect
+ *   0x2 - ping
+ *   0x4 - no_rec_chk
+ *   0x8 - resending
  */
 void preparePacket(char *data, uint32_t protocolID, uint32_t conID,
-                   uint32_t rseq, uint32_t ack, uint32_t *seqID, int flags,
-                   const unsigned char *pk, const unsigned char *sk);
+                   uint32_t rseq, uint32_t ack, uint32_t *seqID, int flags);
 
 uint32_t generateConnectionID(Context &ctx);
 
