@@ -86,7 +86,9 @@ struct ConnectionData {
         UDPC_IPV6_ADDR_TYPE addr,
         uint32_t scope_id,
         uint16_t port,
-        bool isUsingLibsodium);
+        bool isUsingLibsodium,
+        unsigned char *sk,
+        unsigned char *pk);
 
     // copy
     ConnectionData(const ConnectionData& other) = delete;
@@ -106,6 +108,7 @@ struct ConnectionData {
      * 4 - is id set
      * 5 - error initializing keys for public key encryption
      * 6 - using libsodium for header verification
+     * 7 - peer_pk pre-set
      */
     std::bitset<8> flags;
     uint32_t id;
@@ -229,6 +232,9 @@ public:
     std::mutex mutex;
 
     std::chrono::milliseconds threadedSleepTime;
+    unsigned char sk[crypto_sign_SECRETKEYBYTES];
+    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+    std::atomic_bool keysSet;
 
 }; // struct Context
 

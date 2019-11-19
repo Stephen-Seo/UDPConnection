@@ -101,7 +101,8 @@ typedef enum {
     UDPC_ET_CONNECTED,
     UDPC_ET_DISCONNECTED,
     UDPC_ET_GOOD_MODE,
-    UDPC_ET_BAD_MODE
+    UDPC_ET_BAD_MODE,
+    UDPC_ET_REQUEST_CONNECT_PK
 } UDPC_EventType;
 
 typedef struct {
@@ -110,6 +111,7 @@ typedef struct {
     union Value {
         int dropAllWithAddr;
         int enableLibSodium;
+        unsigned char *pk;
     } v;
 } UDPC_Event;
 
@@ -133,11 +135,23 @@ UDPC_HContext UDPC_init_threaded_update_ms(
     int updateMS,
     int isUsingLibsodium);
 
+void UDPC_enable_threaded_update(UDPC_HContext ctx);
+void UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS);
+void UDPC_disable_threaded_update(UDPC_HContext ctx);
+
 void UDPC_destroy(UDPC_HContext ctx);
 
 void UDPC_update(UDPC_HContext ctx);
 
-void UDPC_client_initiate_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, int enableLibSodium);
+void UDPC_client_initiate_connection(
+    UDPC_HContext ctx,
+    UDPC_ConnectionId connectionId,
+    int enableLibSodium);
+
+void UDPC_client_initiate_connection_pk(
+    UDPC_HContext ctx,
+    UDPC_ConnectionId connectionId,
+    unsigned char *serverPK);
 
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
                      int isChecked, void *data, uint32_t size);
@@ -169,6 +183,8 @@ int UDPC_set_receiving_events(UDPC_HContext ctx, int isReceivingEvents);
 UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining);
 
 UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);
+
+void UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char *pk);
 
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
