@@ -186,6 +186,8 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);
 
 void UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char *pk);
 
+void UDPC_unset_libsodium_keys(UDPC_HContext ctx);
+
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
 const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr);

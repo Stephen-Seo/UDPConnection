@@ -2084,9 +2084,20 @@ void UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char
         return;
     }
 
+    std::lock_guard<std::mutex> lock(c->mutex);
     std::memcpy(c->sk, sk, crypto_sign_SECRETKEYBYTES);
     std::memcpy(c->pk, pk, crypto_sign_PUBLICKEYBYTES);
     c->keysSet.store(true);
+}
+
+void UDPC_unset_libsodium_keys(UDPC_HContext ctx) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c || !c->flags.test(2)) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(c->mutex);
+    c->keysSet.store(false);
 }
 
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
