@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include <threads.h>
 
+#ifdef UDPC_LIBSODIUM_ENABLED
+#include <sodium.h>
+#endif
+
 #include <UDPConnection.h>
 
 #define QUEUED_MAX_SIZE 32
@@ -19,6 +23,8 @@ void usage() {
     puts("-l (silent|error|warning|info|verbose|debug) - log level, default debug");
     puts("-e - enable receiving events");
     puts("-ls - enable libsodium");
+    puts("-ck <pubkey_file> - connect to server expecting this public key");
+    puts("-sk <pubkey> <seckey> - start with pub/sec key pair");
 }
 
 void sleep_seconds(unsigned int seconds) {
@@ -45,6 +51,10 @@ int main(int argc, char **argv) {
     UDPC_LoggingType logLevel = UDPC_DEBUG;
     int isReceivingEvents = 0;
     int isLibSodiumEnabled = 0;
+    const char *pubkey_file = NULL;
+    const char *seckey_file = NULL;
+    unsigned char pubkey[crypto_sign_PUBLICKEYBYTES];
+    unsigned char seckey[crypto_sign_SECRETKEYBYTES];
     while(argc > 0) {
         if(strcmp(argv[0], "-c") == 0) {
             isClient = 1;
@@ -95,6 +105,14 @@ int main(int argc, char **argv) {
         } else if(strcmp(argv[0], "-ls") == 0) {
             isLibSodiumEnabled = 1;
             puts("Enabled libsodium");
+        } else if(strcmp(argv[0], "-ck") == 0 && argc > 1) {
+            --argc; ++argv;
+            pubkey_file = argv[0];
+        } else if(strcmp(argv[0], "-sk") == 0 && argc > 2) {
+            --argc; ++argv;
+            pubkey_file = argv[0];
+            --argc; ++argv;
+            seckey_file = argv[0];
         } else {
             printf("ERROR: invalid argument \"%s\"\n", argv[0]);
             usage();
@@ -106,6 +124,39 @@ int main(int argc, char **argv) {
 
     if(isLibSodiumEnabled == 0) {
         puts("Disabled libsodium");
+    } else {
+        if(pubkey_file) {
+            FILE *pubkey_f = fopen(pubkey_file, "r");
+            if(!pubkey_f) {
+                printf("ERROR: Failed to open pubkey_file \"%s\"\n", pubkey_file);
+                return 1;
+            }
+            size_t count = fread(pubkey, 1, crypto_sign_PUBLICKEYBYTES, pubkey_f);
+            if(count != crypto_sign_PUBLICKEYBYTES) {
+                fclose(pubkey_f);
+                printf("ERROR: Failed to read pubkey_file \"%s\"\n", pubkey_file);
+                return 1;
+            }
+            fclose(pubkey_f);
+
+            if(seckey_file) {
+                FILE *seckey_f = fopen(seckey_file, "r");
+                if(!seckey_f) {
+                    printf("ERROR: Failed to open seckey_file \"%s\"\n", seckey_file);
+                    return 1;
+                }
+                count = fread(seckey, 1, crypto_sign_SECRETKEYBYTES, seckey_f);
+                if(count != crypto_sign_SECRETKEYBYTES) {
+                    fclose(seckey_f);
+                    printf("ERROR: Failed to read seckey_file \"%s\"\n", seckey_file);
+                    return 1;
+                }
+                fclose(seckey_f);
+            }
+        } else if(seckey_file) {
+            printf("ERROR: Invalid state (seckey_file defined but not pubkey_file)\n");
+            return 1;
+        }
     }
 
     if(!listenAddr) {
@@ -132,13 +183,21 @@ int main(int argc, char **argv) {
     if(isClient) {
         connectionId = UDPC_create_id_easy(connectionAddr, atoi(connectionPort));
     }
-    UDPC_HContext context = UDPC_init_threaded_update(listenId, isClient, isLibSodiumEnabled);
+    UDPC_HContext context = UDPC_init(listenId, isClient, isLibSodiumEnabled);
     if(!context) {
         puts("ERROR: context is NULL");
         return 1;
     }
+
     UDPC_set_logging_type(context, logLevel);
     UDPC_set_receiving_events(context, isReceivingEvents);
+    if(!isClient && pubkey_file && seckey_file) {
+        UDPC_set_libsodium_keys(context, seckey, pubkey);
+        puts("Set pubkey/seckey for server");
+    }
+
+    UDPC_enable_threaded_update(context);
+
     unsigned int tick = 0;
     unsigned int temp = 0;
     unsigned int temp2, temp3;
@@ -151,7 +210,11 @@ int main(int argc, char **argv) {
     while(1) {
         sleep_seconds(1);
         if(isClient && UDPC_has_connection(context, connectionId) == 0) {
-            UDPC_client_initiate_connection(context, connectionId, isLibSodiumEnabled);
+            if(isLibSodiumEnabled && pubkey_file) {
+                UDPC_client_initiate_connection_pk(context, connectionId, pubkey);
+            } else {
+                UDPC_client_initiate_connection(context, connectionId, isLibSodiumEnabled);
+            }
         }
         if(!noPayload) {
             list = UDPC_get_list_connected(context, &temp);

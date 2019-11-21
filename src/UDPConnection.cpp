@@ -163,7 +163,7 @@ rtt(std::chrono::steady_clock::duration::zero())
                 std::memcpy(this->sk, sk, crypto_sign_SECRETKEYBYTES);
                 std::memcpy(this->pk, pk, crypto_sign_PUBLICKEYBYTES);
             } else {
-                crypto_sign_keypair(pk, sk);
+                crypto_sign_keypair(this->pk, this->sk);
             }
             flags.reset(5);
             flags.set(6);
@@ -307,6 +307,11 @@ void UDPC::Context::update_impl() {
                     newCon.verifyMessage = std::make_unique<char[]>(4 + timeString.size());
                     *((uint32_t*)newCon.verifyMessage.get()) = timeString.size();
                     std::memcpy(newCon.verifyMessage.get() + 4, timeString.c_str(), timeString.size());
+#ifndef NDEBUG
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
+                        "Client set up verification string \"",
+                        timeString, "\"");
+#endif
                 }
 
                 if(conMap.find(optE.value().conId) == conMap.end()) {
@@ -387,6 +392,11 @@ void UDPC::Context::update_impl() {
                     newCon.verifyMessage = std::make_unique<char[]>(4 + timeString.size());
                     *((uint32_t*)newCon.verifyMessage.get()) = timeString.size();
                     std::memcpy(newCon.verifyMessage.get() + 4, timeString.c_str(), timeString.size());
+#ifndef NDEBUG
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
+                        "Client set up verification string \"",
+                        timeString, "\"");
+#endif
 
                     // set peer public key
                     std::memcpy(
@@ -593,20 +603,24 @@ void UDPC::Context::update_impl() {
     {
         auto sendIter = cSendPkts.begin();
         std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher> dropped;
+        std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher> notQueued;
         while(true) {
             auto next = sendIter.current();
             if(next) {
                 if(auto iter = conMap.find(next.value().receiver);
                         iter != conMap.end()) {
                     if(iter->second.sendPkts.size() >= UDPC_QUEUED_PKTS_MAX_SIZE) {
-                        UDPC_CHECK_LOG(this,
-                            UDPC_LoggingType::UDPC_DEBUG,
-                            "Not queueing packet to ",
-                            UDPC_atostr((UDPC_HContext)this,
-                                next.value().receiver.addr),
-                            ", port = ",
-                            next.value().receiver.port,
-                            ", connection's queue reached max size");
+                        if(notQueued.find(next.value().receiver) == notQueued.end()) {
+                            notQueued.insert(next.value().receiver);
+                            UDPC_CHECK_LOG(this,
+                                UDPC_LoggingType::UDPC_DEBUG,
+                                "Not queueing packet to ",
+                                UDPC_atostr((UDPC_HContext)this,
+                                    next.value().receiver.addr),
+                                ", port = ",
+                                next.value().receiver.port,
+                                ", connection's queue reached max size");
+                        }
                         if(sendIter.next()) {
                             continue;
                         } else {
@@ -686,7 +700,6 @@ void UDPC::Context::update_impl() {
                         buf.get() + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES + 4,
                         iter->second.verifyMessage.get() + 4,
                         *((uint32_t*)iter->second.verifyMessage.get()));
-                    // TODO impl presetting a known pubkey of peer
 #else
                     assert(!"libsodium is disabled, invalid state");
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
@@ -1165,6 +1178,7 @@ void UDPC::Context::update_impl() {
                 false,
                 sk, pk);
 #endif
+
             if(newConnection.flags.test(5)) {
                 UDPC_CHECK_LOG(this,
                     UDPC_LoggingType::UDPC_ERROR,
@@ -1177,6 +1191,16 @@ void UDPC::Context::update_impl() {
             }
             if(pktType == 1 && flags.test(2)) {
 #ifdef UDPC_LIBSODIUM_ENABLED
+# ifndef NDEBUG
+                if(willLog(UDPC_LoggingType::UDPC_DEBUG)) {
+                    std::string verificationString(
+                        recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES + 4,
+                        ntohl(*((uint32_t*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES))));
+                    log_impl(UDPC_LoggingType::UDPC_DEBUG,
+                        "Server got verification string \"",
+                        verificationString, "\"");
+                }
+# endif
                 std::memcpy(
                     newConnection.peer_pk,
                     recvBuf + UDPC_MIN_HEADER_SIZE + 4,
@@ -1186,7 +1210,8 @@ void UDPC::Context::update_impl() {
                     (unsigned char*)newConnection.verifyMessage.get(),
                     nullptr,
                     (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES + 4),
-                    ntohl(*((uint32_t*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES))), newConnection.sk);
+                    ntohl(*((uint32_t*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES))),
+                    newConnection.sk);
 #else
                 assert(!"libsodium disabled, invalid state");
                 UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
