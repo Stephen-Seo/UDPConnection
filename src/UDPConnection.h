@@ -184,7 +184,9 @@ UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining);
 
 UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);
 
-void UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char *pk);
+int UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char *pk);
+
+int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, unsigned char *sk);
 
 void UDPC_unset_libsodium_keys(UDPC_HContext ctx);
 

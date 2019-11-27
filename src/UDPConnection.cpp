@@ -2103,16 +2103,25 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining) {
     return UDPC::get_empty_pinfo();
 }
 
-void UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char *pk) {
+int UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char *pk) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c || !c->flags.test(2)) {
-        return;
+        return 0;
     }
 
     std::lock_guard<std::mutex> lock(c->mutex);
     std::memcpy(c->sk, sk, crypto_sign_SECRETKEYBYTES);
     std::memcpy(c->pk, pk, crypto_sign_PUBLICKEYBYTES);
     c->keysSet.store(true);
+    return 1;
+}
+
+int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, unsigned char *sk) {
+    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+    if(crypto_sign_ed25519_sk_to_pk(pk, sk) != 0) {
+        return 0;
+    }
+    return UDPC_set_libsodium_keys(ctx, sk, pk);
 }
 
 void UDPC_unset_libsodium_keys(UDPC_HContext ctx) {
