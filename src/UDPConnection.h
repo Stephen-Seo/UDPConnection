@@ -115,13 +115,40 @@ typedef struct {
     } v;
 } UDPC_Event;
 
-/// port should be in native byte order (not network/big-endian)
+/*!
+ * \brief Creates an UDPC_ConnectionId with the given addr and port
+ *
+ * port should be in native byte order (not network/big-endian). This means that
+ * there is no need to convert the 16-bit value to network byte order, this will
+ * be done automatically by this library when necessary (without modifying the
+ * value in the used UDPC_ConnectionId).
+ */
 UDPC_ConnectionId UDPC_create_id(UDPC_IPV6_ADDR_TYPE addr, uint16_t port);
 
+/*!
+ * \brief Creates an UDPC_ConnectionId with the given addr, scope_id, and port
+ *
+ * port should be in native byte order (not network/big-endian).
+ */
 UDPC_ConnectionId UDPC_create_id_full(UDPC_IPV6_ADDR_TYPE addr, uint32_t scope_id, uint16_t port);
 
+/*!
+ * \brief Creates an UDPC_ConnectionId with the given port
+ *
+ * The address contained in the returned UDPC_ConnectionId will be zeroed out
+ * (the "anyaddr" address).
+ * port should be in native byte order (not network/big-endian).
+ */
 UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
 
+/*!
+ * \brief Creates an UDPC_ConnectionId with the given addr string and port
+ *
+ * The address string should be a valid ipv6 or ipv4 address. (If an ipv4
+ * address is given, the internal address of the returned UDPC_ConnectionId will
+ * be ipv4-mapped ipv6 address.)
+ * port should be in native byte order (not network/big-endian).
+ */
 UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port);
 
 UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLibsodium);
