@@ -135,9 +135,11 @@ UDPC_HContext UDPC_init_threaded_update_ms(
     int updateMS,
     int isUsingLibsodium);
 
-void UDPC_enable_threaded_update(UDPC_HContext ctx);
-void UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS);
-void UDPC_disable_threaded_update(UDPC_HContext ctx);
+int UDPC_enable_threaded_update(UDPC_HContext ctx);
+int UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS);
+int UDPC_disable_threaded_update(UDPC_HContext ctx);
+
+int UDPC_is_valid_context(UDPC_HContext ctx);
 
 void UDPC_destroy(UDPC_HContext ctx);
 

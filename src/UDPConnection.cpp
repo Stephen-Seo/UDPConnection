@@ -1809,10 +1809,10 @@ UDPC_HContext UDPC_init_threaded_update_ms(
     return (UDPC_HContext) ctx;
 }
 
-void UDPC_enable_threaded_update(UDPC_HContext ctx) {
+int UDPC_enable_threaded_update(UDPC_HContext ctx) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c || c->flags.test(0) || c->thread.joinable()) {
-        return;
+        return 0;
     }
 
     c->flags.set(0);
@@ -1821,12 +1821,13 @@ void UDPC_enable_threaded_update(UDPC_HContext ctx) {
     c->thread = std::thread(UDPC::threadedUpdate, c);
 
     UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_INFO, "Started threaded update");
+    return 1;
 }
 
-void UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS) {
+int UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c || c->flags.test(0) || c->thread.joinable()) {
-        return;
+        return 0;
     }
 
     c->flags.set(0);
@@ -1841,12 +1842,13 @@ void UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS) {
     c->thread = std::thread(UDPC::threadedUpdate, c);
 
     UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_INFO, "Started threaded update");
+    return 1;
 }
 
-void UDPC_disable_threaded_update(UDPC_HContext ctx) {
+int UDPC_disable_threaded_update(UDPC_HContext ctx) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c || !c->flags.test(0) || !c->thread.joinable()) {
-        return;
+        return 0;
     }
 
     c->threadRunning.store(false);
@@ -1854,6 +1856,11 @@ void UDPC_disable_threaded_update(UDPC_HContext ctx) {
     c->flags.reset(0);
 
     UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_INFO, "Stopped threaded update");
+    return 1;
+}
+
+int UDPC_is_valid_context(UDPC_HContext ctx) {
+    return UDPC::verifyContext(ctx) != nullptr ? 1 : 0;
 }
 
 void UDPC_destroy(UDPC_HContext ctx) {
