@@ -1879,6 +1879,7 @@ void UDPC_destroy(UDPC_HContext ctx) {
                 delete[] optE.value().v.pk;
             }
         }
+        UDPC_ctx->_contextIdentifier = 0;
         delete UDPC_ctx;
     }
 }
@@ -1977,7 +1978,8 @@ int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting) {
     if(!c) {
         return 0;
     }
-    return c->isAcceptNewConnections.exchange(isAccepting == 0 ? false : true);
+    return c->isAcceptNewConnections.exchange(isAccepting == 0 ? false : true)
+        ? 1 : 0;
 }
 
 void UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, int dropAllWithAddr) {
@@ -2131,14 +2133,17 @@ int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, unsigned char *sk) {
     return UDPC_set_libsodium_keys(ctx, sk, pk);
 }
 
-void UDPC_unset_libsodium_keys(UDPC_HContext ctx) {
+int UDPC_unset_libsodium_keys(UDPC_HContext ctx) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c || !c->flags.test(2)) {
-        return;
+        return 0;
     }
 
     std::lock_guard<std::mutex> lock(c->mutex);
     c->keysSet.store(false);
+    std::memset(c->pk, 0, crypto_sign_PUBLICKEYBYTES);
+    std::memset(c->sk, 0, crypto_sign_SECRETKEYBYTES);
+    return 1;
 }
 
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {

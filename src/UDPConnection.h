@@ -190,7 +190,7 @@ int UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char 
 
 int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, unsigned char *sk);
 
-void UDPC_unset_libsodium_keys(UDPC_HContext ctx);
+int UDPC_unset_libsodium_keys(UDPC_HContext ctx);
 
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
