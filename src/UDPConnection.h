@@ -1,25 +1,39 @@
+/*!
+ * \mainpage UDPConnection
+ * \ref UDPConnection.h
+ */
+
+/*!
+ * \file UDPConnection.h
+ * \brief Public API for UDPConnection
+ */
+
 #ifndef UDPC_CONNECTION_H
 #define UDPC_CONNECTION_H
 
-// Determine platform macros
-#define UDPC_PLATFORM_WINDOWS 1
-#define UDPC_PLATFORM_MAC 2
-#define UDPC_PLATFORM_LINUX 3
-#define UDPC_PLATFORM_UNKNOWN 0
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
 
-#if defined _WIN32
-#define UDPC_PLATFORM UDPC_PLATFORM_WINDOWS
-#elif defined __APPLE__
-#define UDPC_PLATFORM UDPC_PLATFORM_MAC
-#elif defined __linux__
-#define UDPC_PLATFORM UDPC_PLATFORM_LINUX
-#else
-#define UDPC_PLATFORM UDPC_PLATFORM_UNKNOWN
-#endif
+// Determine platform macros
+# define UDPC_PLATFORM_WINDOWS 1
+# define UDPC_PLATFORM_MAC 2
+# define UDPC_PLATFORM_LINUX 3
+# define UDPC_PLATFORM_UNKNOWN 0
+
+# if defined _WIN32
+#  define UDPC_PLATFORM UDPC_PLATFORM_WINDOWS
+# elif defined __APPLE__
+#  define UDPC_PLATFORM UDPC_PLATFORM_MAC
+# elif defined __linux__
+#  define UDPC_PLATFORM UDPC_PLATFORM_LINUX
+# else
+#  define UDPC_PLATFORM UDPC_PLATFORM_UNKNOWN
+# endif
+
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 // OS-based networking macros
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
-#include <winsock2.h>
+# include <winsock2.h>
 # ifdef UDPC_PLATFORM_MINGW
 #  include <ws2ipdef.h>
 #  include <in6addr.h>
@@ -28,46 +42,62 @@
 #  include <In6addr.h>
 # endif
 
-#define UDPC_CLEANUPSOCKET(x) closesocket(x)
-#define UDPC_SOCKETTYPE SOCKET
-#define UDPC_IPV6_SOCKADDR_TYPE SOCKADDR_IN6
-#define UDPC_IPV6_ADDR_TYPE IN6_ADDR
-#define UDPC_IPV6_ADDR_SUB(addr) addr.u.Byte
-#define UDPC_SOCKET_RETURN_ERROR(socket) (socket == INVALID_SOCKET)
-#elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
+# ifndef DOXYGEN_SHOULD_SKIP_THIS
 
-#define UDPC_CLEANUPSOCKET(x) close(x)
-#define UDPC_SOCKETTYPE int
-#define UDPC_IPV6_SOCKADDR_TYPE struct sockaddr_in6
-#define UDPC_IPV6_ADDR_TYPE struct in6_addr
-#define UDPC_IPV6_ADDR_SUB(addr) addr.s6_addr
-#define UDPC_SOCKET_RETURN_ERROR(socket) (socket <= 0)
+#  define UDPC_CLEANUPSOCKET(x) closesocket(x)
+#  define UDPC_SOCKETTYPE SOCKET
+#  define UDPC_IPV6_SOCKADDR_TYPE SOCKADDR_IN6
+#  define UDPC_IPV6_ADDR_TYPE IN6_ADDR
+#  define UDPC_IPV6_ADDR_SUB(addr) addr.u.Byte
+#  define UDPC_SOCKET_RETURN_ERROR(socket) (socket == INVALID_SOCKET)
+
+# endif // DOXYGEN_SHOULD_SKIP_THIS
+
+#elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
+# include <fcntl.h>
+# include <netinet/in.h>
+# include <sys/socket.h>
+# include <unistd.h>
+
+# ifndef DOXYGEN_SHOULD_SKIP_THIS
+
+#  define UDPC_CLEANUPSOCKET(x) close(x)
+#  define UDPC_SOCKETTYPE int
+#  define UDPC_IPV6_SOCKADDR_TYPE struct sockaddr_in6
+#  define UDPC_IPV6_ADDR_TYPE struct in6_addr
+#  define UDPC_IPV6_ADDR_SUB(addr) addr.s6_addr
+#  define UDPC_SOCKET_RETURN_ERROR(socket) (socket <= 0)
+
+# endif // DOXYGEN_SHOULD_SKIP_THIS
+
 #else
-#define UDPC_CLEANUPSOCKET(x) ((void)0)
+# ifndef DOXYGEN_SHOULD_SKIP_THIS
+#  define UDPC_CLEANUPSOCKET(x) ((void)0)
+# endif // DOXYGEN_SHOULD_SKIP_THIS
 #endif
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
 
 // other defines
-#define UDPC_PACKET_MAX_SIZE 8192
-#define UDPC_DEFAULT_PROTOCOL_ID 1357924680 // 0x50f04948
+# define UDPC_PACKET_MAX_SIZE 8192
+# define UDPC_DEFAULT_PROTOCOL_ID 1357924680 // 0x50f04948
 
-#ifndef UDPC_LIBSODIUM_ENABLED
-# define crypto_sign_PUBLICKEYBYTES 1
-# define crypto_sign_SECRETKEYBYTES 1
-# define crypto_sign_BYTES 1
-#endif
+# ifndef UDPC_LIBSODIUM_ENABLED
+#  define crypto_sign_PUBLICKEYBYTES 1
+#  define crypto_sign_SECRETKEYBYTES 1
+#  define crypto_sign_BYTES 1
+# endif
+
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 #ifdef __cplusplus
-#include <cstdint>
+# include <cstdint>
 extern "C" {
 #else
-#include <stdint.h>
+# include <stdint.h>
 #endif
 
-// Opaque struct handle to Context
+/// Opaque struct handle to Context
 struct UDPC_Context;
 typedef struct UDPC_Context *UDPC_HContext;
 
@@ -89,7 +119,7 @@ typedef struct {
      * 0x8 - resending
      */
     uint32_t flags;
-    uint16_t dataSize; // zero if invalid
+    uint16_t dataSize; /// zero if invalid
     UDPC_ConnectionId sender;
     UDPC_ConnectionId receiver;
 } UDPC_PacketInfo;
@@ -151,6 +181,17 @@ UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
  */
 UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port);
 
+/*!
+ * \brief Creates an UDPC_HContext that holds state for connections
+ *
+ * \param listenId The addr and port to listen on (contained in a
+ * UDPC_ConnectionId)
+ * \param isClient Whether or not this instance is a client or a server
+ * \param isUsingLibsodium Set to non-zero if libsodium verification of packets
+ * should be enabled (fails if libsodium support was not compiled)
+ *
+ * The received UDPC_HContext must be freed with a call to UDPC_destroy().
+ */
 UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLibsodium);
 UDPC_HContext UDPC_init_threaded_update(
     UDPC_ConnectionId listenId,
