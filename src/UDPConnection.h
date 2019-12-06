@@ -76,16 +76,24 @@
 # endif // DOXYGEN_SHOULD_SKIP_THIS
 #endif
 
+// other defines
+#define UDPC_PACKET_MAX_SIZE 8192
+#define UDPC_DEFAULT_PROTOCOL_ID 1357924680 // 0x50f04948
+
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 
-// other defines
-# define UDPC_PACKET_MAX_SIZE 8192
-# define UDPC_DEFAULT_PROTOCOL_ID 1357924680 // 0x50f04948
+// other defines continued
 
 # ifndef UDPC_LIBSODIUM_ENABLED
-#  define crypto_sign_PUBLICKEYBYTES 1
-#  define crypto_sign_SECRETKEYBYTES 1
-#  define crypto_sign_BYTES 1
+#  ifndef crypto_sign_PUBLICKEYBYTES
+#   define crypto_sign_PUBLICKEYBYTES 1
+#  endif
+#  ifndef crypto_sign_SECRETKEYBYTES
+#   define crypto_sign_SECRETKEYBYTES 1
+#  endif
+#  ifndef crypto_sign_BYTES
+#   define crypto_sign_BYTES 1
+#  endif
 # endif
 
 #endif // DOXYGEN_SHOULD_SKIP_THIS
@@ -103,27 +111,70 @@ typedef struct UDPC_Context *UDPC_HContext;
 
 typedef enum { UDPC_SILENT, UDPC_ERROR, UDPC_WARNING, UDPC_INFO, UDPC_VERBOSE, UDPC_DEBUG } UDPC_LoggingType;
 
+/*!
+ * \brief Data identifying a peer via addr, port, and scope_id
+ *
+ * This struct needn't be used directly; use UDPC_create_id(),
+ * UDPC_create_id_full(), UDPC_create_id_anyaddr(), or UDPC_create_id_easy() to
+ * create one. This struct does not hold dynamic data, so there is no need to
+ * free it.
+ */
 typedef struct {
     UDPC_IPV6_ADDR_TYPE addr;
     uint32_t scope_id;
     uint16_t port;
 } UDPC_ConnectionId;
 
+/*!
+ * \brief Data representing a received/sent packet
+ */
 typedef struct {
+    /*!
+     * A char array of size \p UDPC_PACKET_MAX_SIZE. Note that the received data
+     * will probably use up less data than the full size of the array. The
+     * actual size of the received data is \p dataSize.
+     */
     // id is stored at offset 8, size 4 (uint32_t) even for "empty" PktInfos
     char data[UDPC_PACKET_MAX_SIZE];
-    /*
-     * 0x1 - connect
-     * 0x2 - ping
-     * 0x4 - no_rec_chk
-     * 0x8 - resending
+    /*!
+     * \brief Flags indication some additional information about the received
+     * packet.
+     *
+     * The following list indicates what each used bit in \p flags refers to.
+     * - 0x1: Is an initiate-connection packet
+     * - 0x2: Is a ping packet
+     * - 0x4: Is a packet that will not be re-sent if not received
+     * - 0x8: Is a packet that was re-sent
      */
     uint32_t flags;
-    uint16_t dataSize; /// zero if invalid
+    /*!
+     * \brief The size in bytes of the received packet's data inside the \p data
+     * array member variable.
+     *
+     * If this variable is zero, then this packet is invalid, or an empty packet
+     * was received.
+     */
+    uint16_t dataSize;
+    /// The \p UDPC_ConnectionId of the sender
     UDPC_ConnectionId sender;
+    /// The \p UDPC_ConnectionId of the receiver
     UDPC_ConnectionId receiver;
 } UDPC_PacketInfo;
 
+/*!
+ * \brief An enum describing the type of event.
+ *
+ * Note that only the following values will be presented when using
+ * UDPC_get_event()
+ * - UDPC_ET_NONE: No events have ocurred
+ * - UDPC_ET_CONNECTED: A peer has initiated a connection
+ * - UDPC_ET_DISCONNECTED: A peer has disconnected
+ * - UDPC_ET_GOOD_MODE: The connection has switched to "good mode"
+ * - UDPC_ET_BAD_MODE: The connection has switched to "bad mode"
+ *
+ * The other unmentioned enum values are used internally, and should never be
+ * returned in a call to UDPC_get_event().
+ */
 typedef enum {
     UDPC_ET_NONE,
     UDPC_ET_REQUEST_CONNECT,
@@ -135,6 +186,16 @@ typedef enum {
     UDPC_ET_REQUEST_CONNECT_PK
 } UDPC_EventType;
 
+/*!
+ * \brief A struct containing information related to the type of event
+ *
+ * Note that instances of this struct received from a call to UDPC_get_event()
+ * will not store any useful data in its union member variable \p v (it will
+ * only be used internally).
+ * Thus, all events received through a call to UDPC_get_event() will contain a
+ * valid UDPC_ConnectionId \p conId that identifies the peer that the event is
+ * referring to.
+ */
 typedef struct {
     UDPC_EventType type;
     UDPC_ConnectionId conId;
@@ -190,42 +251,195 @@ UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port);
  * \param isUsingLibsodium Set to non-zero if libsodium verification of packets
  * should be enabled (fails if libsodium support was not compiled)
  *
- * The received UDPC_HContext must be freed with a call to UDPC_destroy().
+ * UDPC_is_valid_context() may be used to check if the context was successfully
+ * created.
+ *
+ * \warning The received UDPC_HContext must be freed with a call to UDPC_destroy().
  */
 UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLibsodium);
+/*!
+ * \brief Creates an UDPC_HContext that holds state for connections that
+ * auto-updates via a thread.
+ *
+ * By default, the update interval is set to 8 milliseconds.
+ *
+ * \param listenId The addr and port to listen on (contained in a
+ * UDPC_ConnectionId)
+ * \param isClient Whether or not this instance is a client or a server
+ * \param isUsingLibsodium Set to non-zero if libsodium verification of packets
+ * should be enabled (fails if libsodium support was not compiled)
+ *
+ * UDPC_is_valid_context() may be used to check if the context was successfully
+ * created.
+ *
+ * \warning The received UDPC_HContext must be freed with a call to UDPC_destroy().
+ */
 UDPC_HContext UDPC_init_threaded_update(
     UDPC_ConnectionId listenId,
     int isClient,
     int isUsingLibsodium);
+/*!
+ * \brief Creates an UDPC_HContext that holds state for connections that
+ * auto-updates via a thread at a specified interval.
+ *
+ * \param listenId The addr and port to listen on (contained in a
+ * UDPC_ConnectionId)
+ * \param isClient Whether or not this instance is a client or a server
+ * \param updateMS The interval to update at in milliseconds (clamped at a
+ * minimum of 4 ms and a maximum of 333 ms)
+ * \param isUsingLibsodium Set to non-zero if libsodium verification of packets
+ * should be enabled (fails if libsodium support was not compiled)
+ *
+ * UDPC_is_valid_context() may be used to check if the context was successfully
+ * created.
+ *
+ * \warning The received UDPC_HContext must be freed with a call to UDPC_destroy().
+ */
 UDPC_HContext UDPC_init_threaded_update_ms(
     UDPC_ConnectionId listenId,
     int isClient,
     int updateMS,
     int isUsingLibsodium);
 
+/*!
+ * \brief Enables auto updating on a separate thread for the given UDPC_HContext
+ *
+ * By default, the update interval is set to 8 milliseconds.
+ *
+ * \param ctx The context to enable auto updating for
+ * \return non-zero if auto updating is enabled. If the context already had auto
+ * updating enabled, this function will return zero.
+ */
 int UDPC_enable_threaded_update(UDPC_HContext ctx);
+/*!
+ * \brief Enables auto updating on a separate thread for the given UDPC_HContext
+ * with the specified update interval
+ *
+ * \param ctx The context to enable auto updating for
+ * \param updateMS The interval to update at in milliseconds (clamped at a
+ * minimum of 4 ms and a maximum of 333 ms)
+ * \return non-zero if auto updating is enabled. If the context already had auto
+ * updating enabled, this function will return zero.
+ */
 int UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS);
+/*!
+ * \brief Disables auto updating on a separate thread for the given
+ * UDPC_HContext
+ *
+ * \param ctx The context to disable auto updating for
+ * \return non-zero if auto updating is disabled. If the context already had
+ * auto updating disabled, this function will return zero.
+ */
 int UDPC_disable_threaded_update(UDPC_HContext ctx);
 
+/*!
+ * \brief Checks if the given UDPC_HContext is valid (successfully initialized)
+ *
+ * \return non-zero if the given context is valid
+ */
 int UDPC_is_valid_context(UDPC_HContext ctx);
 
+/*!
+ * \brief Cleans up the UDPC_HContext
+ *
+ * If auto updating was enabled for the given context, it will gracefully stop
+ * the thread before cleaning up the context.
+ *
+ * \warning This function must be called after a UDPC_HContext is no longer used
+ * to avoid memory leaks.
+ */
 void UDPC_destroy(UDPC_HContext ctx);
 
+/*!
+ * \brief Updates the context
+ *
+ * Updating consists of:
+ * - Checking if peers have timed out
+ * - Handling requests to connect to server peers as a client
+ * - Sending packets to connected peers
+ * - Receiving packets from connected peers
+ * - Calculating round-trip-time (RTT) to peers
+ * - Checking if a peer has not received a packet and queuing that packet to be
+ *   resent (this is done by using an ack)
+ *
+ * If auto updating was enabled for the context, then there is no need to call
+ * this function.
+ *
+ * Note that the context can only receive at most one packet per call to update
+ * (due to the fact that UDPC created its UDP socket to not block on receive
+ * checks). This is why it is expected to either call this function several
+ * times a second (such as in a game's update loop), or have auto-updating
+ * enabled via UDPC_init_threaded_update(), UDPC_init_threaded_update_ms(),
+ * UDPC_enable_threaded_update(), or UDPC_enable_threaded_update_ms().
+ */
 void UDPC_update(UDPC_HContext ctx);
 
+/*!
+ * \brief Initiate a connection to a server peer
+ *
+ * Note that this function does nothing on a server context.
+ *
+ * \param ctx The context to initiate a connection from
+ * \param connectionId The server peer to initiate a connection to
+ * \param enableLibSodium If packet headers should be verified with the server
+ * peer (Fails if UDPC was not compiled with libsodium support)
+ */
 void UDPC_client_initiate_connection(
     UDPC_HContext ctx,
     UDPC_ConnectionId connectionId,
     int enableLibSodium);
 
+/*!
+ * \brief Initiate a connection to a server peer with an expected public key
+ *
+ * Note that this function does nothing on a server context.
+ *
+ * \param ctx The context to initiate a connection from
+ * \param connectionId The server peer to initiate a connection to
+ * \param serverPK A pointer to the public key that the server is expected to
+ * use (if the server does not use this public key, then the connection will
+ * fail; it must point to a buffer of size \p crypto_sign_PUBLICKEYBYTES)
+ *
+ * This function assumes that support for libsodium was enabled when UDPC was
+ * compiled. If it has not, then this function will fail.
+ */
 void UDPC_client_initiate_connection_pk(
     UDPC_HContext ctx,
     UDPC_ConnectionId connectionId,
     unsigned char *serverPK);
 
+/*!
+ * \brief Queues a packet to be sent to the specified peer
+ *
+ * Note that there must already be an established connection with the peer. A
+ * client can establish a connection to a server peer via a call to
+ * UDPC_client_initiate_connection() or UDPC_client_initiate_connection_pk(). A
+ * server must receive an initiate-connection-packet from a client to establish
+ * a connection (sent by previously mentioned UDPC_client_initiate_* functions).
+ *
+ * \param ctx The context to send a packet on
+ * \param destinationId The peer to send a packet to
+ * \param isChecked Set to non-zero if the packet should be re-sent if the peer
+ * doesn't receive it
+ * \param data A pointer to data to be sent in a packet
+ * \param size The size in bytes of the data to be sent
+ */
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
                      int isChecked, void *data, uint32_t size);
 
+/*!
+ * \brief Gets the size of the data structure holding queued packets
+ *
+ * Note that a UDPC context holds a different data structure per established
+ * connection that holds a limited amount of packets to send. If a connection's
+ * queue is full, it will not be removed from the main queue that this function
+ * (and UDPC_queue_send()) uses. The queue that this function refers to does not
+ * have an imposed limit as it is implemented as a thread-safe linked list (data
+ * is dynamically stored on the heap). Also note that this queue holds packets
+ * for all connections this context maintains. Thus if one connection has free
+ * space, then it may partially remove packets only destined for that connection
+ * from the queue this function refers to.
+ */
 unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx);
 
 int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);

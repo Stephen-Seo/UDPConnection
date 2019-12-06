@@ -44,6 +44,10 @@
 #define UDPC_LSFULL_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+1+crypto_sign_BYTES)
 #define UDPC_NSFULL_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+1)
 
+#define UDPC_UPDATE_MS_MIN 4
+#define UDPC_UPDATE_MS_MAX 333
+#define UDPC_UPDATE_MS_DEFAULT 8
+
 namespace UDPC {
 
 static const auto ONE_SECOND = std::chrono::seconds(1);
