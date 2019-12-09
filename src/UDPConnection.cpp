@@ -1159,6 +1159,28 @@ void UDPC::Context::update_impl() {
                 && conMap.find(identifier) == conMap.end()
                 && isAcceptNewConnections.load()) {
             // is receiving as server, connection did not already exist
+            int authPolicy = this->authPolicy.load();
+            if(pktType == 1 && !flags.test(2)
+                    && authPolicy == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                    "Client peer ",
+                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    " port ",
+                    ntohs(receivedData.sin6_port),
+                    " attempted connection with packet authentication "
+                    "enabled, but auth is disabled and AuthPolicy is STRICT");
+                return;
+            } else if(pktType == 0 && flags.test(2)
+                    && authPolicy == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                    "Client peer ",
+                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    " port ",
+                    ntohs(receivedData.sin6_port),
+                    " attempted connection with packet authentication "
+                    "disabled, but auth is enabled and AuthPolicy is STRICT");
+                return;
+            }
             unsigned char *sk = nullptr;
             unsigned char *pk = nullptr;
             if(keysSet.load()) {
@@ -1259,6 +1281,32 @@ void UDPC::Context::update_impl() {
                     ", port ", ntohs(receivedData.sin6_port));
                 return;
             }
+            int authPolicy = this->authPolicy.load();
+            if(pktType == 2 && !iter->second.flags.test(6)
+                    && authPolicy == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
+                // This block actually should never happen, because the server
+                // receives a packet first. If client requests without auth,
+                // then the server will either deny connection (if strict) or
+                // fallback to a connection without auth (if fallback).
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                    "Server peer ",
+                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    " port ",
+                    ntohs(receivedData.sin6_port),
+                    " attempted connection with packet authentication "
+                    "enabled, but auth is disabled and AuthPolicy is STRICT");
+                return;
+            } else if(pktType == 0 && iter->second.flags.test(6)
+                    && authPolicy == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                    "Server peer ",
+                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    " port ",
+                    ntohs(receivedData.sin6_port),
+                    " attempted connection with packet authentication "
+                    "disabled, but auth is enabled and AuthPolicy is STRICT");
+                return;
+            }
 
             if(pktType == 2 && flags.test(2) && iter->second.flags.test(6)) {
 #ifdef UDPC_LIBSODIUM_ENABLED
@@ -1300,7 +1348,6 @@ void UDPC::Context::update_impl() {
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
                         "peer is not using libsodium, but peer_pk was "
                         "pre-set, dropping to no-verification mode");
-                    // TODO set policy for using/not-using libsodium
                 }
             }
 
@@ -1663,6 +1710,7 @@ UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port) {
 UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLibsodium) {
     UDPC::Context *ctx = new UDPC::Context(false);
     ctx->flags.set(1, isClient != 0);
+    ctx->authPolicy.exchange(UDPC_AuthPolicy::UDPC_AUTH_POLICY_FALLBACK);
 
     UDPC_CHECK_LOG(ctx, UDPC_LoggingType::UDPC_INFO, "Got listen addr ",
         UDPC_atostr((UDPC_HContext)ctx, listenId.addr));
@@ -2144,6 +2192,35 @@ int UDPC_unset_libsodium_keys(UDPC_HContext ctx) {
     std::memset(c->pk, 0, crypto_sign_PUBLICKEYBYTES);
     std::memset(c->sk, 0, crypto_sign_SECRETKEYBYTES);
     return 1;
+}
+
+int UDPC_get_auth_policy(UDPC_HContext ctx) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return 0;
+    }
+
+    return c->authPolicy.load();
+}
+
+int UDPC_set_auth_policy(UDPC_HContext ctx, int policy) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return 0;
+    }
+
+    bool isInRange = false;
+    for(int i = 0; i < UDPC_AuthPolicy::UDPC_AUTH_POLICY_SIZE; ++i) {
+        if(policy == i) {
+            isInRange = true;
+            break;
+        }
+    }
+    if(!isInRange) {
+        return 0;
+    }
+
+    return c->authPolicy.exchange(policy);
 }
 
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {

@@ -109,7 +109,20 @@ extern "C" {
 struct UDPC_Context;
 typedef struct UDPC_Context *UDPC_HContext;
 
-typedef enum { UDPC_SILENT, UDPC_ERROR, UDPC_WARNING, UDPC_INFO, UDPC_VERBOSE, UDPC_DEBUG } UDPC_LoggingType;
+typedef enum {
+    UDPC_SILENT,
+    UDPC_ERROR,
+    UDPC_WARNING,
+    UDPC_INFO,
+    UDPC_VERBOSE,
+    UDPC_DEBUG
+} UDPC_LoggingType;
+
+typedef enum {
+    UDPC_AUTH_POLICY_FALLBACK=0,
+    UDPC_AUTH_POLICY_STRICT,
+    UDPC_AUTH_POLICY_SIZE /// Used internally to get max size of enum
+} UDPC_AuthPolicy;
 
 /*!
  * \brief Data identifying a peer via addr, port, and scope_id
@@ -473,6 +486,9 @@ int UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char 
 int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, unsigned char *sk);
 
 int UDPC_unset_libsodium_keys(UDPC_HContext ctx);
+
+int UDPC_get_auth_policy(UDPC_HContext ctx);
+int UDPC_set_auth_policy(UDPC_HContext ctx, int value);
 
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 

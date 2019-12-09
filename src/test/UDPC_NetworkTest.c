@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <threads.h>
+#include <assert.h>
 
 #ifdef UDPC_LIBSODIUM_ENABLED
 #include <sodium.h>
@@ -25,6 +26,7 @@ void usage() {
     puts("-ls - enable libsodium");
     puts("-ck <pubkey_file> - connect to server expecting this public key");
     puts("-sk <pubkey> <seckey> - start with pub/sec key pair");
+    puts("-p <\"fallback\" or \"strict\"> - set auth policy");
 }
 
 void sleep_seconds(unsigned int seconds) {
@@ -55,6 +57,8 @@ int main(int argc, char **argv) {
     const char *seckey_file = NULL;
     unsigned char pubkey[crypto_sign_PUBLICKEYBYTES];
     unsigned char seckey[crypto_sign_SECRETKEYBYTES];
+    int authPolicy = UDPC_AUTH_POLICY_FALLBACK;
+
     while(argc > 0) {
         if(strcmp(argv[0], "-c") == 0) {
             isClient = 1;
@@ -113,6 +117,18 @@ int main(int argc, char **argv) {
             pubkey_file = argv[0];
             --argc; ++argv;
             seckey_file = argv[0];
+        } else if(strcmp(argv[0], "-p") == 0 && argc > 1) {
+            if(strcmp(argv[1], "fallback") == 0) {
+                authPolicy = UDPC_AUTH_POLICY_FALLBACK;
+                --argc; ++argv;
+            } else if(strcmp(argv[1], "strict") == 0) {
+                authPolicy = UDPC_AUTH_POLICY_STRICT;
+                --argc; ++argv;
+            } else {
+                printf("ERROR: invalid argument \"%s %s\"\n", argv[0], argv[1]);
+                usage();
+                return 1;
+            }
         } else {
             printf("ERROR: invalid argument \"%s\"\n", argv[0]);
             usage();
@@ -194,6 +210,14 @@ int main(int argc, char **argv) {
     if(!isClient && pubkey_file && seckey_file) {
         UDPC_set_libsodium_keys(context, seckey, pubkey);
         puts("Set pubkey/seckey for server");
+    }
+
+    UDPC_set_auth_policy(context, authPolicy);
+    assert(UDPC_get_auth_policy(context) == authPolicy);
+    if(authPolicy == UDPC_AUTH_POLICY_FALLBACK) {
+        puts("Auth policy set to \"fallback\"");
+    } else if(authPolicy == UDPC_AUTH_POLICY_STRICT) {
+        puts("Auth policy set to \"strict\"");
     }
 
     UDPC_enable_threaded_update(context);

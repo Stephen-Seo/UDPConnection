@@ -209,6 +209,8 @@ public:
     std::atomic_bool isReceivingEvents;
     std::atomic_uint32_t protocolID;
     std::atomic_uint_fast8_t loggingType;
+    // See UDPC_AuthPolicy enum in UDPConnection.h for possible values
+    std::atomic_uint_fast8_t authPolicy;
     std::atomic_uint32_t atostrBufIndex;
     char atostrBuf[UDPC_ATOSTR_SIZE];
 
