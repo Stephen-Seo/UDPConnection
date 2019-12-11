@@ -60,7 +60,7 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
             src/test/TestUDPC.cpp
         )
         add_executable(UnitTest ${UDPC_UnitTest_SOURCES})
-        target_compile_features(UnitTest PUBLIC cxx_std_17)
+        target_compile_features(UnitTest PUBLIC cxx_std_11)
         target_link_libraries(UnitTest PUBLIC UDPConnection ${GTEST_BOTH_LIBRARIES})
         target_include_directories(UnitTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
     endif()
