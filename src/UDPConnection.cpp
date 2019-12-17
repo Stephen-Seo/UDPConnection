@@ -1702,7 +1702,8 @@ UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port) {
 
 UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port) {
     UDPC_ConnectionId conId{{0}, 0, port};
-    if(std::regex_match(addrString, ipv6_regex_nolink)) {
+    if(std::regex_match(addrString, ipv6_regex_nolink)
+            || std::regex_match(addrString, ipv4_regex)) {
         conId.addr = UDPC_strtoa(addrString);
     } else if(std::regex_match(addrString, ipv6_regex_linkonly)) {
         conId.addr = UDPC_strtoa_link(addrString, &conId.scope_id);
