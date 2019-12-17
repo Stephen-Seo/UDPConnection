@@ -308,11 +308,12 @@ int main(int argc, char **argv) {
     UDPC_set_accept_new_connections(context, 0);
 
     puts("Dropping all connections...");
-    UDPC_ConnectionId *ids = UDPC_get_list_connected(context, NULL);
+    UDPC_ConnectionId *ids = UDPC_get_list_connected(context, &temp);
     UDPC_ConnectionId *current = ids;
-    while(current->scope_id != 0 && current->port != 0) {
+    while(temp > 0) {
         UDPC_drop_connection(context, *current, 0);
         ++current;
+        --temp;
     }
     UDPC_free_list_connected(ids);
 

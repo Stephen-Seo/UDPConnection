@@ -1490,7 +1490,8 @@ void UDPC::Context::update_impl() {
         ntohs(receivedData.sin6_port),
         ", packet id = ", seqID,
         ", good mode = ", iter->second.flags.test(1) ? "yes" : "no",
-        isPing ? ", ping" : "");
+        isPing && !isConnect ? ", ping"
+            : (isPing && isConnect ? ", disc" : ""));
 
     // check if is delete
     if(isConnect && isPing) {
@@ -2167,6 +2168,9 @@ UDPC_ConnectionId* UDPC_get_list_connected(UDPC_HContext ctx, unsigned int *size
     std::lock_guard<std::mutex> lock(c->mutex);
 
     if(c->conMap.empty()) {
+        if(size) {
+            *size = 0;
+        }
         return nullptr;
     }
     if(size) {
