@@ -264,8 +264,8 @@ void UDPC::Context::update_impl() {
     // handle internalEvents
     do {
         auto optE = internalEvents.top_and_pop();
-        if(optE.has_value()) {
-            switch(optE.value.type) {
+        if(optE) {
+            switch(optE->type) {
             case UDPC_ET_REQUEST_CONNECT:
             {
                 unsigned char *sk = nullptr;
@@ -277,11 +277,11 @@ void UDPC::Context::update_impl() {
                 UDPC::ConnectionData newCon(
                     false,
                     this,
-                    optE.value.conId.addr,
-                    optE.value.conId.scope_id,
-                    optE.value.conId.port,
+                    optE->conId.addr,
+                    optE->conId.scope_id,
+                    optE->conId.port,
 #ifdef UDPC_LIBSODIUM_ENABLED
-                    flags.test(2) && optE.value.v.enableLibSodium != 0,
+                    flags.test(2) && optE->v.enableLibSodium != 0,
                     sk, pk);
 #else
                     false,
@@ -292,9 +292,9 @@ void UDPC::Context::update_impl() {
                         UDPC_LoggingType::UDPC_ERROR,
                         "Failed to init ConnectionData instance (libsodium "
                         "init fail) while client establishing connection with ",
-                        UDPC_atostr((UDPC_HContext)this, optE.value.conId.addr),
+                        UDPC_atostr((UDPC_HContext)this, optE->conId.addr),
                         " port ",
-                        optE.value.conId.port);
+                        optE->conId.port);
                     continue;
                 }
                 newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
@@ -314,34 +314,34 @@ void UDPC::Context::update_impl() {
 #endif
                 }
 
-                if(conMap.find(optE.value.conId) == conMap.end()) {
+                if(conMap.find(optE->conId) == conMap.end()) {
                     conMap.insert(std::make_pair(
-                        optE.value.conId,
+                        optE->conId,
                         std::move(newCon)));
-                    auto addrConIter = addrConMap.find(optE.value.conId.addr);
+                    auto addrConIter = addrConMap.find(optE->conId.addr);
                     if(addrConIter == addrConMap.end()) {
                         auto insertResult = addrConMap.insert(std::make_pair(
-                            optE.value.conId.addr,
+                            optE->conId.addr,
                             std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher>{}));
                         assert(insertResult.second &&
                             "new connection insert into addrConMap must not fail");
                         addrConIter = insertResult.first;
                     }
-                    addrConIter->second.insert(optE.value.conId);
+                    addrConIter->second.insert(optE->conId);
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_INFO,
                         "Client initiating connection to ",
-                        UDPC_atostr((UDPC_HContext)this, optE.value.conId.addr),
+                        UDPC_atostr((UDPC_HContext)this, optE->conId.addr),
                         " port ",
-                        optE.value.conId.port,
+                        optE->conId.port,
                         " ...");
                 } else {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_WARNING,
                         "Client initiate connection, already connected to peer ",
-                        UDPC_atostr((UDPC_HContext)this, optE.value.conId.addr),
+                        UDPC_atostr((UDPC_HContext)this, optE->conId.addr),
                         " port ",
-                        optE.value.conId.port);
+                        optE->conId.port);
                 }
             }
                 break;
@@ -358,9 +358,9 @@ void UDPC::Context::update_impl() {
                 UDPC::ConnectionData newCon(
                     false,
                     this,
-                    optE.value.conId.addr,
-                    optE.value.conId.scope_id,
-                    optE.value.conId.port,
+                    optE->conId.addr,
+                    optE->conId.scope_id,
+                    optE->conId.port,
 #ifdef UDPC_LIBSODIUM_ENABLED
                     true,
                     sk, pk);
@@ -368,18 +368,18 @@ void UDPC::Context::update_impl() {
                     false,
                     sk, pk);
                 assert(!"compiled without libsodium support");
-                delete[] optE.value.v.pk;
+                delete[] optE->v.pk;
                 break;
 #endif
                 if(newCon.flags.test(5)) {
-                    delete[] optE.value.v.pk;
+                    delete[] optE->v.pk;
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_ERROR,
                         "Failed to init ConnectionData instance (libsodium "
                         "init fail) while client establishing connection with ",
-                        UDPC_atostr((UDPC_HContext)this, optE.value.conId.addr),
+                        UDPC_atostr((UDPC_HContext)this, optE->conId.addr),
                         " port ",
-                        optE.value.conId.port);
+                        optE->conId.port);
                     continue;
                 }
                 newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
@@ -401,48 +401,48 @@ void UDPC::Context::update_impl() {
                     // set peer public key
                     std::memcpy(
                         newCon.peer_pk,
-                        optE.value.v.pk,
+                        optE->v.pk,
                         crypto_sign_PUBLICKEYBYTES);
                     newCon.flags.set(7);
                 }
 
-                delete[] optE.value.v.pk;
+                delete[] optE->v.pk;
 
-                if(conMap.find(optE.value.conId) == conMap.end()) {
+                if(conMap.find(optE->conId) == conMap.end()) {
                     conMap.insert(std::make_pair(
-                        optE.value.conId,
+                        optE->conId,
                         std::move(newCon)));
-                    auto addrConIter = addrConMap.find(optE.value.conId.addr);
+                    auto addrConIter = addrConMap.find(optE->conId.addr);
                     if(addrConIter == addrConMap.end()) {
                         auto insertResult = addrConMap.insert(std::make_pair(
-                            optE.value.conId.addr,
+                            optE->conId.addr,
                             std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher>{}));
                         assert(insertResult.second &&
                             "new connection insert into addrConMap must not fail");
                         addrConIter = insertResult.first;
                     }
-                    addrConIter->second.insert(optE.value.conId);
+                    addrConIter->second.insert(optE->conId);
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_INFO,
                         "Client initiating connection to ",
-                        UDPC_atostr((UDPC_HContext)this, optE.value.conId.addr),
+                        UDPC_atostr((UDPC_HContext)this, optE->conId.addr),
                         " port ",
-                        optE.value.conId.port,
+                        optE->conId.port,
                         " ...");
                 } else {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_WARNING,
                         "Client initiate connection, already connected to peer ",
-                        UDPC_atostr((UDPC_HContext)this, optE.value.conId.addr),
+                        UDPC_atostr((UDPC_HContext)this, optE->conId.addr),
                         " port ",
-                        optE.value.conId.port);
+                        optE->conId.port);
                 }
             }
                 break;
             case UDPC_ET_REQUEST_DISCONNECT:
-                if(optE.value.v.dropAllWithAddr != 0) {
+                if(optE->v.dropAllWithAddr != 0) {
                     // drop all connections with same address
-                    auto addrConIter = addrConMap.find(optE.value.conId.addr);
+                    auto addrConIter = addrConMap.find(optE->conId.addr);
                     if(addrConIter != addrConMap.end()) {
                         for(auto identIter = addrConIter->second.begin();
                                 identIter != addrConIter->second.end();
@@ -463,14 +463,14 @@ void UDPC::Context::update_impl() {
                     }
                 } else {
                     // drop only specific connection with addr and port
-                    auto iter = conMap.find(optE.value.conId);
+                    auto iter = conMap.find(optE->conId);
                     if(iter != conMap.end()) {
                         if(iter->second.flags.test(4)) {
                             idMap.erase(iter->second.id);
                         }
-                        auto addrConIter = addrConMap.find(optE.value.conId.addr);
+                        auto addrConIter = addrConMap.find(optE->conId.addr);
                         if(addrConIter != addrConMap.end()) {
-                            addrConIter->second.erase(optE.value.conId);
+                            addrConIter->second.erase(optE->conId);
                             if(addrConIter->second.empty()) {
                                 addrConMap.erase(addrConIter);
                             }
@@ -607,18 +607,18 @@ void UDPC::Context::update_impl() {
         while(true) {
             auto next = sendIter.current();
             if(next) {
-                auto iter = conMap.find(next.value.receiver);
+                auto iter = conMap.find(next->receiver);
                 if(iter != conMap.end()) {
                     if(iter->second.sendPkts.size() >= UDPC_QUEUED_PKTS_MAX_SIZE) {
-                        if(notQueued.find(next.value.receiver) == notQueued.end()) {
-                            notQueued.insert(next.value.receiver);
+                        if(notQueued.find(next->receiver) == notQueued.end()) {
+                            notQueued.insert(next->receiver);
                             UDPC_CHECK_LOG(this,
                                 UDPC_LoggingType::UDPC_DEBUG,
                                 "Not queueing packet to ",
                                 UDPC_atostr((UDPC_HContext)this,
-                                    next.value.receiver.addr),
+                                    next->receiver.addr),
                                 ", port = ",
-                                next.value.receiver.port,
+                                next->receiver.port,
                                 ", connection's queue reached max size");
                         }
                         if(sendIter.next()) {
@@ -627,24 +627,24 @@ void UDPC::Context::update_impl() {
                             break;
                         }
                     }
-                    iter->second.sendPkts.push_back(next.value);
+                    iter->second.sendPkts.push_back(*next);
                     if(sendIter.remove()) {
                         continue;
                     } else {
                         break;
                     }
                 } else {
-                    if(dropped.find(next.value.receiver) == dropped.end()) {
+                    if(dropped.find(next->receiver) == dropped.end()) {
                         UDPC_CHECK_LOG(this,
                             UDPC_LoggingType::UDPC_WARNING,
                             "Dropped queued packets to ",
                             UDPC_atostr(
                                 (UDPC_HContext)this,
-                                next.value.receiver.addr),
+                                next->receiver.addr),
                             ", port = ",
-                            next.value.receiver.port,
+                            next->receiver.port,
                             " due to connection not existing");
-                        dropped.insert(next.value.receiver);
+                        dropped.insert(next->receiver);
                     }
                     if(sendIter.remove()) {
                         continue;
@@ -1929,8 +1929,8 @@ void UDPC_destroy(UDPC_HContext ctx) {
 #endif
         while(!UDPC_ctx->internalEvents.empty()) {
             auto optE = UDPC_ctx->internalEvents.top_and_pop();
-            if(optE.has_value() && optE.value.type == UDPC_ET_REQUEST_CONNECT_PK) {
-                delete[] optE.value.v.pk;
+            if(optE && optE->type == UDPC_ET_REQUEST_CONNECT_PK) {
+                delete[] optE->v.pk;
             }
         }
         UDPC_ctx->_contextIdentifier = 0;
@@ -2147,7 +2147,7 @@ UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining) {
 
     auto optE = c->externalEvents.top_and_pop_and_rsize(remaining);
     if(optE) {
-        return optE.value;
+        return *optE;
     } else {
         return UDPC_Event{UDPC_ET_NONE, UDPC_create_id_anyaddr(0), 0};
     }

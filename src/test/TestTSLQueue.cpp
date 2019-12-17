@@ -8,7 +8,7 @@
 TEST(TSLQueue, PushTopPopSize) {
     TSLQueue<int> q;
 
-    EXPECT_FALSE(q.top().has_value());
+    EXPECT_FALSE(q.top());
 
     for(int i = 0; i < 10; ++i) {
         EXPECT_EQ(i, q.size());
@@ -17,8 +17,8 @@ TEST(TSLQueue, PushTopPopSize) {
 
     for(int i = 0; i < 10; ++i) {
         auto v = q.top();
-        ASSERT_TRUE(v.has_value());
-        EXPECT_EQ(v.value, i);
+        ASSERT_TRUE(v);
+        EXPECT_EQ(*v, i);
         EXPECT_EQ(10 - i, q.size());
         EXPECT_TRUE(q.pop());
     }
@@ -37,21 +37,21 @@ TEST(TSLQueue, PushNB_TopNB_TopAndPop_Size) {
 
     for(int i = 0; i < 10; ++i) {
         auto v = q.top_nb();
-        ASSERT_TRUE(v.has_value());
-        EXPECT_EQ(v.value, i);
+        ASSERT_TRUE(v);
+        EXPECT_EQ(*v, i);
         EXPECT_EQ(q.size(), 10 - i);
         v = q.top_and_pop();
-        ASSERT_TRUE(v.has_value());
-        EXPECT_EQ(v.value, i);
+        ASSERT_TRUE(v);
+        EXPECT_EQ(*v, i);
     }
 
     {
         auto v = q.top_nb();
-        ASSERT_FALSE(v.has_value());
+        ASSERT_FALSE(v);
     }
     {
         auto v = q.top_and_pop();
-        ASSERT_FALSE(v.has_value());
+        ASSERT_FALSE(v);
     }
     EXPECT_EQ(q.size(), 0);
 }
@@ -68,8 +68,8 @@ TEST(TSLQueue, Push_TopAndPopAndEmpty_Size) {
     for(int i = 0; i < 10; ++i) {
         EXPECT_EQ(q.size(), 10 - i);
         auto v = q.top_and_pop_and_empty(&isEmpty);
-        ASSERT_TRUE(v.has_value());
-        EXPECT_EQ(v.value, i);
+        ASSERT_TRUE(v);
+        EXPECT_EQ(*v, i);
         EXPECT_EQ(i == 9, isEmpty);
     }
     EXPECT_EQ(q.size(), 0);
@@ -109,9 +109,9 @@ TEST(TSLQueue, Concurrent) {
     for(int i = 0; i < 100; ++i) {
         EXPECT_EQ(q.size(), 100 - i);
         auto v = q.top_and_pop();
-        ASSERT_TRUE(v.has_value());
-        EXPECT_GE(v.value, 0);
-        EXPECT_LE(v.value, 100);
+        ASSERT_TRUE(v);
+        EXPECT_GE(*v, 0);
+        EXPECT_LE(*v, 100);
         EXPECT_EQ(i == 99, q.empty());
     }
     EXPECT_EQ(q.size(), 0);
@@ -130,8 +130,8 @@ TEST(TSLQueue, Iterator) {
         auto iter = q.begin();
         int i = 0;
         auto op = iter.current();
-        while(op.has_value()) {
-            EXPECT_EQ(op.value, i++);
+        while(op) {
+            EXPECT_EQ(*op, i++);
             if(i < 10) {
                 EXPECT_TRUE(iter.next());
             } else {
@@ -143,13 +143,13 @@ TEST(TSLQueue, Iterator) {
         // test that lock is held by iterator
         EXPECT_FALSE(q.push_nb(10));
         op = q.top_nb();
-        EXPECT_FALSE(op.has_value());
+        EXPECT_FALSE(op);
 
         // backwards iteration
         EXPECT_TRUE(iter.prev());
         op = iter.current();
-        while(op.has_value()) {
-            EXPECT_EQ(op.value, --i);
+        while(op) {
+            EXPECT_EQ(*op, --i);
             if(i > 0) {
                 EXPECT_TRUE(iter.prev());
             } else {
@@ -168,23 +168,23 @@ TEST(TSLQueue, Iterator) {
         EXPECT_TRUE(iter.remove());
 
         auto op = iter.current();
-        EXPECT_TRUE(op.has_value());
-        EXPECT_EQ(op.value, 4);
+        EXPECT_TRUE(op);
+        EXPECT_EQ(*op, 4);
 
         EXPECT_TRUE(iter.prev());
         op = iter.current();
-        EXPECT_TRUE(op.has_value());
-        EXPECT_EQ(op.value, 2);
+        EXPECT_TRUE(op);
+        EXPECT_EQ(*op, 2);
     }
     EXPECT_EQ(q.size(), 9);
 
     // check that "3" was removed from queue
     int i = 0;
-    TSLQueue<int>::Entry op;
+    std::unique_ptr<int> op;
     while(!q.empty()) {
         op = q.top();
-        EXPECT_TRUE(op.has_value());
-        EXPECT_EQ(i++, op.value);
+        EXPECT_TRUE(op);
+        EXPECT_EQ(i++, *op);
         if(i == 3) {
             ++i;
         }
@@ -205,8 +205,8 @@ TEST(TSLQueue, Iterator) {
     i = 1;
     while(!q.empty()) {
         op = q.top();
-        EXPECT_TRUE(op.has_value());
-        EXPECT_EQ(i++, op.value);
+        EXPECT_TRUE(op);
+        EXPECT_EQ(i++, *op);
         EXPECT_TRUE(q.pop());
     }
 
@@ -221,8 +221,8 @@ TEST(TSLQueue, Iterator) {
         while(true) {
             EXPECT_TRUE(iter.next());
             op = iter.current();
-            EXPECT_TRUE(op.has_value());
-            if(op.value == 3) {
+            EXPECT_TRUE(op);
+            if(*op == 3) {
                 EXPECT_FALSE(iter.remove());
                 break;
             }
@@ -232,11 +232,29 @@ TEST(TSLQueue, Iterator) {
     i = 0;
     while(!q.empty()) {
         op = q.top();
-        EXPECT_TRUE(op.has_value());
-        EXPECT_EQ(i++, op.value);
+        EXPECT_TRUE(op);
+        EXPECT_EQ(i++, *op);
         EXPECT_TRUE(q.pop());
         if(i == 3) {
             EXPECT_TRUE(q.empty());
         }
     }
+}
+
+TEST(TSLQueue, TempToNew) {
+    TSLQueue<int> q;
+
+    q.push(1234);
+    q.push(5678);
+
+    auto getValue = [] (TSLQueue<int> *q) -> int {
+        auto uptr = q->top_and_pop();
+        return *uptr;
+    };
+    int value;
+
+    value = getValue(&q);
+    EXPECT_EQ(1234, value);
+    value = getValue(&q);
+    EXPECT_EQ(5678, value);
 }
