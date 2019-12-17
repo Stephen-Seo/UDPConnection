@@ -304,6 +304,22 @@ int main(int argc, char **argv) {
             break;
         }
     }
+
+    UDPC_set_accept_new_connections(context, 0);
+
+    puts("Dropping all connections...");
+    UDPC_ConnectionId *ids = UDPC_get_list_connected(context, NULL);
+    UDPC_ConnectionId *current = ids;
+    while(current->scope_id != 0 && current->port != 0) {
+        UDPC_drop_connection(context, *current, 0);
+        ++current;
+    }
+    UDPC_free_list_connected(ids);
+
+    puts("Waiting 2 seconds for disconnect packets to be sent...");
+    sleep_seconds(2);
+
+    puts("Cleaning up UDPC context...");
     UDPC_destroy(context);
 
     return 0;

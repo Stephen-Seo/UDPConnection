@@ -224,6 +224,7 @@ public:
     std::unordered_map<UDPC_IPV6_ADDR_TYPE, std::unordered_set<UDPC_ConnectionId, ConnectionIdHasher>, IPV6_Hasher> addrConMap;
     // id to ipv6 address and port (as UDPC_ConnectionId)
     std::unordered_map<uint32_t, UDPC_ConnectionId> idMap;
+    std::unordered_set<UDPC_ConnectionId, ConnectionIdHasher> deletionMap;
     TSLQueue<UDPC_PacketInfo> receivedPkts;
     TSLQueue<UDPC_PacketInfo> cSendPkts;
     // handled internally
