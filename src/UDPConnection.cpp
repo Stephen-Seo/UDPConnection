@@ -1170,7 +1170,9 @@ void UDPC::Context::update_impl() {
     bool isNotRecChecked = conID & UDPC_ID_NO_REC_CHK;
     bool isResending = conID & UDPC_ID_RESENDING;
     conID &= 0x0FFFFFFF;
-    UDPC_ConnectionId identifier{receivedData.sin6_addr, receivedData.sin6_scope_id, ntohs(receivedData.sin6_port)};
+    UDPC_ConnectionId identifier = UDPC_create_id_full(receivedData.sin6_addr,
+                                                       receivedData.sin6_scope_id,
+                                                       ntohs(receivedData.sin6_port));
 
     if(isConnect && !isPing && bytes < (int)(UDPC_CON_HEADER_SIZE)) {
         // invalid packet size
@@ -2227,14 +2229,15 @@ UDPC_ConnectionId* UDPC_get_list_connected(UDPC_HContext ctx, unsigned int *size
         *size = c->conMap.size();
     }
 
-    UDPC_ConnectionId *list = (UDPC_ConnectionId*)std::malloc(
-            sizeof(UDPC_ConnectionId) * (c->conMap.size() + 1));
+    UDPC_ConnectionId *list = (UDPC_ConnectionId*)std::calloc(
+            c->conMap.size() + 1, sizeof(UDPC_ConnectionId));
     UDPC_ConnectionId *current = list;
     for(auto iter = c->conMap.begin(); iter != c->conMap.end(); ++iter) {
         *current = iter->first;
         ++current;
     }
-    *current = UDPC_ConnectionId{{0}, 0, 0};
+    // following line is redudnant, since calloc initialized all bits to zero
+//    *current = UDPC_ConnectionId{{0}, 0, 0};
     return list;
 }
 
