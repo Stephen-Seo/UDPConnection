@@ -1791,28 +1791,54 @@ void UDPC::threadedUpdate(Context *ctx) {
 }
 
 UDPC_ConnectionId UDPC_create_id(UDPC_IPV6_ADDR_TYPE addr, uint16_t port) {
-    return UDPC_ConnectionId{addr, 0, port};
+    UDPC_ConnectionId result;
+
+    std::memset(&result, 0, sizeof(UDPC_ConnectionId));
+
+    result.addr = addr;
+//    result.scope_id = 0;
+    result.port = port;
+    return result;
 }
 
 UDPC_ConnectionId UDPC_create_id_full(UDPC_IPV6_ADDR_TYPE addr, uint32_t scope_id, uint16_t port) {
-    return UDPC_ConnectionId{addr, scope_id, port};
+    UDPC_ConnectionId result;
+
+    std::memset(&result, 0, sizeof(UDPC_ConnectionId));
+
+    result.addr = addr;
+    result.scope_id = scope_id;
+    result.port = port;
+    return result;
 }
 
 UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port) {
-    return UDPC_ConnectionId{in6addr_any, 0, port};
+    UDPC_ConnectionId result;
+
+    std::memset(&result, 0, sizeof(UDPC_ConnectionId));
+
+//    result.addr = in6addr_any;
+    result.scope_id = 0;
+    result.port = port;
+    return result;
 }
 
 UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port) {
-    UDPC_ConnectionId conId{{0}, 0, port};
+    UDPC_ConnectionId result;
+
+    std::memset(&result, 0, sizeof(UDPC_ConnectionId));
+
+    result.port = port;
+
     if(std::regex_match(addrString, ipv6_regex_nolink)
             || std::regex_match(addrString, ipv4_regex)) {
-        conId.addr = UDPC_strtoa(addrString);
+        result.addr = UDPC_strtoa(addrString);
     } else if(std::regex_match(addrString, ipv6_regex_linkonly)) {
-        conId.addr = UDPC_strtoa_link(addrString, &conId.scope_id);
+        result.addr = UDPC_strtoa_link(addrString, &result.scope_id);
     } else {
-        conId.addr = in6addr_loopback;
+        result.addr = in6addr_loopback;
     }
-    return conId;
+    return result;
 }
 
 UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLibsodium) {
@@ -2436,6 +2462,10 @@ UDPC_IPV6_ADDR_TYPE UDPC_strtoa(const char *addrStr) {
     UDPC_IPV6_ADDR_TYPE result = in6addr_loopback;
     std::cmatch matchResults;
     if(std::regex_match(addrStr, matchResults, ipv6_regex_nolink)) {
+        if(std::strcmp("::", addrStr) == 0) {
+            return in6addr_any;
+        }
+
         unsigned int index = 0;
         unsigned int strIndex = 0;
         int doubleColonIndex = -1;

@@ -235,3 +235,25 @@ TEST(UDPC, create_id_easy) {
     EXPECT_EQ(conId.scope_id, 3);
     EXPECT_EQ(conId.port, 123);
 }
+
+TEST(UDPC, ConnectionIdBits) {
+    UDPC_ConnectionId id = UDPC_create_id({0}, 0);
+    for(unsigned int i = 0; i < sizeof(UDPC_ConnectionId); ++i) {
+        EXPECT_EQ(((char*)&id)[i], 0);
+    }
+
+    id = UDPC_create_id_full({0}, 0, 0);
+    for(unsigned int i = 0; i < sizeof(UDPC_ConnectionId); ++i) {
+        EXPECT_EQ(((char*)&id)[i], 0);
+    }
+
+    id = UDPC_create_id_anyaddr(0);
+    for(unsigned int i = 0; i < sizeof(UDPC_ConnectionId); ++i) {
+        EXPECT_EQ(((char*)&id)[i], 0);
+    }
+
+    id = UDPC_create_id_easy("::", 0);
+    for(unsigned int i = 0; i < sizeof(UDPC_ConnectionId); ++i) {
+        EXPECT_EQ(((char*)&id)[i], 0);
+    }
+}
