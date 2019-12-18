@@ -225,6 +225,7 @@ int main(int argc, char **argv) {
     unsigned int tick = 0;
     unsigned int temp = 0;
     unsigned int temp2, temp3;
+    int temp4;
     unsigned long size;
     UDPC_ConnectionId *list = NULL;
     unsigned int sendIds[SEND_IDS_SIZE];
@@ -242,24 +243,30 @@ int main(int argc, char **argv) {
         }
         if(!noPayload) {
             list = UDPC_get_list_connected(context, &temp);
-            if(list) {
-                if(sendIdsSize < temp) {
-                    while(sendIdsSize < temp) {
-                        if(sendIdsSize == SEND_IDS_SIZE) {
-                            temp = SEND_IDS_SIZE;
-                            break;
-                        }
-                        sendIds[sendIdsSize++] = 0;
+
+            if(sendIdsSize < temp) {
+                while(sendIdsSize < temp) {
+                    if(sendIdsSize == SEND_IDS_SIZE) {
+                        temp = SEND_IDS_SIZE;
+                        break;
                     }
-                } else if(sendIdsSize > temp) {
-                    sendIdsSize = temp;
+                    sendIds[sendIdsSize++] = 0;
                 }
-                size = UDPC_get_queue_send_current_size(context);
-                temp2 = size < QUEUED_MAX_SIZE ? QUEUED_MAX_SIZE - size : 0;
-                for(unsigned int i = 0; i < temp2; ++i) {
-                    temp3 = htonl(sendIds[i % temp]++);
-                    UDPC_queue_send(context, list[i % temp], 0, &temp3, sizeof(unsigned int));
+            } else if(sendIdsSize > temp) {
+                sendIdsSize = temp;
+            }
+
+            for(unsigned int i = 0; i < temp; ++i) {
+                size = UDPC_get_max_queued_size() - UDPC_get_queued_size(context, list[i], &temp4);
+                if(temp4 == 0) {
+                    continue;
                 }
+                for(unsigned int j = 0; j < size; ++j) {
+                    temp2 = htonl(sendIds[i]++);
+                    UDPC_queue_send(context, list[i], 0, &temp2, sizeof(unsigned int));
+                }
+            }
+            if(list) {
                 UDPC_free_list_connected(list);
             }
             do {

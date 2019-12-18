@@ -2129,6 +2129,30 @@ unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx) {
     return c->cSendPkts.size();
 }
 
+unsigned long UDPC_get_queued_size(UDPC_HContext ctx, UDPC_ConnectionId id, int *exists) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return 0;
+    }
+
+    std::lock_guard<std::mutex> lock(c->mutex);
+    auto iter = c->conMap.find(id);
+    if(iter != c->conMap.end()) {
+        if(exists) {
+            *exists = 1;
+        }
+        return iter->second.sendPkts.size();
+    }
+    if(exists) {
+        *exists = 0;
+    }
+    return 0;
+}
+
+unsigned long UDPC_get_max_queued_size() {
+    return UDPC_QUEUED_PKTS_MAX_SIZE;
+}
+
 int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c) {

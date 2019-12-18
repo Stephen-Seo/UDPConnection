@@ -455,6 +455,10 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
  */
 unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx);
 
+unsigned long UDPC_get_queued_size(UDPC_HContext ctx, UDPC_ConnectionId id, int *exists);
+
+unsigned long UDPC_get_max_queued_size();
+
 int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);
 
 void UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, int dropAllWithAddr);
