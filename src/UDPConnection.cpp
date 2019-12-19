@@ -1784,9 +1784,10 @@ void UDPC::threadedUpdate(Context *ctx) {
     decltype(now) nextNow;
     while(ctx->threadRunning.load()) {
         now = std::chrono::steady_clock::now();
-        ctx->mutex.lock();
-        ctx->update_impl();
-        ctx->mutex.unlock();
+        {
+            std::lock_guard<std::mutex> lock(ctx->mutex);
+            ctx->update_impl();
+        }
         nextNow = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(ctx->threadedSleepTime - (nextNow - now));
     }
@@ -2075,6 +2076,7 @@ void UDPC_update(UDPC_HContext ctx) {
         return;
     }
 
+    std::lock_guard<std::mutex> lock(c->mutex);
     c->update_impl();
 }
 
