@@ -424,11 +424,13 @@ void UDPC_client_initiate_connection_pk(
 /*!
  * \brief Queues a packet to be sent to the specified peer
  *
- * Note that there must already be an established connection with the peer. A
- * client can establish a connection to a server peer via a call to
- * UDPC_client_initiate_connection() or UDPC_client_initiate_connection_pk(). A
- * server must receive an initiate-connection-packet from a client to establish
- * a connection (sent by previously mentioned UDPC_client_initiate_* functions).
+ * Note that there must already be an established connection with the peer. If
+ * a packet is queued for a peer that is not connected, it will be dropped and
+ * logged with log-level warning. A client can establish a connection to a
+ * server peer via a call to UDPC_client_initiate_connection() or
+ * UDPC_client_initiate_connection_pk(). A server must receive an
+ * initiate-connection-packet from a client to establish a connection (sent by
+ * previously mentioned UDPC_client_initiate_* functions).
  *
  * \param ctx The context to send a packet on
  * \param destinationId The peer to send a packet to
@@ -448,15 +450,31 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
  * queue is full, it will not be removed from the main queue that this function
  * (and UDPC_queue_send()) uses. The queue that this function refers to does not
  * have an imposed limit as it is implemented as a thread-safe linked list (data
- * is dynamically stored on the heap). Also note that this queue holds packets
- * for all connections this context maintains. Thus if one connection has free
- * space, then it may partially remove packets only destined for that connection
- * from the queue this function refers to.
+ * is dynamically stored on the heap) and access to this data structure is
+ * faster than accessing a connection's internal queue. Also note that this
+ * queue holds packets for all connections this context maintains. Thus if one
+ * connection has free space, then it may partially remove packets only destined
+ * for that connection from the queue this function refers to.
  */
 unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx);
 
+/*!
+ * \brief Gets the size of a connection's queue of queued packets
+ *
+ * Note that a UDPC context holds a queue per established connection that holds
+ * a limited amount of packets to send. This function checks a connection's
+ * internal queue, but must do so after locking an internal mutex (a call to
+ * UDPC_update() will lock this mutex, regardless of whether or not the context
+ * is using threaded update).
+ */
 unsigned long UDPC_get_queued_size(UDPC_HContext ctx, UDPC_ConnectionId id, int *exists);
 
+/*!
+ * \brief Gets the size limit of a connection's queue of queued packets
+ *
+ * Note that a call to this function does not use any locks, as the limit is
+ * known at compile time and is the same for all UDPC connections.
+ */
 unsigned long UDPC_get_max_queued_size();
 
 int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);
