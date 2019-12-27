@@ -168,6 +168,7 @@ typedef struct {
      * was received.
      */
     uint16_t dataSize;
+    uint16_t rtt;
     /// The \p UDPC_ConnectionId of the sender
     UDPC_ConnectionId sender;
     /// The \p UDPC_ConnectionId of the receiver

@@ -1657,11 +1657,12 @@ void UDPC::Context::update_impl() {
             "Received packet is out of order");
     }
 
-    if((pktType == 0 && bytes > (int)UDPC_NSFULL_HEADER_SIZE)
-            | (pktType == 1 && bytes > (int)UDPC_LSFULL_HEADER_SIZE)) {
+    if(pktType == 0 && bytes > (int)UDPC_NSFULL_HEADER_SIZE) {
         UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
-        std::memcpy(recPktInfo.data, recvBuf, bytes);
-        recPktInfo.dataSize = bytes;
+        std::memcpy(recPktInfo.data + UDPC_NSFULL_HEADER_SIZE,
+                    recvBuf,
+                    bytes - UDPC_NSFULL_HEADER_SIZE);
+        recPktInfo.dataSize = bytes - UDPC_NSFULL_HEADER_SIZE;
         recPktInfo.flags =
             (isConnect ? 0x1 : 0)
             | (isPing ? 0x2 : 0)
@@ -1671,6 +1672,25 @@ void UDPC::Context::update_impl() {
         recPktInfo.receiver.addr = in6addr_loopback;
         recPktInfo.sender.port = ntohs(receivedData.sin6_port);
         recPktInfo.receiver.port = ntohs(socketInfo.sin6_port);
+        recPktInfo.rtt = durationToMS(iter->second.rtt);
+
+        receivedPkts.push(recPktInfo);
+    } else if(pktType == 1 && bytes > (int)UDPC_LSFULL_HEADER_SIZE) {
+        UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
+        std::memcpy(recPktInfo.data + UDPC_LSFULL_HEADER_SIZE,
+                    recvBuf,
+                    bytes - UDPC_LSFULL_HEADER_SIZE);
+        recPktInfo.dataSize = bytes - UDPC_LSFULL_HEADER_SIZE;
+        recPktInfo.flags =
+            (isConnect ? 0x1 : 0)
+            | (isPing ? 0x2 : 0)
+            | (isNotRecChecked ? 0x4 : 0)
+            | (isResending ? 0x8 : 0);
+        recPktInfo.sender.addr = receivedData.sin6_addr;
+        recPktInfo.receiver.addr = in6addr_loopback;
+        recPktInfo.sender.port = ntohs(receivedData.sin6_port);
+        recPktInfo.receiver.port = ntohs(socketInfo.sin6_port);
+        recPktInfo.rtt = durationToMS(iter->second.rtt);
 
         receivedPkts.push(recPktInfo);
     } else {
@@ -1753,6 +1773,10 @@ float UDPC::durationToFSec(const std::chrono::steady_clock::duration& duration) 
         / (float)std::decay_t<decltype(duration)>::period::den;
 }
 
+uint16_t UDPC::durationToMS(const std::chrono::steady_clock::duration& duration) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+}
+
 float UDPC::timePointsToFSec(
         const std::chrono::steady_clock::time_point& older,
         const std::chrono::steady_clock::time_point& newer) {
@@ -1766,6 +1790,7 @@ UDPC_PacketInfo UDPC::get_empty_pinfo() {
         {0},     // data (array)
         0,       // flags
         0,       // dataSize
+        0,       // rtt
         {        // sender
             {0},   // ipv6 addr
             0,     // scope_id

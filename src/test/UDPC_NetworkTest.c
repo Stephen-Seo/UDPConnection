@@ -271,11 +271,13 @@ int main(int argc, char **argv) {
             }
             do {
                 received = UDPC_get_received(context, &size);
+//                printf("Received data size = %u\n", received.dataSize);
                 if(received.dataSize == sizeof(unsigned int)) {
                     if((received.flags & 0x8) != 0) {
                         temp2 = ntohl(*((unsigned int*)received.data));
                         printf("Got out of order, data = %u\n", temp2);
                     }
+//                    printf("Got rtt %u\n", received.rtt);
                 }
             } while (size > 0);
         }

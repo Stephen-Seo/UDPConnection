@@ -263,6 +263,8 @@ uint32_t generateConnectionID(Context &ctx);
 
 float durationToFSec(const std::chrono::steady_clock::duration& duration);
 
+uint16_t durationToMS(const std::chrono::steady_clock::duration& duration);
+
 float timePointsToFSec(
     const std::chrono::steady_clock::time_point& older,
     const std::chrono::steady_clock::time_point& newer);
