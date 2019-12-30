@@ -1659,10 +1659,10 @@ void UDPC::Context::update_impl() {
 
     if(pktType == 0 && bytes > (int)UDPC_NSFULL_HEADER_SIZE) {
         UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
-        std::memcpy(recPktInfo.data + UDPC_NSFULL_HEADER_SIZE,
-                    recvBuf,
-                    bytes - UDPC_NSFULL_HEADER_SIZE);
         recPktInfo.dataSize = bytes - UDPC_NSFULL_HEADER_SIZE;
+        std::memcpy(recPktInfo.data,
+                    recvBuf + UDPC_NSFULL_HEADER_SIZE,
+                    recPktInfo.dataSize);
         recPktInfo.flags =
             (isConnect ? 0x1 : 0)
             | (isPing ? 0x2 : 0)
@@ -1677,10 +1677,10 @@ void UDPC::Context::update_impl() {
         receivedPkts.push(recPktInfo);
     } else if(pktType == 1 && bytes > (int)UDPC_LSFULL_HEADER_SIZE) {
         UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
-        std::memcpy(recPktInfo.data + UDPC_LSFULL_HEADER_SIZE,
-                    recvBuf,
-                    bytes - UDPC_LSFULL_HEADER_SIZE);
         recPktInfo.dataSize = bytes - UDPC_LSFULL_HEADER_SIZE;
+        std::memcpy(recPktInfo.data,
+                    recvBuf + UDPC_LSFULL_HEADER_SIZE,
+                    recPktInfo.dataSize);
         recPktInfo.flags =
             (isConnect ? 0x1 : 0)
             | (isPing ? 0x2 : 0)
