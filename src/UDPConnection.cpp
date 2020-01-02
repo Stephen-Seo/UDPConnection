@@ -300,18 +300,21 @@ void UDPC::Context::update_impl() {
                 newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
                 if(flags.test(2) && newCon.flags.test(6)) {
                     // set up verification string to send to server
-                    std::stringstream ss;
-                    auto timeT = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-                    ss << std::put_time(std::gmtime(&timeT), "%c %Z");
-                    auto timeString = ss.str();
-                    newCon.verifyMessage = std::unique_ptr<char[]>(new char[4 + timeString.size()]);
-                    *((uint32_t*)newCon.verifyMessage.get()) = timeString.size();
-                    std::memcpy(newCon.verifyMessage.get() + 4, timeString.c_str(), timeString.size());
+                    std::time_t time = std::time(nullptr);
+                    if(time <= 0) {
+                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                            "Failed to get current epoch time");
+                        continue;
+                    }
+                    uint64_t timeInt = time;
 #ifndef NDEBUG
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
-                        "Client set up verification string \"",
-                        timeString, "\"");
+                        "Client set up verification epoch time \"",
+                        timeInt, "\"");
 #endif
+                    UDPC::be64((char*)&timeInt);
+                    newCon.verifyMessage = std::unique_ptr<char[]>(new char[8]);
+                    std::memcpy(newCon.verifyMessage.get(), &timeInt, 8);
                 }
 
                 if(conMap.find(optE->conId) == conMap.end()) {
@@ -385,18 +388,21 @@ void UDPC::Context::update_impl() {
                 newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
                 if(flags.test(2) && newCon.flags.test(6)) {
                     // set up verification string to send to server
-                    std::stringstream ss;
-                    auto timeT = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-                    ss << std::put_time(std::gmtime(&timeT), "%c %Z");
-                    auto timeString = ss.str();
-                    newCon.verifyMessage = std::unique_ptr<char[]>(new char[4 + timeString.size()]);
-                    *((uint32_t*)newCon.verifyMessage.get()) = timeString.size();
-                    std::memcpy(newCon.verifyMessage.get() + 4, timeString.c_str(), timeString.size());
+                    std::time_t time = std::time(nullptr);
+                    if(time <= 0) {
+                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                            "Failed to get current epoch time");
+                        continue;
+                    }
+                    uint64_t timeInt = time;
 #ifndef NDEBUG
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
-                        "Client set up verification string \"",
-                        timeString, "\"");
+                        "Client set up verification epoch time \"",
+                        timeInt, "\"");
 #endif
+                    UDPC::be64((char*)&timeInt);
+                    newCon.verifyMessage = std::unique_ptr<char[]>(new char[8]);
+                    std::memcpy(newCon.verifyMessage.get(), &timeInt, 8);
 
                     // set peer public key
                     std::memcpy(
@@ -735,7 +741,7 @@ void UDPC::Context::update_impl() {
 #ifdef UDPC_LIBSODIUM_ENABLED
                     assert(iter->second.verifyMessage
                         && "Verify message should already exist");
-                    sendSize = UDPC_CCL_HEADER_SIZE + *((uint32_t*)iter->second.verifyMessage.get());
+                    sendSize = UDPC_CCL_HEADER_SIZE;
                     buf = std::unique_ptr<char[]>(new char[sendSize]);
                     // set type 1
                     *((uint32_t*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = htonl(1);
@@ -744,17 +750,11 @@ void UDPC::Context::update_impl() {
                         buf.get() + UDPC_MIN_HEADER_SIZE + 4,
                         iter->second.pk,
                         crypto_sign_PUBLICKEYBYTES);
-                    // set verify message size
-                    uint32_t temp = htonl(*((uint32_t*)iter->second.verifyMessage.get()));
-                    std::memcpy(
-                        buf.get() + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES,
-                        &temp,
-                        4);
                     // set verify message
                     std::memcpy(
-                        buf.get() + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES + 4,
-                        iter->second.verifyMessage.get() + 4,
-                        *((uint32_t*)iter->second.verifyMessage.get()));
+                        buf.get() + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES,
+                        iter->second.verifyMessage.get(),
+                        8);
 #else
                     assert(!"libsodium is disabled, invalid state");
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
@@ -1299,26 +1299,33 @@ void UDPC::Context::update_impl() {
             }
             if(pktType == 1 && flags.test(2)) {
 #ifdef UDPC_LIBSODIUM_ENABLED
-# ifndef NDEBUG
-                if(willLog(UDPC_LoggingType::UDPC_DEBUG)) {
-                    std::string verificationString(
-                        recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES + 4,
-                        ntohl(*((uint32_t*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES))));
-                    log_impl(UDPC_LoggingType::UDPC_DEBUG,
-                        "Server got verification string \"",
-                        verificationString, "\"");
-                }
-# endif
                 std::memcpy(
                     newConnection.peer_pk,
                     recvBuf + UDPC_MIN_HEADER_SIZE + 4,
                     crypto_sign_PUBLICKEYBYTES);
                 newConnection.verifyMessage = std::unique_ptr<char[]>(new char[crypto_sign_BYTES]);
+                std::time_t currentTime = std::time(nullptr);
+                uint64_t receivedTime;
+                std::memcpy(&receivedTime, recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES, 8);
+                UDPC::be64((char*)&receivedTime);
+# ifndef NDEBUG
+                if(willLog(UDPC_LoggingType::UDPC_DEBUG)) {
+                    log_impl(UDPC_LoggingType::UDPC_DEBUG,
+                        "Server got verification epoch time \"",
+                        receivedTime, "\"");
+                }
+# endif
+                std::time_t receivedTimeT = receivedTime;
+                if(currentTime < receivedTimeT || currentTime - receivedTimeT > 3) {
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                        "Got invalid epoch time from client, ignoring");
+                    return;
+                }
                 crypto_sign_detached(
                     (unsigned char*)newConnection.verifyMessage.get(),
                     nullptr,
-                    (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES + 4),
-                    ntohl(*((uint32_t*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES))),
+                    (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES),
+                    8,
                     newConnection.sk);
 #else
                 assert(!"libsodium disabled, invalid state");
@@ -1412,8 +1419,8 @@ void UDPC::Context::update_impl() {
                 }
                 if(crypto_sign_verify_detached(
                     (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES),
-                    (unsigned char*)(iter->second.verifyMessage.get() + 4),
-                    *((uint32_t*)(iter->second.verifyMessage.get())),
+                    (unsigned char*)(iter->second.verifyMessage.get()),
+                    8,
                     iter->second.peer_pk) != 0) {
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
                         "Failed to verify peer (server) ",
@@ -1741,6 +1748,26 @@ bool UDPC::isBigEndian() {
 
     isBigEndian = (bint.c[0] == 1 ? 1 : 2);
     return isBigEndian;
+}
+
+void UDPC::be64(char *integer) {
+    if(UDPC::isBigEndian()) {
+        return;
+    }
+    char conv[8];
+    for(unsigned int i = 0; i < 8; ++i) {
+        conv[i] = integer[7 - i];
+    }
+    std::memcpy(integer, conv, 8);
+}
+
+void UDPC::be64_copy(char *out, const char *in) {
+    if(UDPC::isBigEndian()) {
+        return;
+    }
+    for(unsigned int i = 0; i < 8; ++i) {
+        out[i] = in[7 - i];
+    }
 }
 
 void UDPC::preparePacket(

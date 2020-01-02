@@ -39,7 +39,7 @@
 
 #define UDPC_MIN_HEADER_SIZE 20
 #define UDPC_CON_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+4)
-#define UDPC_CCL_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+4+crypto_sign_PUBLICKEYBYTES+4)
+#define UDPC_CCL_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+4+crypto_sign_PUBLICKEYBYTES+8)
 #define UDPC_CSR_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+4+crypto_sign_PUBLICKEYBYTES+crypto_sign_BYTES)
 #define UDPC_LSFULL_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+1+crypto_sign_BYTES)
 #define UDPC_NSFULL_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+1)
@@ -248,6 +248,9 @@ public:
 Context *verifyContext(UDPC_HContext ctx);
 
 bool isBigEndian();
+
+void be64(char *integer);
+void be64_copy(char *out, const char *in);
 
 /*
  * flags:
