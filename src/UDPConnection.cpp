@@ -667,9 +667,11 @@ void UDPC::Context::update_impl() {
                 0x3);
             if(flags.test(2) && iter->second.flags.test(6)) {
 #ifdef UDPC_LIBSODIUM_ENABLED
+                unsigned char sig[crypto_sign_BYTES];
+                std::memset(buf.get() + UDPC_MIN_HEADER_SIZE + 1, 0, crypto_sign_BYTES);
                 if(crypto_sign_detached(
-                    (unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE + 1), nullptr,
-                    (unsigned char*)buf.get(), UDPC_MIN_HEADER_SIZE,
+                    sig, nullptr,
+                    (unsigned char*)buf.get(), UDPC_LSFULL_HEADER_SIZE,
                     iter->second.sk) != 0) {
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                         "Failed to sign packet for peer ",
@@ -678,6 +680,7 @@ void UDPC::Context::update_impl() {
                         iter->second.port);
                     continue;
                 }
+                std::memcpy(buf.get() + UDPC_MIN_HEADER_SIZE + 1, sig, crypto_sign_BYTES);
 #else
                 assert(!"libsodium disabled, invalid state");
                 UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
@@ -903,9 +906,11 @@ void UDPC::Context::update_impl() {
                 0);
             if(flags.test(2) && iter->second.flags.test(6)) {
 #ifdef UDPC_LIBSODIUM_ENABLED
+                unsigned char sig[crypto_sign_BYTES];
+                std::memset(buf.get() + UDPC_MIN_HEADER_SIZE + 1, 0, crypto_sign_BYTES);
                 if(crypto_sign_detached(
-                    (unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE + 1), nullptr,
-                    (unsigned char*)buf.get(), UDPC_MIN_HEADER_SIZE,
+                    sig, nullptr,
+                    (unsigned char*)buf.get(), UDPC_LSFULL_HEADER_SIZE,
                     iter->second.sk) != 0) {
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                         "Failed to sign packet for peer ",
@@ -914,6 +919,7 @@ void UDPC::Context::update_impl() {
                         iter->second.port);
                     continue;
                 }
+                std::memcpy(buf.get() + UDPC_MIN_HEADER_SIZE + 1, sig, crypto_sign_BYTES);
 #else
                 assert(!"libsodium disabled, invalid state");
                 UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
@@ -1000,9 +1006,12 @@ void UDPC::Context::update_impl() {
 
             if(flags.test(2) && iter->second.flags.test(6)) {
 #ifdef UDPC_LIBSODIUM_ENABLED
+                unsigned char sig[crypto_sign_BYTES];
+                std::memset(buf.get() + UDPC_MIN_HEADER_SIZE + 1, 0, crypto_sign_BYTES);
+                std::memcpy(buf.get() + UDPC_LSFULL_HEADER_SIZE, pInfo.data, pInfo.dataSize);
                 if(crypto_sign_detached(
-                    (unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE + 1), nullptr,
-                    (unsigned char*)buf.get(), UDPC_MIN_HEADER_SIZE,
+                    sig, nullptr,
+                    (unsigned char*)buf.get(), sendSize,
                     iter->second.sk) != 0) {
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                         "Failed to sign packet for peer ",
@@ -1011,13 +1020,13 @@ void UDPC::Context::update_impl() {
                         iter->second.port);
                     continue;
                 }
+                std::memcpy(buf.get() + UDPC_MIN_HEADER_SIZE + 1, sig, crypto_sign_BYTES);
 #else
                 assert(!"libsodium disabled, invalid state");
                 UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                     "libsodium is disabled, cannot send packet");
                 continue;
 #endif
-                std::memcpy(buf.get() + UDPC_LSFULL_HEADER_SIZE, pInfo.data, pInfo.dataSize);
             } else {
                 std::memcpy(buf.get() + UDPC_NSFULL_HEADER_SIZE, pInfo.data, pInfo.dataSize);
             }
@@ -1460,10 +1469,13 @@ void UDPC::Context::update_impl() {
     if(pktType == 1) {
 #ifdef UDPC_LIBSODIUM_ENABLED
         // verify signature of header
+        unsigned char sig[crypto_sign_BYTES];
+        std::memcpy(sig, recvBuf + UDPC_MIN_HEADER_SIZE + 1, crypto_sign_BYTES);
+        std::memset(recvBuf + UDPC_MIN_HEADER_SIZE + 1, 0, crypto_sign_BYTES);
         if(crypto_sign_verify_detached(
-            (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 1),
+            sig,
             (unsigned char*)recvBuf,
-            UDPC_MIN_HEADER_SIZE,
+            bytes,
             iter->second.peer_pk) != 0) {
             UDPC_CHECK_LOG(
                 this,
