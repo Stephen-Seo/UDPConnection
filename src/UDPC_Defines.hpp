@@ -82,6 +82,16 @@ struct IPV6_Hasher {
     std::size_t operator()(const UDPC_IPV6_ADDR_TYPE& addr) const;
 };
 
+struct PKContainer {
+    PKContainer();
+    PKContainer(unsigned char *pk);
+
+    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+
+    std::size_t operator()(const PKContainer& container) const;
+    bool operator==(const PKContainer& other) const;
+};
+
 struct ConnectionData {
     ConnectionData(bool isUsingLibsodium);
     ConnectionData(
@@ -112,7 +122,6 @@ struct ConnectionData {
      * 4 - is id set
      * 5 - error initializing keys for public key encryption
      * 6 - using libsodium for header verification
-     * 7 - peer_pk pre-set
      */
     std::bitset<8> flags;
     uint32_t id;
@@ -225,6 +234,7 @@ public:
     // id to ipv6 address and port (as UDPC_ConnectionId)
     std::unordered_map<uint32_t, UDPC_ConnectionId> idMap;
     std::unordered_set<UDPC_ConnectionId, ConnectionIdHasher> deletionMap;
+    std::unordered_set<PKContainer, PKContainer> peerPKWhitelist;
     TSLQueue<UDPC_PacketInfo> receivedPkts;
     TSLQueue<UDPC_PacketInfo> cSendPkts;
     // handled internally
@@ -236,7 +246,8 @@ public:
 
     std::thread thread;
     std::atomic_bool threadRunning;
-    std::mutex mutex;
+    std::mutex conMapMutex;
+    std::mutex peerPKWhitelistMutex;
 
     std::chrono::milliseconds threadedSleepTime;
     unsigned char sk[crypto_sign_SECRETKEYBYTES];

@@ -196,8 +196,7 @@ typedef enum {
     UDPC_ET_CONNECTED,
     UDPC_ET_DISCONNECTED,
     UDPC_ET_GOOD_MODE,
-    UDPC_ET_BAD_MODE,
-    UDPC_ET_REQUEST_CONNECT_PK
+    UDPC_ET_BAD_MODE
 } UDPC_EventType;
 
 /*!
@@ -216,7 +215,6 @@ typedef struct {
     union Value {
         int dropAllWithAddr;
         int enableLibSodium;
-        unsigned char *pk;
     } v;
 } UDPC_Event;
 
@@ -404,25 +402,6 @@ void UDPC_client_initiate_connection(
     int enableLibSodium);
 
 /*!
- * \brief Initiate a connection to a server peer with an expected public key
- *
- * Note that this function does nothing on a server context.
- *
- * \param ctx The context to initiate a connection from
- * \param connectionId The server peer to initiate a connection to
- * \param serverPK A pointer to the public key that the server is expected to
- * use (if the server does not use this public key, then the connection will
- * fail; it must point to a buffer of size \p crypto_sign_PUBLICKEYBYTES)
- *
- * This function assumes that support for libsodium was enabled when UDPC was
- * compiled. If it has not, then this function will fail.
- */
-void UDPC_client_initiate_connection_pk(
-    UDPC_HContext ctx,
-    UDPC_ConnectionId connectionId,
-    unsigned char *serverPK);
-
-/*!
  * \brief Queues a packet to be sent to the specified peer
  *
  * Note that there must already be an established connection with the peer. If
@@ -509,6 +488,11 @@ int UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char 
 int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, unsigned char *sk);
 
 int UDPC_unset_libsodium_keys(UDPC_HContext ctx);
+
+int UDPC_add_whitelist_pk(UDPC_HContext ctx, unsigned char *pk);
+int UDPC_has_whitelist_pk(UDPC_HContext ctx, unsigned char *pk);
+int UDPC_remove_whitelist_pk(UDPC_HContext ctx, unsigned char *pk);
+int UDPC_clear_whitelist(UDPC_HContext ctx);
 
 int UDPC_get_auth_policy(UDPC_HContext ctx);
 int UDPC_set_auth_policy(UDPC_HContext ctx, int value);

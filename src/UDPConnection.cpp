@@ -65,6 +65,24 @@ std::size_t UDPC::IPV6_Hasher::operator()(const UDPC_IPV6_ADDR_TYPE& addr) const
     return std::hash<std::string>()(std::string((const char*)UDPC_IPV6_ADDR_SUB(addr), 16));
 }
 
+UDPC::PKContainer::PKContainer() {
+    std::memset(pk, 0, crypto_sign_PUBLICKEYBYTES);
+}
+
+UDPC::PKContainer::PKContainer(unsigned char *pk) {
+    std::memcpy(this->pk, pk, crypto_sign_PUBLICKEYBYTES);
+}
+
+std::size_t UDPC::PKContainer::operator()(const PKContainer& container) const {
+    return std::hash<std::string>()(std::string(
+        (const char*)container.pk,
+        crypto_sign_PUBLICKEYBYTES));
+}
+
+bool UDPC::PKContainer::operator==(const PKContainer& other) const {
+    return std::memcmp(pk, other.pk, crypto_sign_PUBLICKEYBYTES) == 0;
+}
+
 bool operator ==(const UDPC_ConnectionId& a, const UDPC_ConnectionId& b) {
     return a.addr == b.addr && a.scope_id == b.scope_id && a.port == b.port;
 }
@@ -208,7 +226,7 @@ atostrBufIndex(0),
 receivedPkts(),
 cSendPkts(),
 rng_engine(),
-mutex()
+conMapMutex()
 {
     for(unsigned int i = 0; i < UDPC_ATOSTR_SIZE; ++i) {
         atostrBuf[i] = 0;
@@ -316,103 +334,6 @@ void UDPC::Context::update_impl() {
                     newCon.verifyMessage = std::unique_ptr<char[]>(new char[8]);
                     std::memcpy(newCon.verifyMessage.get(), &timeInt, 8);
                 }
-
-                if(conMap.find(optE->conId) == conMap.end()) {
-                    conMap.insert(std::make_pair(
-                        optE->conId,
-                        std::move(newCon)));
-                    auto addrConIter = addrConMap.find(optE->conId.addr);
-                    if(addrConIter == addrConMap.end()) {
-                        auto insertResult = addrConMap.insert(std::make_pair(
-                            optE->conId.addr,
-                            std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher>{}));
-                        assert(insertResult.second &&
-                            "new connection insert into addrConMap must not fail");
-                        addrConIter = insertResult.first;
-                    }
-                    addrConIter->second.insert(optE->conId);
-                    UDPC_CHECK_LOG(this,
-                        UDPC_LoggingType::UDPC_INFO,
-                        "Client initiating connection to ",
-                        UDPC_atostr((UDPC_HContext)this, optE->conId.addr),
-                        " port ",
-                        optE->conId.port,
-                        " ...");
-                } else {
-                    UDPC_CHECK_LOG(this,
-                        UDPC_LoggingType::UDPC_WARNING,
-                        "Client initiate connection, already connected to peer ",
-                        UDPC_atostr((UDPC_HContext)this, optE->conId.addr),
-                        " port ",
-                        optE->conId.port);
-                }
-            }
-                break;
-            case UDPC_ET_REQUEST_CONNECT_PK:
-            {
-                assert(flags.test(2) &&
-                    "libsodium should be explictly enabled");
-                unsigned char *sk = nullptr;
-                unsigned char *pk = nullptr;
-                if(keysSet.load()) {
-                    sk = this->sk;
-                    pk = this->pk;
-                }
-                UDPC::ConnectionData newCon(
-                    false,
-                    this,
-                    optE->conId.addr,
-                    optE->conId.scope_id,
-                    optE->conId.port,
-#ifdef UDPC_LIBSODIUM_ENABLED
-                    true,
-                    sk, pk);
-#else
-                    false,
-                    sk, pk);
-                assert(!"compiled without libsodium support");
-                delete[] optE->v.pk;
-                break;
-#endif
-                if(newCon.flags.test(5)) {
-                    delete[] optE->v.pk;
-                    UDPC_CHECK_LOG(this,
-                        UDPC_LoggingType::UDPC_ERROR,
-                        "Failed to init ConnectionData instance (libsodium "
-                        "init fail) while client establishing connection with ",
-                        UDPC_atostr((UDPC_HContext)this, optE->conId.addr),
-                        " port ",
-                        optE->conId.port);
-                    continue;
-                }
-                newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
-                if(flags.test(2) && newCon.flags.test(6)) {
-                    // set up verification string to send to server
-                    std::time_t time = std::time(nullptr);
-                    if(time <= 0) {
-                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
-                            "Failed to get current epoch time");
-                        continue;
-                    }
-                    uint64_t timeInt = time;
-#ifndef NDEBUG
-                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
-                        "Client set up verification epoch time \"",
-                        timeInt, "\"");
-#endif
-                    UDPC::be64((char*)&timeInt);
-                    newCon.verifyMessage = std::unique_ptr<char[]>(new char[8]);
-                    std::memcpy(newCon.verifyMessage.get(), &timeInt, 8);
-
-                    // set peer public key
-                    std::memcpy(
-                        newCon.peer_pk,
-                        optE->v.pk,
-                        crypto_sign_PUBLICKEYBYTES);
-                    newCon.flags.set(7);
-                }
-
-                delete[] optE->v.pk;
 
                 if(conMap.find(optE->conId) == conMap.end()) {
                     conMap.insert(std::make_pair(
@@ -1303,6 +1224,15 @@ void UDPC::Context::update_impl() {
                     newConnection.peer_pk,
                     recvBuf + UDPC_MIN_HEADER_SIZE + 4,
                     crypto_sign_PUBLICKEYBYTES);
+                {
+                    std::lock_guard<std::mutex> lock(peerPKWhitelistMutex);
+                    if(!peerPKWhitelist.empty() && peerPKWhitelist.find(UDPC::PKContainer(newConnection.peer_pk)) == peerPKWhitelist.end()) {
+                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                            "peer_pk is not in whitelist, not establishing "
+                            "connection with client");
+                        return;
+                    }
+                }
                 newConnection.verifyMessage = std::unique_ptr<char[]>(new char[crypto_sign_BYTES]);
                 std::time_t currentTime = std::time(nullptr);
                 uint64_t receivedTime;
@@ -1403,19 +1333,17 @@ void UDPC::Context::update_impl() {
 
             if(pktType == 2 && flags.test(2) && iter->second.flags.test(6)) {
 #ifdef UDPC_LIBSODIUM_ENABLED
-                if(iter->second.flags.test(7)) {
-                    if(std::memcmp(iter->second.peer_pk,
-                            recvBuf + UDPC_MIN_HEADER_SIZE + 4,
-                            crypto_sign_PUBLICKEYBYTES) != 0) {
+                std::memcpy(iter->second.peer_pk,
+                    recvBuf + UDPC_MIN_HEADER_SIZE + 4,
+                    crypto_sign_PUBLICKEYBYTES);
+                {
+                    std::lock_guard<std::mutex> lock(peerPKWhitelistMutex);
+                    if(!peerPKWhitelist.empty() && peerPKWhitelist.find(UDPC::PKContainer(iter->second.peer_pk)) == peerPKWhitelist.end()) {
                         UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
-                            "peer_pk did not match pre-set peer_pk, not "
-                            "establishing connection");
+                            "peer_pk is not in whitelist, not establishing "
+                            "connection with server");
                         return;
                     }
-                } else {
-                    std::memcpy(iter->second.peer_pk,
-                        recvBuf + UDPC_MIN_HEADER_SIZE + 4,
-                        crypto_sign_PUBLICKEYBYTES);
                 }
                 if(crypto_sign_verify_detached(
                     (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES),
@@ -1849,7 +1777,7 @@ void UDPC::threadedUpdate(Context *ctx) {
     while(ctx->threadRunning.load()) {
         now = std::chrono::steady_clock::now();
         {
-            std::lock_guard<std::mutex> lock(ctx->mutex);
+            std::lock_guard<std::mutex> lock(ctx->conMapMutex);
             ctx->update_impl();
         }
         nextNow = std::chrono::steady_clock::now();
@@ -2122,12 +2050,6 @@ void UDPC_destroy(UDPC_HContext ctx) {
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
         WSACleanup();
 #endif
-        while(!UDPC_ctx->internalEvents.empty()) {
-            auto optE = UDPC_ctx->internalEvents.top_and_pop();
-            if(optE && optE->type == UDPC_ET_REQUEST_CONNECT_PK) {
-                delete[] optE->v.pk;
-            }
-        }
         UDPC_ctx->_contextIdentifier = 0;
         delete UDPC_ctx;
     }
@@ -2140,7 +2062,7 @@ void UDPC_update(UDPC_HContext ctx) {
         return;
     }
 
-    std::lock_guard<std::mutex> lock(c->mutex);
+    std::lock_guard<std::mutex> lock(c->conMapMutex);
     c->update_impl();
 }
 
@@ -2161,34 +2083,6 @@ void UDPC_client_initiate_connection(
 #endif
 
     c->internalEvents.push(UDPC_Event{UDPC_ET_REQUEST_CONNECT, connectionId, enableLibSodium});
-}
-
-void UDPC_client_initiate_connection_pk(
-        UDPC_HContext ctx,
-        UDPC_ConnectionId connectionId,
-        unsigned char *serverPK) {
-    UDPC::Context *c = UDPC::verifyContext(ctx);
-    if(!c || !c->flags.test(1)) {
-        return;
-    }
-#ifndef UDPC_LIBSODIUM_ENABLED
-    UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_ERROR,
-        "Cannot initiate connection with public key, UDPC was compiled "
-        "without libsodium");
-    return;
-#else
-    else if(!c->flags.test(2)) {
-        UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_ERROR,
-            "Cannot initiate connection with public key, libsodium is not "
-            "enabled");
-        return;
-    }
-#endif
-
-    UDPC_Event event{UDPC_ET_REQUEST_CONNECT_PK, connectionId, 0};
-    event.v.pk = new unsigned char[crypto_sign_PUBLICKEYBYTES];
-    std::memcpy(event.v.pk, serverPK, crypto_sign_PUBLICKEYBYTES);
-    c->internalEvents.push(event);
 }
 
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
@@ -2229,7 +2123,7 @@ unsigned long UDPC_get_queued_size(UDPC_HContext ctx, UDPC_ConnectionId id, int 
         return 0;
     }
 
-    std::lock_guard<std::mutex> lock(c->mutex);
+    std::lock_guard<std::mutex> lock(c->conMapMutex);
     auto iter = c->conMap.find(id);
     if(iter != c->conMap.end()) {
         if(exists) {
@@ -2272,7 +2166,7 @@ int UDPC_has_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
         return 0;
     }
 
-    std::lock_guard<std::mutex> lock(c->mutex);
+    std::lock_guard<std::mutex> lock(c->conMapMutex);
 
     return c->conMap.find(connectionId) == c->conMap.end() ? 0 : 1;
 }
@@ -2283,7 +2177,7 @@ UDPC_ConnectionId* UDPC_get_list_connected(UDPC_HContext ctx, unsigned int *size
         return nullptr;
     }
 
-    std::lock_guard<std::mutex> lock(c->mutex);
+    std::lock_guard<std::mutex> lock(c->conMapMutex);
 
     if(c->conMap.empty()) {
         if(size) {
@@ -2396,7 +2290,7 @@ int UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char 
         return 0;
     }
 
-    std::lock_guard<std::mutex> lock(c->mutex);
+    std::lock_guard<std::mutex> lock(c->conMapMutex);
     std::memcpy(c->sk, sk, crypto_sign_SECRETKEYBYTES);
     std::memcpy(c->pk, pk, crypto_sign_PUBLICKEYBYTES);
     c->keysSet.store(true);
@@ -2417,10 +2311,61 @@ int UDPC_unset_libsodium_keys(UDPC_HContext ctx) {
         return 0;
     }
 
-    std::lock_guard<std::mutex> lock(c->mutex);
+    std::lock_guard<std::mutex> lock(c->conMapMutex);
     c->keysSet.store(false);
     std::memset(c->pk, 0, crypto_sign_PUBLICKEYBYTES);
     std::memset(c->sk, 0, crypto_sign_SECRETKEYBYTES);
+    return 1;
+}
+
+int UDPC_add_whitelist_pk(UDPC_HContext ctx, unsigned char *pk) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c || !c->flags.test(2)) {
+        return 0;
+    }
+
+    std::lock_guard<std::mutex> lock(c->peerPKWhitelistMutex);
+    auto result = c->peerPKWhitelist.insert(UDPC::PKContainer(pk));
+    if(result.second) {
+        return c->peerPKWhitelist.size();
+    }
+    return 0;
+}
+
+int UDPC_has_whitelist_pk(UDPC_HContext ctx, unsigned char *pk) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c || !c->flags.test(2)) {
+        return 0;
+    }
+
+    std::lock_guard<std::mutex> lock(c->peerPKWhitelistMutex);
+    if(c->peerPKWhitelist.find(UDPC::PKContainer(pk)) != c->peerPKWhitelist.end()) {
+        return 1;
+    }
+    return 0;
+}
+
+int UDPC_remove_whitelist_pk(UDPC_HContext ctx, unsigned char *pk) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c || !c->flags.test(2)) {
+        return 0;
+    }
+
+    std::lock_guard<std::mutex> lock(c->peerPKWhitelistMutex);
+    if(c->peerPKWhitelist.erase(UDPC::PKContainer(pk)) != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+int UDPC_clear_whitelist(UDPC_HContext ctx) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c || !c->flags.test(2)) {
+        return 0;
+    }
+
+    std::lock_guard<std::mutex> lock(c->peerPKWhitelistMutex);
+    c->peerPKWhitelist.clear();
     return 1;
 }
 

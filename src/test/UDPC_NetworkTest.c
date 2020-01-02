@@ -12,6 +12,7 @@
 
 #define QUEUED_MAX_SIZE 32
 #define SEND_IDS_SIZE 64
+#define WHITELIST_FILES_SIZE 64
 
 void usage() {
     puts("[-c | -s] - client or server (default server)");
@@ -24,7 +25,7 @@ void usage() {
     puts("-l (silent|error|warning|info|verbose|debug) - log level, default debug");
     puts("-e - enable receiving events");
     puts("-ls - enable libsodium");
-    puts("-ck <pubkey_file> - connect to server expecting this public key");
+    puts("-ck <pubkey_file> - add pubkey to whitelist");
     puts("-sk <pubkey> <seckey> - start with pub/sec key pair");
     puts("-p <\"fallback\" or \"strict\"> - set auth policy");
 }
@@ -57,6 +58,9 @@ int main(int argc, char **argv) {
     const char *seckey_file = NULL;
     unsigned char pubkey[crypto_sign_PUBLICKEYBYTES];
     unsigned char seckey[crypto_sign_SECRETKEYBYTES];
+    const char *whitelist_pk_files[WHITELIST_FILES_SIZE];
+    unsigned int whitelist_pk_files_index = 0;
+    unsigned char whitelist_pks[WHITELIST_FILES_SIZE][crypto_sign_PUBLICKEYBYTES];
     int authPolicy = UDPC_AUTH_POLICY_FALLBACK;
 
     while(argc > 0) {
@@ -111,7 +115,11 @@ int main(int argc, char **argv) {
             puts("Enabled libsodium");
         } else if(strcmp(argv[0], "-ck") == 0 && argc > 1) {
             --argc; ++argv;
-            pubkey_file = argv[0];
+            if(whitelist_pk_files_index >= WHITELIST_FILES_SIZE) {
+                puts("ERROR: limit reached for whitelisted pks");
+                return 1;
+            }
+            whitelist_pk_files[whitelist_pk_files_index++] = argv[0];
         } else if(strcmp(argv[0], "-sk") == 0 && argc > 2) {
             --argc; ++argv;
             pubkey_file = argv[0];
@@ -141,37 +149,52 @@ int main(int argc, char **argv) {
     if(isLibSodiumEnabled == 0) {
         puts("Disabled libsodium");
     } else {
-        if(pubkey_file) {
-            FILE *pubkey_f = fopen(pubkey_file, "r");
+        if(pubkey_file && seckey_file) {
+            FILE *pubkey_f = fopen(pubkey_file, "rb");
             if(!pubkey_f) {
                 printf("ERROR: Failed to open pubkey_file \"%s\"\n", pubkey_file);
                 return 1;
             }
-            size_t count = fread(pubkey, 1, crypto_sign_PUBLICKEYBYTES, pubkey_f);
-            if(count != crypto_sign_PUBLICKEYBYTES) {
+            size_t count = fread(pubkey, crypto_sign_PUBLICKEYBYTES, 1, pubkey_f);
+            if(count != 1) {
                 fclose(pubkey_f);
                 printf("ERROR: Failed to read pubkey_file \"%s\"\n", pubkey_file);
                 return 1;
             }
             fclose(pubkey_f);
 
-            if(seckey_file) {
-                FILE *seckey_f = fopen(seckey_file, "r");
-                if(!seckey_f) {
-                    printf("ERROR: Failed to open seckey_file \"%s\"\n", seckey_file);
-                    return 1;
-                }
-                count = fread(seckey, 1, crypto_sign_SECRETKEYBYTES, seckey_f);
-                if(count != crypto_sign_SECRETKEYBYTES) {
-                    fclose(seckey_f);
-                    printf("ERROR: Failed to read seckey_file \"%s\"\n", seckey_file);
-                    return 1;
-                }
-                fclose(seckey_f);
+            FILE *seckey_f = fopen(seckey_file, "rb");
+            if(!seckey_f) {
+                printf("ERROR: Failed to open seckey_file \"%s\"\n", seckey_file);
+                return 1;
             }
-        } else if(seckey_file) {
-            printf("ERROR: Invalid state (seckey_file defined but not pubkey_file)\n");
+            count = fread(seckey, crypto_sign_SECRETKEYBYTES, 1, seckey_f);
+            if(count != 1) {
+                fclose(seckey_f);
+                printf("ERROR: Failed to read seckey_file \"%s\"\n", seckey_file);
+                return 1;
+            }
+            fclose(seckey_f);
+        } else if(pubkey_file || seckey_file) {
+            printf("ERROR: Invalid state (pubkey_file and seckey_file not "
+                "defined)\n");
             return 1;
+        }
+        for(unsigned int i = 0; i < whitelist_pk_files_index; ++i) {
+            FILE *pkf = fopen(whitelist_pk_files[i], "rb");
+            if(!pkf) {
+                printf("ERROR: Failed to open whitelist pubkey file \"%s\"\n",
+                    whitelist_pk_files[i]);
+                return 1;
+            }
+            size_t count = fread(whitelist_pks[i], crypto_sign_PUBLICKEYBYTES, 1, pkf);
+            if(count != 1) {
+                fclose(pkf);
+                printf("ERROR: Failed to read whitelist pubkey file \"%s\"\n",
+                    whitelist_pk_files[i]);
+                return 1;
+            }
+            fclose(pkf);
         }
     }
 
@@ -207,9 +230,9 @@ int main(int argc, char **argv) {
 
     UDPC_set_logging_type(context, logLevel);
     UDPC_set_receiving_events(context, isReceivingEvents);
-    if(!isClient && pubkey_file && seckey_file) {
+    if(pubkey_file && seckey_file) {
         UDPC_set_libsodium_keys(context, seckey, pubkey);
-        puts("Set pubkey/seckey for server");
+        puts("Set pubkey/seckey");
     }
 
     UDPC_set_auth_policy(context, authPolicy);
@@ -218,6 +241,16 @@ int main(int argc, char **argv) {
         puts("Auth policy set to \"fallback\"");
     } else if(authPolicy == UDPC_AUTH_POLICY_STRICT) {
         puts("Auth policy set to \"strict\"");
+    }
+
+    if(isLibSodiumEnabled && whitelist_pk_files_index > 0) {
+        puts("Enabling pubkey whitelist...");
+        for(unsigned int i = 0; i < whitelist_pk_files_index; ++i) {
+            if(UDPC_add_whitelist_pk(context, whitelist_pks[i]) != i + 1) {
+                puts("Failed to add pubkey to whitelist");
+                return 1;
+            }
+        }
     }
 
     UDPC_enable_threaded_update(context);
@@ -235,11 +268,8 @@ int main(int argc, char **argv) {
     while(1) {
         sleep_seconds(1);
         if(isClient && UDPC_has_connection(context, connectionId) == 0) {
-            if(isLibSodiumEnabled && pubkey_file) {
-                UDPC_client_initiate_connection_pk(context, connectionId, pubkey);
-            } else {
-                UDPC_client_initiate_connection(context, connectionId, isLibSodiumEnabled);
-            }
+
+            UDPC_client_initiate_connection(context, connectionId, isLibSodiumEnabled);
         }
         if(!noPayload) {
             list = UDPC_get_list_connected(context, &temp);
