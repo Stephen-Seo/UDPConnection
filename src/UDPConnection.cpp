@@ -288,7 +288,7 @@ void UDPC::Context::update_impl() {
             {
                 unsigned char *sk = nullptr;
                 unsigned char *pk = nullptr;
-                if(keysSet.load(std::memory_order_relaxed)) {
+                if(keysSet.load()) {
                     sk = this->sk;
                     pk = this->pk;
                 }
@@ -1206,7 +1206,7 @@ void UDPC::Context::update_impl() {
             }
             unsigned char *sk = nullptr;
             unsigned char *pk = nullptr;
-            if(keysSet.load(std::memory_order_relaxed)) {
+            if(keysSet.load()) {
                 sk = this->sk;
                 pk = this->pk;
             }
@@ -2303,7 +2303,6 @@ int UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char 
         return 0;
     }
 
-    std::lock_guard<std::mutex> lock(c->conMapMutex);
     std::memcpy(c->sk, sk, crypto_sign_SECRETKEYBYTES);
     std::memcpy(c->pk, pk, crypto_sign_PUBLICKEYBYTES);
     c->keysSet.store(true);
@@ -2324,7 +2323,6 @@ int UDPC_unset_libsodium_keys(UDPC_HContext ctx) {
         return 0;
     }
 
-    std::lock_guard<std::mutex> lock(c->conMapMutex);
     c->keysSet.store(false);
     std::memset(c->pk, 0, crypto_sign_PUBLICKEYBYTES);
     std::memset(c->sk, 0, crypto_sign_SECRETKEYBYTES);
