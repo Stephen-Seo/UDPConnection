@@ -324,6 +324,9 @@ int main(int argc, char **argv) {
             case UDPC_ET_DISCONNECTED:
                 typeString = "DISCONNECTED";
                 break;
+            case UDPC_ET_FAIL_CONNECT:
+                typeString = "FAIL_CONNECT";
+                break;
             case UDPC_ET_GOOD_MODE:
                 typeString = "GOOD_MODE";
                 break;

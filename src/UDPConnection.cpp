@@ -478,8 +478,13 @@ void UDPC::Context::update_impl() {
                 idMap.erase(cIter->second.id);
             }
             if(isReceivingEvents.load()) {
-                externalEvents.push(UDPC_Event{
-                    UDPC_ET_DISCONNECTED, *iter, false});
+                if(flags.test(1) && !cIter->second.flags.test(4)) {
+                    externalEvents.push(UDPC_Event{
+                        UDPC_ET_FAIL_CONNECT, *iter, false});
+                } else {
+                    externalEvents.push(UDPC_Event{
+                        UDPC_ET_DISCONNECTED, *iter, false});
+                }
             }
 
             conMap.erase(cIter);
