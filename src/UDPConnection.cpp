@@ -288,7 +288,7 @@ void UDPC::Context::update_impl() {
             {
                 unsigned char *sk = nullptr;
                 unsigned char *pk = nullptr;
-                if(keysSet.load()) {
+                if(keysSet.load(std::memory_order_relaxed)) {
                     sk = this->sk;
                     pk = this->pk;
                 }
@@ -1206,7 +1206,7 @@ void UDPC::Context::update_impl() {
             }
             unsigned char *sk = nullptr;
             unsigned char *pk = nullptr;
-            if(keysSet.load()) {
+            if(keysSet.load(std::memory_order_relaxed)) {
                 sk = this->sk;
                 pk = this->pk;
             }
