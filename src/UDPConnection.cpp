@@ -2307,6 +2307,7 @@ int UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char 
         return 0;
     }
 
+    c->keysSet.store(false);
     std::memcpy(c->sk, sk, crypto_sign_SECRETKEYBYTES);
     std::memcpy(c->pk, pk, crypto_sign_PUBLICKEYBYTES);
     c->keysSet.store(true);
