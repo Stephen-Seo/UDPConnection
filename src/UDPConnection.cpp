@@ -226,11 +226,10 @@ atostrBufIndex(0),
 receivedPkts(),
 cSendPkts(),
 rng_engine(),
-conMapMutex()
+conMapMutex(),
+peerPKWhitelistMutex()
 {
-    for(unsigned int i = 0; i < UDPC_ATOSTR_SIZE; ++i) {
-        atostrBuf[i] = 0;
-    }
+    std::memset(atostrBuf, 0, UDPC_ATOSTR_SIZE);
 
     if(isThreaded) {
         flags.set(0);
@@ -484,7 +483,7 @@ void UDPC::Context::update_impl() {
                 idMap.erase(cIter->second.id);
             }
             if(isReceivingEvents.load()) {
-                if(flags.test(1) && !cIter->second.flags.test(4)) {
+                if(flags.test(1) && cIter->second.flags.test(3)) {
                     externalEvents.push(UDPC_Event{
                         UDPC_ET_FAIL_CONNECT, *iter, false});
                 } else {
@@ -1045,8 +1044,13 @@ void UDPC::Context::update_impl() {
                 }
             }
             if(isReceivingEvents.load()) {
-                externalEvents.push(UDPC_Event{
-                    UDPC_ET_DISCONNECTED, iter->first, false});
+                if(flags.test(1) && iter->second.flags.test(3)) {
+                    externalEvents.push(UDPC_Event{
+                        UDPC_ET_FAIL_CONNECT, iter->first, false});
+                } else {
+                    externalEvents.push(UDPC_Event{
+                        UDPC_ET_DISCONNECTED, iter->first, false});
+                }
             }
             conMap.erase(iter);
         }
