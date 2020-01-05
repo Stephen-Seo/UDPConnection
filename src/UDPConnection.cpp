@@ -316,24 +316,6 @@ void UDPC::Context::update_impl() {
                     continue;
                 }
                 newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
-                if(flags.test(2) && newCon.flags.test(6)) {
-                    // set up verification string to send to server
-                    std::time_t time = std::time(nullptr);
-                    if(time <= 0) {
-                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
-                            "Failed to get current epoch time");
-                        continue;
-                    }
-                    uint64_t timeInt = time;
-#ifndef NDEBUG
-                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
-                        "Client set up verification epoch time \"",
-                        timeInt, "\"");
-#endif
-                    UDPC::be64((char*)&timeInt);
-                    newCon.verifyMessage = std::unique_ptr<char[]>(new char[8]);
-                    std::memcpy(newCon.verifyMessage.get(), &timeInt, 8);
-                }
 
                 if(conMap.find(optE->conId) == conMap.end()) {
                     conMap.insert(std::make_pair(
@@ -660,8 +642,6 @@ void UDPC::Context::update_impl() {
                 unsigned int sendSize = 0;
                 if(flags.test(2) && iter->second.flags.test(6)) {
 #ifdef UDPC_LIBSODIUM_ENABLED
-                    assert(iter->second.verifyMessage
-                        && "Verify message should already exist");
                     sendSize = UDPC_CCL_HEADER_SIZE;
                     buf = std::unique_ptr<char[]>(new char[sendSize]);
                     // set type 1
@@ -672,9 +652,28 @@ void UDPC::Context::update_impl() {
                         iter->second.pk,
                         crypto_sign_PUBLICKEYBYTES);
                     // set verify message
+                    std::time_t time = std::time(nullptr);
+                    if(time <= 0) {
+                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                            "Failed to get current epoch time");
+                        continue;
+                    }
+                    uint64_t timeInt = time;
+# ifndef NDEBUG
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
+                        "Client set up verification epoch time \"",
+                        timeInt, "\"");
+# endif
+                    UDPC::be64((char*)&timeInt);
+                    iter->second.verifyMessage =
+                        std::unique_ptr<char[]>(new char[8]);
+                    std::memcpy(
+                        iter->second.verifyMessage.get(),
+                        &timeInt,
+                        8);
                     std::memcpy(
                         buf.get() + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES,
-                        iter->second.verifyMessage.get(),
+                        &timeInt,
                         8);
 #else
                     assert(!"libsodium is disabled, invalid state");
