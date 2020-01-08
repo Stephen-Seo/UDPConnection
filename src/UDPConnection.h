@@ -77,6 +77,7 @@
 #endif
 
 // other defines
+/// The maximum size of a UDP packet
 #define UDPC_PACKET_MAX_SIZE 8192
 #define UDPC_DEFAULT_PROTOCOL_ID 1357924680 // 0x50f04948
 
@@ -110,11 +111,17 @@ struct UDPC_Context;
 typedef struct UDPC_Context *UDPC_HContext;
 
 typedef enum {
+    /// Does not log anything
     UDPC_SILENT,
+    /// Only log errors
     UDPC_ERROR,
+    /// Log errors and warnings
     UDPC_WARNING,
+    /// Log errors, warnings, and info
     UDPC_INFO,
+    /// Log errors, warning, info, and verbose
     UDPC_VERBOSE,
+    /// Log all possible types of messages
     UDPC_DEBUG
 } UDPC_LoggingType;
 
@@ -143,9 +150,9 @@ typedef struct {
  */
 typedef struct {
     /*!
-     * A char array of size \p UDPC_PACKET_MAX_SIZE. Note that the received data
-     * will probably use up less data than the full size of the array. The
-     * actual size of the received data is \p dataSize.
+     * A char array of size \ref UDPC_PACKET_MAX_SIZE. Note that the received
+     * data will probably use up less data than the full size of the array. The
+     * actual size of the received data is \ref dataSize.
      */
     // id is stored at offset 8, size 4 (uint32_t) even for "empty" PktInfos
     char data[UDPC_PACKET_MAX_SIZE];
@@ -161,7 +168,7 @@ typedef struct {
      */
     uint32_t flags;
     /*!
-     * \brief The size in bytes of the received packet's data inside the \p data
+     * \brief The size in bytes of the received packet's data inside the \ref data
      * array member variable.
      *
      * If this variable is zero, then this packet is invalid, or an empty packet
@@ -169,9 +176,9 @@ typedef struct {
      */
     uint16_t dataSize;
     uint16_t rtt;
-    /// The \p UDPC_ConnectionId of the sender
+    /// The \ref UDPC_ConnectionId of the sender
     UDPC_ConnectionId sender;
-    /// The \p UDPC_ConnectionId of the receiver
+    /// The \ref UDPC_ConnectionId of the receiver
     UDPC_ConnectionId receiver;
 } UDPC_PacketInfo;
 
@@ -188,6 +195,10 @@ typedef struct {
  *
  * The other unmentioned enum values are used internally, and should never be
  * returned in a call to UDPC_get_event().
+ *
+ * All events returned by UDPC_get_event() will have set the member variable
+ * \p conId in the UDPC_Event which refers to the peer with which the event
+ * ocurred.
  */
 typedef enum {
     UDPC_ET_NONE,
@@ -226,6 +237,8 @@ typedef struct {
  * there is no need to convert the 16-bit value to network byte order, this will
  * be done automatically by this library when necessary (without modifying the
  * value in the used UDPC_ConnectionId).
+ *
+ * \return An initialized UDPC_ConnectionId
  */
 UDPC_ConnectionId UDPC_create_id(UDPC_IPV6_ADDR_TYPE addr, uint16_t port);
 
@@ -233,6 +246,8 @@ UDPC_ConnectionId UDPC_create_id(UDPC_IPV6_ADDR_TYPE addr, uint16_t port);
  * \brief Creates an UDPC_ConnectionId with the given addr, scope_id, and port
  *
  * port should be in native byte order (not network/big-endian).
+ *
+ * \return An initialized UDPC_ConnectionId
  */
 UDPC_ConnectionId UDPC_create_id_full(UDPC_IPV6_ADDR_TYPE addr, uint32_t scope_id, uint16_t port);
 
@@ -242,6 +257,8 @@ UDPC_ConnectionId UDPC_create_id_full(UDPC_IPV6_ADDR_TYPE addr, uint32_t scope_i
  * The address contained in the returned UDPC_ConnectionId will be zeroed out
  * (the "anyaddr" address).
  * port should be in native byte order (not network/big-endian).
+ *
+ * \return An initialized UDPC_ConnectionId
  */
 UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
 
@@ -252,6 +269,8 @@ UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
  * address is given, the internal address of the returned UDPC_ConnectionId will
  * be ipv4-mapped ipv6 address.)
  * port should be in native byte order (not network/big-endian).
+ *
+ * \return An initialized UDPC_ConnectionId
  */
 UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port);
 
@@ -268,6 +287,8 @@ UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port);
  * created.
  *
  * \warning The received UDPC_HContext must be freed with a call to UDPC_destroy().
+ *
+ * \return A UDPC context
  */
 UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLibsodium);
 /*!
@@ -286,6 +307,8 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLib
  * created.
  *
  * \warning The received UDPC_HContext must be freed with a call to UDPC_destroy().
+ *
+ * \return A UDPC context
  */
 UDPC_HContext UDPC_init_threaded_update(
     UDPC_ConnectionId listenId,
@@ -307,6 +330,8 @@ UDPC_HContext UDPC_init_threaded_update(
  * created.
  *
  * \warning The received UDPC_HContext must be freed with a call to UDPC_destroy().
+ *
+ * \return A UDPC context
  */
 UDPC_HContext UDPC_init_threaded_update_ms(
     UDPC_ConnectionId listenId,
@@ -436,6 +461,8 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
  * queue holds packets for all connections this context maintains. Thus if one
  * connection has free space, then it may partially remove packets only destined
  * for that connection from the queue this function refers to.
+ *
+ * \return The size of the queue
  */
 unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx);
 
@@ -447,6 +474,8 @@ unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx);
  * internal queue, but must do so after locking an internal mutex (a call to
  * UDPC_update() will lock this mutex, regardless of whether or not the context
  * is using threaded update).
+ *
+ * \return The size of a connection's queue
  */
 unsigned long UDPC_get_queued_size(UDPC_HContext ctx, UDPC_ConnectionId id, int *exists);
 
@@ -455,31 +484,143 @@ unsigned long UDPC_get_queued_size(UDPC_HContext ctx, UDPC_ConnectionId id, int 
  *
  * Note that a call to this function does not use any locks, as the limit is
  * known at compile time and is the same for all UDPC connections.
+ *
+ * \return The size limit of a connection's queue
  */
 unsigned long UDPC_get_max_queued_size();
 
+/*!
+ * \brief Set whether or not the UDPC context will accept new connections
+ * \param ctx The UDPC context
+ * \param isAccepting Set to non-zero to accept connections
+ * \return The previous setting (1 if accepting, 0 if not)
+ */
 int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);
 
+/*!
+ * \brief Drops an existing connection to a peer
+ *
+ * Note that UDPC will send a disconnect packet to the peer before removing
+ * the internal connection data handling the connection to that peer.
+ *
+ * \param ctx The UDPC context
+ * \param connectionId The identifier of the peer to disconnect from
+ * \param dropAllWithAddr Set to non-zero to drop all peers with the ip address
+ * specified in \p connectionId
+ */
 void UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, int dropAllWithAddr);
 
+/*!
+ * \brief Checks if a connection exists to the peer identified by the given
+ * \p connectionId
+ *
+ * \param ctx The UDPC context
+ * \param connectionId The identifier for a peer
+ *
+ * \return non-zero if a connection to the peer exists
+ */
 int UDPC_has_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
+/*!
+ * \brief Gets a dynamically allocated array of connected peers' identifiers
+ *
+ * Note that an additional element is appended to the array that is initialized
+ * with all fields to zero.
+ *
+ * \warning One must call UDPC_free_list_connected() with the returned array to
+ * clean up data to avoid a memory leak
+ *
+ * \param ctx The UDPC context
+ * \param size Pointer to an unsigned int to set the size of the returned array
+ * (set to NULL to not get a size)
+ * \return A dynamically allocated array of identifiers
+ */
 UDPC_ConnectionId* UDPC_get_list_connected(UDPC_HContext ctx, unsigned int *size);
 
+/*!
+ * \brief Cleans up a dynamically allocated array of connected peers' identifiers
+ * \param list The array to clean up
+ */
 void UDPC_free_list_connected(UDPC_ConnectionId *list);
 
+/*!
+ * \brief Gets the protocol id of the UDPC context
+ *
+ * UDPC uses the protocol id by prefixing every sent packet with it. Other UDPC
+ * instances will only accept packets with the same protocol id.
+ *
+ * One can use UDPC_set_protocol_id() to change it.
+ *
+ * \param ctx The UDPC context
+ * \return The protocol id of the given UDPC context
+ */
 uint32_t UDPC_get_protocol_id(UDPC_HContext ctx);
 
+/*!
+ * \brief Sets the protocol id of the UDPC context
+ *
+ * UDPC uses the protocol id by prefixing every sent packet with it. Other UDPC
+ * instances will only accept packets with the same protocol id.
+ *
+ * \param ctx The UDPC context
+ * \param id The new id to use as the protocol id
+ * \return The previous protocol id of the UDPC context
+ */
 uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id);
 
+/*!
+ * \brief Gets the logging type of the UDPC context
+ *
+ * See \ref UDPC_LoggingType for possible values.
+ *
+ * \param ctx The UDPC context
+ * \return The logging type of the UDPC context
+ */
 UDPC_LoggingType UDPC_get_logging_type(UDPC_HContext ctx);
 
+/*!
+ * \brief Sets the logging type of the UDPC context
+ *
+ * See \ref UDPC_LoggingType for possible values.
+ *
+ * \param ctx The UDPC context
+ * \param loggingType The logging type to set to
+ * \return The previously set logging type
+ */
 UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingType);
 
-int UPDC_get_receiving_events(UDPC_HContext ctx);
+/*!
+ * \brief Returns non-zero if the UDPC context will record events
+ *
+ * Events that have ocurred can by polled by calling UDPC_get_event()
+ *
+ * \param ctx The UDPC context
+ * \return non-zero if receiving events
+ */
+int UDPC_get_receiving_events(UDPC_HContext ctx);
 
+/*!
+ * \brief Sets whether or not UDPC will record events
+ *
+ * Events that have ocurred can by polled by calling UDPC_get_event()
+ *
+ * \param ctx The UDPC context
+ * \param isReceivingEvents Set to non-zero to receive events
+ * \return non-zero if UDPC was previously receiving events
+ */
 int UDPC_set_receiving_events(UDPC_HContext ctx, int isReceivingEvents);
 
+/*!
+ * \brief Gets a recorded event
+ *
+ * See \ref UDPC_EventType for possible types of a UDPC_Event.
+ *
+ * \param ctx The UDPC context
+ * \param remaining Pointer to set the number of remaining events that can be
+ * returned
+ * \return An UDPC_Event (will be of type UDPC_ET_NONE if there are no more
+ * events)
+ */
 UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining);
 
 UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);

@@ -2234,7 +2234,7 @@ UDPC_ConnectionId* UDPC_get_list_connected(UDPC_HContext ctx, unsigned int *size
 }
 
 void UDPC_free_list_connected(UDPC_ConnectionId *list) {
-    std::free(list);
+    if(list) { std::free(list); }
 }
 
 uint32_t UDPC_get_protocol_id(UDPC_HContext ctx) {
@@ -2286,7 +2286,7 @@ int UDPC_set_receiving_events(UDPC_HContext ctx, int isReceivingEvents) {
         return 0;
     }
 
-    return c->isReceivingEvents.exchange(isReceivingEvents != 0);
+    return c->isReceivingEvents.exchange(isReceivingEvents != 0) ? 1 : 0;
 }
 
 UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining) {
