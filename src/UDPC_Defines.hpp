@@ -235,12 +235,15 @@ public:
     std::unordered_map<uint32_t, UDPC_ConnectionId> idMap;
     std::unordered_set<UDPC_ConnectionId, ConnectionIdHasher> deletionMap;
     std::unordered_set<PKContainer, PKContainer> peerPKWhitelist;
-    TSLQueue<UDPC_PacketInfo> receivedPkts;
+    std::deque<UDPC_PacketInfo> receivedPkts;
+    std::mutex receivedPktsMutex;
     TSLQueue<UDPC_PacketInfo> cSendPkts;
     // handled internally
-    TSLQueue<UDPC_Event> internalEvents;
+    std::deque<UDPC_Event> internalEvents;
+    std::mutex internalEventsMutex;
     // handled via interface, if isReceivingEvents is true
-    TSLQueue<UDPC_Event> externalEvents;
+    std::deque<UDPC_Event> externalEvents;
+    std::mutex externalEventsMutex;
 
     std::default_random_engine rng_engine;
 
