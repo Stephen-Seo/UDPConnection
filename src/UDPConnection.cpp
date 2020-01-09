@@ -2907,6 +2907,7 @@ UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out) 
     else {
         struct ifreq req{{0}, 0, 0};
         std::strncpy(req.ifr_name, linkName, IFNAMSIZ);
+        req.ifr_name[IFNAMSIZ - 1] = 0;
         int socketHandle = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
         if(ioctl(socketHandle, SIOCGIFINDEX, &req) < 0) {
             UDPC_CLEANUPSOCKET(socketHandle);
