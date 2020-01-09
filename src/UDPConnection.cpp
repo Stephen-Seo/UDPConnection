@@ -1,5 +1,5 @@
 #include "UDPC_Defines.hpp"
-#include "UDPConnection.h"
+#include "UDPC.h"
 
 #include <cassert>
 #include <chrono>

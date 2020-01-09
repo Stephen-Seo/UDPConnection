@@ -33,7 +33,7 @@
 #include <iostream>
 
 #include "TSLQueue.hpp"
-#include "UDPConnection.h"
+#include "UDPC.h"
 
 #include <sodium.h>
 

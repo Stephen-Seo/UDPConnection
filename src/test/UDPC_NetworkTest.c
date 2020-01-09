@@ -8,7 +8,7 @@
 #include <sodium.h>
 #endif
 
-#include <UDPConnection.h>
+#include <UDPC.h>
 
 #define QUEUED_MAX_SIZE 32
 #define SEND_IDS_SIZE 64

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <UDPConnection.h>
+#include <UDPC.h>
 #include <UDPC_Defines.hpp>
 
 #include <cstring>
