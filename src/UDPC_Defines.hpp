@@ -84,7 +84,7 @@ struct IPV6_Hasher {
 
 struct PKContainer {
     PKContainer();
-    PKContainer(unsigned char *pk);
+    PKContainer(const unsigned char *pk);
 
     unsigned char pk[crypto_sign_PUBLICKEYBYTES];
 

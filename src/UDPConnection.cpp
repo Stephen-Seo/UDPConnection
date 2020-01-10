@@ -69,7 +69,7 @@ UDPC::PKContainer::PKContainer() {
     std::memset(pk, 0, crypto_sign_PUBLICKEYBYTES);
 }
 
-UDPC::PKContainer::PKContainer(unsigned char *pk) {
+UDPC::PKContainer::PKContainer(const unsigned char *pk) {
     std::memcpy(this->pk, pk, crypto_sign_PUBLICKEYBYTES);
 }
 
@@ -2117,7 +2117,7 @@ void UDPC_client_initiate_connection(
 }
 
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
-                     int isChecked, void *data, uint32_t size) {
+                     int isChecked, const void *data, uint32_t size) {
     if(size == 0 || !data) {
         return;
     }
@@ -2325,7 +2325,7 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining) {
     }
 }
 
-int UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char *pk) {
+int UDPC_set_libsodium_keys(UDPC_HContext ctx, const unsigned char *sk, const unsigned char *pk) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c || !c->flags.test(2)) {
         return 0;
@@ -2338,7 +2338,7 @@ int UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char 
     return 1;
 }
 
-int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, unsigned char *sk) {
+int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, const unsigned char *sk) {
     unsigned char pk[crypto_sign_PUBLICKEYBYTES];
     if(crypto_sign_ed25519_sk_to_pk(pk, sk) != 0) {
         return 0;
@@ -2358,7 +2358,7 @@ int UDPC_unset_libsodium_keys(UDPC_HContext ctx) {
     return 1;
 }
 
-int UDPC_add_whitelist_pk(UDPC_HContext ctx, unsigned char *pk) {
+int UDPC_add_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c || !c->flags.test(2)) {
         return 0;
@@ -2372,7 +2372,7 @@ int UDPC_add_whitelist_pk(UDPC_HContext ctx, unsigned char *pk) {
     return 0;
 }
 
-int UDPC_has_whitelist_pk(UDPC_HContext ctx, unsigned char *pk) {
+int UDPC_has_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c || !c->flags.test(2)) {
         return 0;
@@ -2385,7 +2385,7 @@ int UDPC_has_whitelist_pk(UDPC_HContext ctx, unsigned char *pk) {
     return 0;
 }
 
-int UDPC_remove_whitelist_pk(UDPC_HContext ctx, unsigned char *pk) {
+int UDPC_remove_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if(!c || !c->flags.test(2)) {
         return 0;

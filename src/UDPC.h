@@ -446,7 +446,7 @@ void UDPC_client_initiate_connection(
  * \param size The size in bytes of the data to be sent
  */
 void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
-                     int isChecked, void *data, uint32_t size);
+                     int isChecked, const void *data, uint32_t size);
 
 /*!
  * \brief Gets the size of the data structure holding queued packets
@@ -474,6 +474,11 @@ unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx);
  * internal queue, but must do so after locking an internal mutex (a call to
  * UDPC_update() will lock this mutex, regardless of whether or not the context
  * is using threaded update).
+ *
+ * If \p exists is a non-null pointer to an \p int, and a connection to a peer
+ * identified by \p id exists, then the value of \p exists will be set to
+ * non-zero, otherwise a non-existing peer will set the value of \p exists to
+ * zero.
  *
  * \return The size of a connection's queue
  */
@@ -625,15 +630,15 @@ UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining);
 
 UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);
 
-int UDPC_set_libsodium_keys(UDPC_HContext ctx, unsigned char *sk, unsigned char *pk);
+int UDPC_set_libsodium_keys(UDPC_HContext ctx, const unsigned char *sk, const unsigned char *pk);
 
-int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, unsigned char *sk);
+int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, const unsigned char *sk);
 
 int UDPC_unset_libsodium_keys(UDPC_HContext ctx);
 
-int UDPC_add_whitelist_pk(UDPC_HContext ctx, unsigned char *pk);
-int UDPC_has_whitelist_pk(UDPC_HContext ctx, unsigned char *pk);
-int UDPC_remove_whitelist_pk(UDPC_HContext ctx, unsigned char *pk);
+int UDPC_add_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
+int UDPC_has_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
+int UDPC_remove_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
 int UDPC_clear_whitelist(UDPC_HContext ctx);
 
 int UDPC_get_auth_policy(UDPC_HContext ctx);
