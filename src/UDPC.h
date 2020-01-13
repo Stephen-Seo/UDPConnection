@@ -1,10 +1,10 @@
 /*!
  * \mainpage UDPConnection
- * \ref UDPConnection.h
+ * \ref UDPC.h
  */
 
 /*!
- * \file UDPConnection.h
+ * \file UDPC.h
  * \brief Public API for UDPConnection
  */
 
@@ -171,8 +171,9 @@ typedef struct {
      * \brief The size in bytes of the received packet's data inside the \ref data
      * array member variable.
      *
-     * If this variable is zero, then this packet is invalid, or an empty packet
-     * was received.
+     * UDPC does not return an empty packet when calling UDPC_get_received(), so
+     * in such a packet dataSize shouldn't be zero. (UDPC only stores received
+     * packets that do have a payload.)
      */
     uint16_t dataSize;
     uint16_t rtt;
