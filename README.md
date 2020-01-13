@@ -15,11 +15,20 @@ created by invoking `doxygen Doxyfile` in the root directory of the project.
 
 ## Compiling
 
+### Release builds
+
     mkdir buildRelease
     cd buildRelease
     cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_SHARED_LIBS=True ..
     make
     make DESTDIR=install_destination install
+
+### Debug builds
+
+    mkdir buildDebug
+    cd buildDebug
+    cmake -DCMAKE_BUILD_TYPE=Debug ..
+    make
 
 ## Usage
 
