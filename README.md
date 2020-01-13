@@ -7,6 +7,11 @@ should facilitate creating bindings for other programming languages if needed.
 This library is still a work in progress, so api breaking changes may happen
 in the future.
 
+## Documentation
+
+`src/UDPC.h` is documented with Doxygen style comments. The doxygen docs can be
+created by invoking `doxygen Doxyfile` in the root directory of the project.
+
 ## Compiling
 
     mkdir buildRelease
