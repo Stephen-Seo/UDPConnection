@@ -1,8 +1,9 @@
 # UDPConnection
 
 Provides a network connection over UDP, with verification of packet support via
-libsodium (optional). Implemented in C++, but is available via a C api, which
-should facilitate creating bindings for other programming languages if needed.
+libsodium (optional). Implemented in C++ (up to C++11 standard), but is
+available via a C api, which should facilitate creating bindings for other
+programming languages if needed.
 
 This library is still a work in progress, so api breaking changes may happen
 in the future.
@@ -24,3 +25,10 @@ created by invoking `doxygen Doxyfile` in the root directory of the project.
 
 The program in `src/test/UDPC_NetworkTest.c` is used for testing UDPConnection
 and is also an example of using the library in a C program.
+
+## Debug Builds
+
+NetworkTest only builds when CMAKE\_BUILD\_TYPE is Debug (default).
+
+UnitTest only builds in Debug mode and if GTest (a unit testing framework) is
+available.
