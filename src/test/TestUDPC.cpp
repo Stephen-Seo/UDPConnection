@@ -3,6 +3,7 @@
 #include <UDPC.h>
 #include <UDPC_Defines.hpp>
 
+#include <cstdio>
 #include <cstring>
 #include <future>
 
@@ -255,5 +256,65 @@ TEST(UDPC, ConnectionIdBits) {
     id = UDPC_create_id_easy("::", 0);
     for(unsigned int i = 0; i < sizeof(UDPC_ConnectionId); ++i) {
         EXPECT_EQ(((char*)&id)[i], 0);
+    }
+}
+
+TEST(UDPC, NetworkOrderEndianness) {
+    if(UDPC_is_big_endian() != 0) {
+        puts("Is big-endian");
+        uint16_t s = 0x0102;
+        s = UDPC_no16i(s);
+        EXPECT_EQ(s, 0x0102);
+
+        uint32_t l = 0x01020304;
+        l = UDPC_no32i(l);
+        EXPECT_EQ(l, 0x01020304);
+
+        uint64_t ll = 0x0102030405060708;
+        ll = UDPC_no64i(ll);
+        EXPECT_EQ(ll, 0x0102030405060708);
+
+        l = 0x40208040;
+        float *f = reinterpret_cast<float*>(&l);
+        *f = UDPC_no32f(*f);
+        EXPECT_EQ(l, 0x40208040);
+
+        ll = 0x4000001010008040;
+        double *d = reinterpret_cast<double*>(&ll);
+        *d = UDPC_no64f(*d);
+        EXPECT_EQ(ll, 0x4000001010008040);
+    } else {
+        puts("Is NOT big-endian");
+        uint16_t s = 0x0102;
+        s = UDPC_no16i(s);
+        EXPECT_EQ(s, 0x0201);
+        s = UDPC_no16i(s);
+        EXPECT_EQ(s, 0x0102);
+
+        uint32_t l = 0x01020304;
+        l = UDPC_no32i(l);
+        EXPECT_EQ(l, 0x04030201);
+        l = UDPC_no32i(l);
+        EXPECT_EQ(l, 0x01020304);
+
+        uint64_t ll = 0x0102030405060708;
+        ll = UDPC_no64i(ll);
+        EXPECT_EQ(ll, 0x0807060504030201);
+        ll = UDPC_no64i(ll);
+        EXPECT_EQ(ll, 0x0102030405060708);
+
+        l = 0x40208040;
+        float *f = reinterpret_cast<float*>(&l);
+        *f = UDPC_no32f(*f);
+        EXPECT_EQ(l, 0x40802040);
+        *f = UDPC_no32f(*f);
+        EXPECT_EQ(l, 0x40208040);
+
+        ll = 0x4000001010008040;
+        double *d = reinterpret_cast<double*>(&ll);
+        *d = UDPC_no64f(*d);
+        EXPECT_EQ(ll, 0x4080001010000040);
+        *d = UDPC_no64f(*d);
+        EXPECT_EQ(ll, 0x4000001010008040);
     }
 }

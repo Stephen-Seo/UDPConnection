@@ -2932,3 +2932,32 @@ UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out) 
     checkSetOut(scope_id);
     return result;
 }
+
+int UDPC_is_big_endian() {
+    return UDPC::isBigEndian() ? 1 : 0;
+}
+
+uint16_t UDPC_no16i(uint16_t i) {
+    return htons(i);
+}
+
+uint32_t UDPC_no32i(uint32_t i) {
+    return htonl(i);
+}
+
+uint64_t UDPC_no64i(uint64_t i) {
+    UDPC::be64((char*)&i);
+    return i;
+}
+
+float UDPC_no32f(float f) {
+    uint32_t *i = reinterpret_cast<uint32_t*>(&f);
+    *i = htonl(*i);
+    return f;
+}
+
+double UDPC_no64f(double f) {
+    uint64_t *i = reinterpret_cast<uint64_t*>(&f);
+    UDPC::be64((char*)i);
+    return f;
+}

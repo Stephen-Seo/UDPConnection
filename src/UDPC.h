@@ -649,10 +649,20 @@ const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
 const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr);
 
+// =============================================================================
+// Helpers
+
 /// addrStr must be a valid ipv6 address or a valid ipv4 address
 UDPC_IPV6_ADDR_TYPE UDPC_strtoa(const char *addrStr);
 
 UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out);
+
+int UDPC_is_big_endian();
+uint16_t UDPC_no16i(uint16_t i);
+uint32_t UDPC_no32i(uint32_t i);
+uint64_t UDPC_no64i(uint64_t i);
+float UDPC_no32f(float f);
+double UDPC_no64f(double f);
 
 #ifdef __cplusplus
 }
