@@ -1719,7 +1719,7 @@ bool UDPC::isBigEndian() {
     } bint = {0x01020304};
 
     isBigEndian = (bint.c[0] == 1 ? 1 : 2);
-    return isBigEndian;
+    return isBigEndian == 1;
 }
 
 void UDPC::be64(char *integer) {
