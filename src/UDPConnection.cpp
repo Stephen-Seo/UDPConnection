@@ -2349,11 +2349,15 @@ int UDPC_set_libsodium_keys(UDPC_HContext ctx, const unsigned char *sk, const un
 }
 
 int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, const unsigned char *sk) {
+#ifndef UDPC_LIBSODIUM_ENABLED
+    return 0;
+#else
     unsigned char pk[crypto_sign_PUBLICKEYBYTES];
     if(crypto_sign_ed25519_sk_to_pk(pk, sk) != 0) {
         return 0;
     }
     return UDPC_set_libsodium_keys(ctx, sk, pk);
+#endif
 }
 
 int UDPC_unset_libsodium_keys(UDPC_HContext ctx) {

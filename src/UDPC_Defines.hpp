@@ -35,7 +35,9 @@
 #include "TSLQueue.hpp"
 #include "UDPC.h"
 
-#include <sodium.h>
+#ifdef UDPC_LIBSODIUM_ENABLED
+# include <sodium.h>
+#endif
 
 #define UDPC_MIN_HEADER_SIZE 20
 #define UDPC_CON_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+4)
