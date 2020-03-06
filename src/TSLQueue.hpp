@@ -91,8 +91,8 @@ class TSLQueue {
 
 template <typename T>
 TSLQueue<T>::TSLQueue() :
-    head(std::make_shared<TSLQNode>()),
-    tail(std::make_shared<TSLQNode>()),
+    head(std::shared_ptr<TSLQNode>(new TSLQNode())),
+    tail(std::shared_ptr<TSLQNode>(new TSLQNode())),
     msize(0)
 {
     head->next = tail;
@@ -126,8 +126,8 @@ TSLQueue<T> & TSLQueue<T>::operator=(TSLQueue &&other) {
 template <typename T>
 void TSLQueue<T>::push(const T &data) {
     std::lock_guard<std::mutex> lock(mutex);
-    auto newNode = std::make_shared<TSLQNode>();
-    newNode->data = std::make_unique<T>(data);
+    auto newNode = std::shared_ptr<TSLQNode>(new TSLQNode());
+    newNode->data = std::unique_ptr<T>(new T(data));
 
     auto last = tail->prev.lock();
     assert(last);
@@ -142,8 +142,8 @@ void TSLQueue<T>::push(const T &data) {
 template <typename T>
 bool TSLQueue<T>::push_nb(const T &data) {
     if(mutex.try_lock()) {
-        auto newNode = std::make_shared<TSLQNode>();
-        newNode->data = std::make_unique<T>(data);
+        auto newNode = std::shared_ptr<TSLQNode>(new TSLQNode());
+        newNode->data = std::unique_ptr<T>(new T(data));
 
         auto last = tail->prev.lock();
         assert(last);

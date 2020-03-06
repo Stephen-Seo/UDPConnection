@@ -1780,8 +1780,8 @@ uint32_t UDPC::generateConnectionID(Context &ctx) {
 
 float UDPC::durationToFSec(const std::chrono::steady_clock::duration& duration) {
     return (float)duration.count()
-        * (float)std::decay_t<decltype(duration)>::period::num
-        / (float)std::decay_t<decltype(duration)>::period::den;
+        * (float)std::chrono::steady_clock::duration::period::num
+        / (float)std::chrono::steady_clock::duration::period::den;
 }
 
 uint16_t UDPC::durationToMS(const std::chrono::steady_clock::duration& duration) {
