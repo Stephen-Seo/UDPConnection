@@ -309,6 +309,7 @@ int main(int argc, char **argv) {
                     }
 //                    printf("Got rtt %u\n", received.rtt);
                 }
+                UDPC_free_PacketInfo(received);
             } while (size > 0);
         }
         do {

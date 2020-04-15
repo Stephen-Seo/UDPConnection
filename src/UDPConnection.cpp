@@ -199,6 +199,18 @@ rtt(std::chrono::steady_clock::duration::zero())
 #endif
 }
 
+UDPC::ConnectionData::~ConnectionData() {
+    for(auto iter = sentPkts.begin(); iter != sentPkts.end(); ++iter) {
+        std::free(iter->data);
+    }
+    for(auto iter = sendPkts.begin(); iter != sendPkts.end(); ++iter) {
+        std::free(iter->data);
+    }
+    for(auto iter = priorityPkts.begin(); iter != priorityPkts.end(); ++iter) {
+        std::free(iter->data);
+    }
+}
+
 void UDPC::ConnectionData::cleanupSentPkts() {
     uint32_t id;
     while(sentPkts.size() > UDPC_SENT_PKTS_MAX_SIZE) {
@@ -207,6 +219,7 @@ void UDPC::ConnectionData::cleanupSentPkts() {
         assert(iter != sentInfoMap.end()
                 && "Sent packet must have correspoding entry in sentInfoMap");
         sentInfoMap.erase(iter);
+        std::free(sentPkts.front().data);
         sentPkts.pop_front();
     }
 }
@@ -241,6 +254,24 @@ peerPKWhitelistMutex()
 
     threadRunning.store(true);
     keysSet.store(false);
+}
+
+UDPC::Context::~Context() {
+    // cleanup packets
+    for(auto iter = receivedPkts.begin();
+             iter != receivedPkts.end();
+           ++iter) {
+        std::free(iter->data);
+    }
+    {
+        auto iter = cSendPkts.begin();
+        auto current = iter.current();
+        while(current) {
+            std::free(current->data);
+            if(!iter.next()) { break; }
+            current = iter.current();
+        }
+    }
 }
 
 bool UDPC::Context::willLog(UDPC_LoggingType type) {
@@ -901,6 +932,8 @@ void UDPC::Context::update_impl() {
                 }
 
                 UDPC_PacketInfo pInfo = UDPC::get_empty_pinfo();
+                pInfo.dataSize = UDPC_NSFULL_HEADER_SIZE;
+                pInfo.data = (char*)std::malloc(pInfo.dataSize);
                 pInfo.flags = 0x4;
                 pInfo.sender.addr = in6addr_loopback;
                 pInfo.receiver.addr = iter->first.addr;
@@ -964,6 +997,7 @@ void UDPC::Context::update_impl() {
                             UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                             ", port ",
                             iter->second.port);
+                        std::free(pInfo.data);
                         continue;
                     }
                     std::memcpy(buf.get() + UDPC_MIN_HEADER_SIZE + 1, sig, crypto_sign_BYTES);
@@ -971,6 +1005,7 @@ void UDPC::Context::update_impl() {
                     assert(!"libsodium disabled, invalid state");
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                         "libsodium is disabled, cannot send packet");
+                    std::free(pInfo.data);
                     continue;
 #endif
                 } else {
@@ -1001,15 +1036,17 @@ void UDPC::Context::update_impl() {
                         UDPC_atostr((UDPC_HContext)this, iter->first.addr),
                         ", port = ",
                         iter->second.port);
+                    std::free(pInfo.data);
                     continue;
                 }
 
                 if((pInfo.flags & 0x4) == 0) {
                     // is check-received, store data in case packet gets lost
                     UDPC_PacketInfo sentPInfo = UDPC::get_empty_pinfo();
+                    sentPInfo.dataSize = sendSize;
+                    sentPInfo.data = (char*)std::malloc(sentPInfo.dataSize);
                     std::memcpy(sentPInfo.data, buf.get(), sendSize);
                     sentPInfo.flags = 0;
-                    sentPInfo.dataSize = sendSize;
                     sentPInfo.sender.addr = in6addr_loopback;
                     sentPInfo.receiver.addr = iter->first.addr;
                     sentPInfo.sender.port = ntohs(socketInfo.sin6_port);
@@ -1020,8 +1057,9 @@ void UDPC::Context::update_impl() {
                 } else {
                     // is not check-received, only id stored in data array
                     UDPC_PacketInfo sentPInfo = UDPC::get_empty_pinfo();
+                    sentPInfo.dataSize = UDPC_MIN_HEADER_SIZE;
+                    sentPInfo.data = (char*)std::malloc(sentPInfo.dataSize);
                     sentPInfo.flags = 0x4;
-                    sentPInfo.dataSize = 0;
                     sentPInfo.sender.addr = in6addr_loopback;
                     sentPInfo.receiver.addr = iter->first.addr;
                     sentPInfo.sender.port = ntohs(socketInfo.sin6_port);
@@ -1036,6 +1074,7 @@ void UDPC::Context::update_impl() {
                 UDPC::SentPktInfo::Ptr sentPktInfo = std::make_shared<UDPC::SentPktInfo>();
                 sentPktInfo->id = iter->second.lseq - 1;
                 iter->second.sentInfoMap.insert(std::make_pair(sentPktInfo->id, sentPktInfo));
+                std::free(pInfo.data);
             }
             iter->second.sent = now;
         }
@@ -1572,11 +1611,13 @@ void UDPC::Context::update_impl() {
                     UDPC_PacketInfo resendingData = UDPC::get_empty_pinfo();
                     if(pktSigned) {
                         resendingData.dataSize = sentIter->dataSize - UDPC_LSFULL_HEADER_SIZE;
+                        resendingData.data = (char*)std::malloc(resendingData.dataSize);
                         std::memcpy(resendingData.data,
                             sentIter->data + UDPC_LSFULL_HEADER_SIZE,
                             resendingData.dataSize);
                     } else {
                         resendingData.dataSize = sentIter->dataSize - UDPC_NSFULL_HEADER_SIZE;
+                        resendingData.data = (char*)std::malloc(resendingData.dataSize);
                         std::memcpy(resendingData.data,
                             sentIter->data + UDPC_NSFULL_HEADER_SIZE,
                             resendingData.dataSize);
@@ -1649,6 +1690,7 @@ void UDPC::Context::update_impl() {
     if(pktType == 0 && bytes > (int)UDPC_NSFULL_HEADER_SIZE) {
         UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
         recPktInfo.dataSize = bytes - UDPC_NSFULL_HEADER_SIZE;
+        recPktInfo.data = (char*)std::malloc(recPktInfo.dataSize);
         std::memcpy(recPktInfo.data,
                     recvBuf + UDPC_NSFULL_HEADER_SIZE,
                     recPktInfo.dataSize);
@@ -1668,6 +1710,7 @@ void UDPC::Context::update_impl() {
     } else if(pktType == 1 && bytes > (int)UDPC_LSFULL_HEADER_SIZE) {
         UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
         recPktInfo.dataSize = bytes - UDPC_LSFULL_HEADER_SIZE;
+        recPktInfo.data = (char*)std::malloc(recPktInfo.dataSize);
         std::memcpy(recPktInfo.data,
                     recvBuf + UDPC_LSFULL_HEADER_SIZE,
                     recPktInfo.dataSize);
@@ -1798,7 +1841,7 @@ float UDPC::timePointsToFSec(
 
 UDPC_PacketInfo UDPC::get_empty_pinfo() {
     return UDPC_PacketInfo {
-        {0},     // data (array)
+        0,       // data (ptr)
         0,       // flags
         0,       // dataSize
         0,       // rtt
@@ -2084,10 +2127,12 @@ int UDPC_is_valid_context(UDPC_HContext ctx) {
 void UDPC_destroy(UDPC_HContext ctx) {
     UDPC::Context *UDPC_ctx = UDPC::verifyContext(ctx);
     if(UDPC_ctx) {
+        // stop thread if threaded
         if(UDPC_ctx->flags.test(0)) {
             UDPC_ctx->threadRunning.store(false);
             UDPC_ctx->thread.join();
         }
+
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
         WSACleanup();
 #endif
@@ -2138,8 +2183,9 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
     }
 
     UDPC_PacketInfo sendInfo = UDPC::get_empty_pinfo();
-    std::memcpy(sendInfo.data, data, size);
     sendInfo.dataSize = size;
+    sendInfo.data = (char*)std::malloc(sendInfo.dataSize);
+    std::memcpy(sendInfo.data, data, size);
     sendInfo.sender.addr = in6addr_loopback;
     sendInfo.sender.port = ntohs(c->socketInfo.sin6_port);
     sendInfo.receiver.addr = destinationId.addr;
@@ -2332,6 +2378,14 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining) {
         c->receivedPkts.pop_front();
         if(remaining) { *remaining = c->receivedPkts.size(); }
         return pinfo;
+    }
+}
+
+void UDPC_free_PacketInfo(UDPC_PacketInfo pInfo) {
+    if(pInfo.data && pInfo.dataSize > 0) {
+        std::free(pInfo.data);
+        pInfo.data = 0;
+        pInfo.dataSize = 0;
     }
 }
 

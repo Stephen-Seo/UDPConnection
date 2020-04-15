@@ -105,6 +105,7 @@ struct ConnectionData {
         bool isUsingLibsodium,
         unsigned char *sk,
         unsigned char *pk);
+    ~ConnectionData();
 
     // copy
     ConnectionData(const ConnectionData& other) = delete;
@@ -156,6 +157,7 @@ struct ConnectionData {
 struct Context {
 public:
     Context(bool isThreaded);
+    ~Context();
 
     bool willLog(UDPC_LoggingType);
 

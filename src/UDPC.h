@@ -147,15 +147,19 @@ typedef struct {
 
 /*!
  * \brief Data representing a received/sent packet
+ *
+ * If \ref data is NULL or \ref dataSize is 0, then this packet is invalid.
+ *
+ * \warning This struct must be free'd with a call to UDPC_free_PacketInfo to
+ * avoid a memory leak.
  */
 typedef struct {
     /*!
-     * A char array of size \ref UDPC_PACKET_MAX_SIZE. Note that the received
-     * data will probably use up less data than the full size of the array. The
-     * actual size of the received data is \ref dataSize.
+     * A char array of size \ref dataSize. Will be NULL if this UDPC_PacketInfo
+     * is invalid.
      */
     // id is stored at offset 8, size 4 (uint32_t) even for "empty" PktInfos
-    char data[UDPC_PACKET_MAX_SIZE];
+    char *data;
     /*!
      * \brief Flags indication some additional information about the received
      * packet.
@@ -169,11 +173,12 @@ typedef struct {
     uint32_t flags;
     /*!
      * \brief The size in bytes of the received packet's data inside the \ref data
-     * array member variable.
+     * pointer member variable.
      *
      * UDPC does not return an empty packet when calling UDPC_get_received(), so
      * in such a packet dataSize shouldn't be zero. (UDPC only stores received
-     * packets that do have a payload.)
+     * packets that do have a payload.) This means that if this variable is 0,
+     * then this UDPC_PacketInfo is invalid.
      */
     uint16_t dataSize;
     uint16_t rtt;
@@ -629,7 +634,22 @@ int UDPC_set_receiving_events(UDPC_HContext ctx, int isReceivingEvents);
  */
 UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining);
 
+/*!
+ * \brief Get a received packet from a given UDPC context.
+ *
+ * \warning The received packet (if valid) must be free'd with a call to
+ * \ref UDPC_free_PacketInfo() to avoid a memory leak.
+ */
 UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);
+
+/*!
+ * \brief Frees a UDPC_PacketInfo.
+ *
+ * Internally, the member variable \ref UDPC_PacketInfo::data will be free'd and
+ * set to NULL and \ref UDPC_PacketInfo::dataSize will be set to 0 if the given
+ * packet is valid.
+ */
+void UDPC_free_PacketInfo(UDPC_PacketInfo pInfo);
 
 int UDPC_set_libsodium_keys(UDPC_HContext ctx, const unsigned char *sk, const unsigned char *pk);
 
