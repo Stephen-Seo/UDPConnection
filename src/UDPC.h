@@ -196,6 +196,7 @@ typedef struct {
  * - UDPC_ET_NONE: No events have ocurred
  * - UDPC_ET_CONNECTED: A peer has initiated a connection
  * - UDPC_ET_DISCONNECTED: A peer has disconnected
+ * - UDPC_ET_FAIL_CONNECT: Failed to establish a connection to server peer
  * - UDPC_ET_GOOD_MODE: The connection has switched to "good mode"
  * - UDPC_ET_BAD_MODE: The connection has switched to "bad mode"
  *
