@@ -214,7 +214,8 @@ UDPC::ConnectionData::~ConnectionData() {
 void UDPC::ConnectionData::cleanupSentPkts() {
     uint32_t id;
     while(sentPkts.size() > UDPC_SENT_PKTS_MAX_SIZE) {
-        id = ntohl(*((uint32_t*)(sentPkts.front().data + 8)));
+        std::memcpy(&id, sentPkts.front().data + 8, 4);
+        id = ntohl(id);
         auto iter = sentInfoMap.find(id);
         assert(iter != sentInfoMap.end()
                 && "Sent packet must have correspoding entry in sentInfoMap");
@@ -610,11 +611,11 @@ void UDPC::Context::update_impl() {
                 if(flags.test(2) && iter->second.flags.test(6)) {
                     sendSize = UDPC_LSFULL_HEADER_SIZE;
                     buf = std::unique_ptr<char[]>(new char[sendSize]);
-                    *((unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = 1;
+                    buf[UDPC_MIN_HEADER_SIZE] = 1;
                 } else {
                     sendSize = UDPC_NSFULL_HEADER_SIZE;
                     buf = std::unique_ptr<char[]>(new char[sendSize]);
-                    *((unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = 0;
+                    buf[UDPC_MIN_HEADER_SIZE] = 0;
                 }
                 UDPC::preparePacket(
                     buf.get(),
@@ -695,7 +696,8 @@ void UDPC::Context::update_impl() {
                         sendSize = UDPC_CCL_HEADER_SIZE;
                         buf = std::unique_ptr<char[]>(new char[sendSize]);
                         // set type 1
-                        *((uint32_t*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = htonl(1);
+                        uint32_t temp = htonl(1);
+                        std::memcpy(buf.get() + UDPC_MIN_HEADER_SIZE, &temp, 4);
                         // set public key
                         std::memcpy(
                             buf.get() + UDPC_MIN_HEADER_SIZE + 4,
@@ -741,7 +743,10 @@ void UDPC::Context::update_impl() {
                     } else {
                         sendSize = UDPC_CON_HEADER_SIZE;
                         buf = std::unique_ptr<char[]>(new char[sendSize]);
-                        *((uint32_t*)(buf.get() + 20)) = 0;
+                        buf[UDPC_MIN_HEADER_SIZE] = 0;
+                        buf[UDPC_MIN_HEADER_SIZE + 1] = 0;
+                        buf[UDPC_MIN_HEADER_SIZE + 2] = 0;
+                        buf[UDPC_MIN_HEADER_SIZE + 3] = 0;
                     }
                     UDPC::preparePacket(
                         buf.get(),
@@ -792,7 +797,8 @@ void UDPC::Context::update_impl() {
                         sendSize = UDPC_CSR_HEADER_SIZE;
                         buf = std::unique_ptr<char[]>(new char[sendSize]);
                         // set type
-                        *((uint32_t*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = htonl(2);
+                        uint32_t temp = htonl(2);
+                        std::memcpy(buf.get() + UDPC_MIN_HEADER_SIZE, &temp, 4);
                         // set pubkey
                         std::memcpy(buf.get() + UDPC_MIN_HEADER_SIZE + 4,
                             iter->second.pk,
@@ -813,7 +819,10 @@ void UDPC::Context::update_impl() {
                     } else {
                         sendSize = UDPC_CON_HEADER_SIZE;
                         buf = std::unique_ptr<char[]>(new char[sendSize]);
-                        *((uint32_t*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = 0;
+                        buf[UDPC_MIN_HEADER_SIZE] = 0;
+                        buf[UDPC_MIN_HEADER_SIZE + 1] = 0;
+                        buf[UDPC_MIN_HEADER_SIZE + 2] = 0;
+                        buf[UDPC_MIN_HEADER_SIZE + 3] = 0;
                     }
                     UDPC::preparePacket(
                         buf.get(),
@@ -867,11 +876,11 @@ void UDPC::Context::update_impl() {
                 if(flags.test(2) && iter->second.flags.test(6)) {
                     sendSize = UDPC_LSFULL_HEADER_SIZE;
                     buf = std::unique_ptr<char[]>(new char[sendSize]);
-                    *((unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = 1;
+                    buf[UDPC_MIN_HEADER_SIZE] = 1;
                 } else {
                     sendSize = UDPC_NSFULL_HEADER_SIZE;
                     buf = std::unique_ptr<char[]>(new char[sendSize]);
-                    *((unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = 0;
+                    buf[UDPC_MIN_HEADER_SIZE] = 0;
                 }
                 UDPC::preparePacket(
                     buf.get(),
@@ -939,7 +948,8 @@ void UDPC::Context::update_impl() {
                 pInfo.receiver.addr = iter->first.addr;
                 pInfo.sender.port = ntohs(socketInfo.sin6_port);
                 pInfo.receiver.port = iter->second.port;
-                *((uint32_t*)(pInfo.data + 8)) = htonl(iter->second.lseq - 1);
+                uint32_t temp = htonl(iter->second.lseq - 1);
+                std::memcpy(pInfo.data + 8, &temp, 4);
                 pInfo.data[UDPC_MIN_HEADER_SIZE] = flags.test(2) && iter->second.flags.test(6) ? 1 : 0;
 
                 iter->second.sentPkts.push_back(std::move(pInfo));
@@ -967,11 +977,11 @@ void UDPC::Context::update_impl() {
                 if(flags.test(2) && iter->second.flags.test(6)) {
                     sendSize = UDPC_LSFULL_HEADER_SIZE + pInfo.dataSize;
                     buf = std::unique_ptr<char[]>(new char[sendSize]);
-                    *((unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = 1;
+                    buf[UDPC_MIN_HEADER_SIZE] = 1;
                 } else {
                     sendSize = UDPC_NSFULL_HEADER_SIZE + pInfo.dataSize;
                     buf = std::unique_ptr<char[]>(new char[sendSize]);
-                    *((unsigned char*)(buf.get() + UDPC_MIN_HEADER_SIZE)) = 0;
+                    buf[UDPC_MIN_HEADER_SIZE] = 0;
                 }
 
                 UDPC::preparePacket(
@@ -1064,7 +1074,8 @@ void UDPC::Context::update_impl() {
                     sentPInfo.receiver.addr = iter->first.addr;
                     sentPInfo.sender.port = ntohs(socketInfo.sin6_port);
                     sentPInfo.receiver.port = iter->second.port;
-                    *((uint32_t*)(sentPInfo.data + 8)) = htonl(iter->second.lseq - 1);
+                    uint32_t temp = htonl(iter->second.lseq - 1);
+                    std::memcpy(sentPInfo.data + 8, &temp, 4);
 
                     iter->second.sentPkts.push_back(std::move(sentPInfo));
                     iter->second.cleanupSentPkts();
@@ -1151,7 +1162,9 @@ void UDPC::Context::update_impl() {
         return;
     }
 
-    uint32_t temp = ntohl(*((uint32_t*)recvBuf));
+    uint32_t temp;
+    std::memcpy(&temp, recvBuf, 4);
+    temp = ntohl(temp);
     if(temp != protocolID) {
         // Invalid protocol id in packet
         UDPC_CHECK_LOG(this,
@@ -1163,10 +1176,14 @@ void UDPC::Context::update_impl() {
         return;
     }
 
-    uint32_t conID = ntohl(*((uint32_t*)(recvBuf + 4)));
-    uint32_t seqID = ntohl(*((uint32_t*)(recvBuf + 8)));
-    uint32_t rseq = ntohl(*((uint32_t*)(recvBuf + 12)));
-    uint32_t ack = ntohl(*((uint32_t*)(recvBuf + 16)));
+    std::memcpy(&temp, recvBuf + 4, 4);
+    uint32_t conID = ntohl(temp);
+    std::memcpy(&temp, recvBuf + 8, 4);
+    uint32_t seqID = ntohl(temp);
+    std::memcpy(&temp, recvBuf + 12, 4);
+    uint32_t rseq = ntohl(temp);
+    std::memcpy(&temp, recvBuf + 16, 4);
+    uint32_t ack = ntohl(temp);
 
     bool isConnect = conID & UDPC_ID_CONNECT;
     bool isPing = conID & UDPC_ID_PING;
@@ -1200,9 +1217,10 @@ void UDPC::Context::update_impl() {
         return;
     }
 
-    uint32_t pktType = 0;
+    uint32_t pktType;
     if(isConnect && !isPing) {
-        pktType = ntohl(*((uint32_t*)(recvBuf + UDPC_MIN_HEADER_SIZE)));
+        std::memcpy(&pktType, recvBuf + UDPC_MIN_HEADER_SIZE, 4);
+        pktType = ntohl(pktType);
         switch(pktType) {
         case 0: // client/server connect with libsodium disabled
             break;
@@ -1218,13 +1236,13 @@ void UDPC::Context::update_impl() {
             return;
         }
     } else {
-        pktType = ((unsigned char*)recvBuf)[UDPC_MIN_HEADER_SIZE];
-        switch(pktType) {
-        case 0: // not signed
-            break;
-        case 1: // signed
-            break;
-        default:
+        if(recvBuf[UDPC_MIN_HEADER_SIZE] == 0) {
+            // not signed
+            pktType = 0;
+        } else if(recvBuf[UDPC_MIN_HEADER_SIZE] == 1) {
+            // signed
+            pktType = 1;
+        } else {
             UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
                 "Got invalid pktType from ",
                 UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
@@ -1551,7 +1569,9 @@ void UDPC::Context::update_impl() {
 
     // update rtt
     for(auto sentIter = iter->second.sentPkts.rbegin(); sentIter != iter->second.sentPkts.rend(); ++sentIter) {
-        uint32_t id = ntohl(*((uint32_t*)(sentIter->data + 8)));
+        uint32_t id;
+        std::memcpy(&id, sentIter->data + 8, 4);
+        id = ntohl(id);
         if(id == rseq) {
             auto sentInfoIter = iter->second.sentInfoMap.find(id);
             assert(sentInfoIter != iter->second.sentInfoMap.end()
@@ -1586,7 +1606,9 @@ void UDPC::Context::update_impl() {
 
         // pkt not received yet, find it in sent to check if it timed out
         for(auto sentIter = iter->second.sentPkts.rbegin(); sentIter != iter->second.sentPkts.rend(); ++sentIter) {
-            uint32_t sentID = ntohl(*((uint32_t*)(sentIter->data + 8)));
+            uint32_t sentID;
+            std::memcpy(&sentID, sentIter->data + 8, 4);
+            sentID = ntohl(sentID);
             if(sentID == rseq) {
                 if((sentIter->flags & 0x4) != 0 || (sentIter->flags & 0x8) != 0) {
                     // already resent or not rec-checked pkt
