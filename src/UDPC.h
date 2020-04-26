@@ -281,6 +281,8 @@ UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
  */
 UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port);
 
+UDPC_ConnectionId UDPC_create_id_hostname(const char *hostname, uint16_t port);
+
 /*!
  * \brief Creates an UDPC_HContext that holds state for connections
  *
@@ -677,6 +679,8 @@ const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr);
 UDPC_IPV6_ADDR_TYPE UDPC_strtoa(const char *addrStr);
 
 UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out);
+
+UDPC_IPV6_ADDR_TYPE UDPC_a4toa6(uint32_t a4_be);
 
 int UDPC_is_big_endian();
 uint16_t UDPC_no16i(uint16_t i);

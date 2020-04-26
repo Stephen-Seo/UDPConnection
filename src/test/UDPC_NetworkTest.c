@@ -19,6 +19,7 @@ void usage() {
     puts("-ll <addr> - listen addr");
     puts("-lp <port> - listen port");
     puts("-cl <addr> - connection addr (client only)");
+    puts("-clh <hostname> - connection hostname (client only)");
     puts("-cp <port> - connection port (client only)");
     puts("-t <tick_count>");
     puts("-n - do not add payload to packets");
@@ -28,6 +29,7 @@ void usage() {
     puts("-ck <pubkey_file> - add pubkey to whitelist");
     puts("-sk <pubkey> <seckey> - start with pub/sec key pair");
     puts("-p <\"fallback\" or \"strict\"> - set auth policy");
+    puts("--hostname <hostname> - dont run test, just lookup hostname");
 }
 
 void sleep_seconds(unsigned int seconds) {
@@ -48,6 +50,7 @@ int main(int argc, char **argv) {
     const char *listenAddr = NULL;
     const char *listenPort = NULL;
     const char *connectionAddr = NULL;
+    const char *connectionHostname = NULL;
     const char *connectionPort = NULL;
     unsigned int tickLimit = 15;
     int noPayload = 0;
@@ -77,6 +80,9 @@ int main(int argc, char **argv) {
         } else if(strcmp(argv[0], "-cl") == 0 && argc > 1) {
             --argc; ++argv;
             connectionAddr = argv[0];
+        } else if(strcmp(argv[0], "-clh") == 0 && argc > 1) {
+            --argc; ++argv;
+            connectionHostname = argv[0];
         } else if(strcmp(argv[0], "-cp") == 0 && argc > 1) {
             --argc; ++argv;
             connectionPort = argv[0];
@@ -137,6 +143,16 @@ int main(int argc, char **argv) {
                 usage();
                 return 1;
             }
+        } else if(strcmp(argv[0], "--hostname") == 0 && argc > 1) {
+            --argc; ++argv;
+            UDPC_ConnectionId id = UDPC_create_id_hostname(argv[0], 9000);
+
+            UDPC_HContext ctx = UDPC_init(UDPC_create_id_easy("::1", 9000), 0, 0);
+            const char *str = UDPC_atostr(ctx, id.addr);
+            printf("Got addr \"%s\" for hostname \"%s\"\n", str, argv[0]);
+            UDPC_destroy(ctx);
+
+            return 0;
         } else {
             printf("ERROR: invalid argument \"%s\"\n", argv[0]);
             usage();
@@ -204,8 +220,8 @@ int main(int argc, char **argv) {
     } else if(!listenPort) {
         puts("ERROR: listenPort was not specified");
         return 1;
-    } else if(isClient && !connectionAddr) {
-        puts("ERROR: connectionAddr was not specified");
+    } else if(isClient && !connectionAddr && !connectionHostname) {
+        puts("ERROR: connectionAddr or connectionHostname was not specified");
         return 1;
     } else if(isClient && !connectionPort) {
         puts("ERROR: connectionPort was not specified");
@@ -220,7 +236,15 @@ int main(int argc, char **argv) {
         listenId = UDPC_create_id_easy(listenAddr, atoi(listenPort));
     }
     if(isClient) {
-        connectionId = UDPC_create_id_easy(connectionAddr, atoi(connectionPort));
+        if(connectionAddr) {
+            connectionId = UDPC_create_id_easy(connectionAddr, atoi(connectionPort));
+        } else /* if(connectionHostname) */ {
+            connectionId = UDPC_create_id_hostname(connectionHostname, atoi(connectionPort));
+            if(memcmp(&connectionId.addr, &in6addr_loopback, 16) == 0) {
+                puts("ERROR: Failed to resolve hostname");
+                return 1;
+            }
+        }
     }
     UDPC_HContext context = UDPC_init(listenId, isClient, isLibSodiumEnabled);
     if(!context) {

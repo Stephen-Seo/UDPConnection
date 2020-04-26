@@ -19,21 +19,8 @@
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
 #include <netioapi.h>
-
-static const UDPC_IPV6_ADDR_TYPE in6addr_any = UDPC_IPV6_ADDR_TYPE{{
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0
-}};
-static const UDPC_IPV6_ADDR_TYPE in6addr_loopback = UDPC_IPV6_ADDR_TYPE{{
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 1
-}};
-
 typedef int socklen_t;
+
 #elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
 #include <sys/ioctl.h>
 #include <net/if.h>
@@ -319,6 +306,12 @@ void UDPC::Context::update_impl() {
             switch(event.type) {
             case UDPC_ET_REQUEST_CONNECT:
             {
+                if(!isAcceptNewConnections.load()) {
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                        "Ignoring connection request because "
+                        "accept-new-connections flag is false");
+                    break;
+                }
                 unsigned char *sk = nullptr;
                 unsigned char *pk = nullptr;
                 if(keysSet.load()) {
@@ -1942,6 +1935,51 @@ UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port) {
     return result;
 }
 
+UDPC_ConnectionId UDPC_create_id_hostname(const char *hostname, uint16_t port) {
+    UDPC_ConnectionId result;
+    std::memset(&result, 0, sizeof(UDPC_ConnectionId));
+    result.port = port;
+
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+    WORD wVersionRequested = MAKEWORD(2, 2);
+    WSADATA wsaData;
+    if(WSAStartup(wVersionRequested, &wsaData) != 0) {
+        fprintf(stderr, "Failed to initialize Winsock\n");
+        return result;
+    }
+#elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
+#endif
+    addrinfo hints;
+    std::memset(&hints, 0, sizeof(addrinfo));
+
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    addrinfo *lookupResult;
+    int error = getaddrinfo(hostname, nullptr, &hints, &lookupResult);
+
+    if(error == 0) {
+        if(lookupResult->ai_family == AF_INET) {
+            sockaddr_in *a4 = (sockaddr_in*)lookupResult->ai_addr;
+            result.addr = UDPC_a4toa6(a4->sin_addr.s_addr);
+        } else if(lookupResult->ai_family == AF_INET6) {
+            sockaddr_in6 *a6 = (sockaddr_in6*)lookupResult->ai_addr;
+            result.addr = a6->sin6_addr;
+        } else {
+            result.addr = in6addr_loopback;
+        }
+        freeaddrinfo(lookupResult);
+    } else {
+        result.addr = in6addr_loopback;
+    }
+
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+    WSACleanup();
+#endif
+
+    return result;
+}
+
 UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLibsodium) {
     UDPC::Context *ctx = new UDPC::Context(false);
     ctx->flags.set(1, isClient != 0);
@@ -3010,6 +3048,31 @@ UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out) 
 #endif
 
     checkSetOut(scope_id);
+    return result;
+}
+
+UDPC_IPV6_ADDR_TYPE UDPC_a4toa6(uint32_t a4_be) {
+    if(a4_be == 0) {
+        return in6addr_any;
+    }
+
+    uint32_t a4 = ntohl(a4_be);
+
+    if(a4 == 0x7F000001) {
+        return in6addr_loopback;
+    }
+
+    UDPC_IPV6_ADDR_TYPE result;
+    for(unsigned int i = 0; i < 10; ++i) {
+        UDPC_IPV6_ADDR_SUB(result)[i] = 0;
+    }
+    UDPC_IPV6_ADDR_SUB(result)[10] = 0xFF;
+    UDPC_IPV6_ADDR_SUB(result)[11] = 0xFF;
+
+    for(unsigned int i = 0; i < 4; ++i) {
+        UDPC_IPV6_ADDR_SUB(result)[12 + i] = *((uint8_t*)&a4 + (3 - i));
+    }
+
     return result;
 }
 

@@ -39,6 +39,12 @@
 # include <sodium.h>
 #endif
 
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+# include <ws2tcpip.h>
+#elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM_LINUX
+# include <netdb.h>
+#endif
+
 #define UDPC_MIN_HEADER_SIZE 20
 #define UDPC_CON_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+4)
 #define UDPC_CCL_HEADER_SIZE (UDPC_MIN_HEADER_SIZE+4+crypto_sign_PUBLICKEYBYTES+12)
