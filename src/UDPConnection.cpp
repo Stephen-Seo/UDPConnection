@@ -1954,6 +1954,7 @@ UDPC_ConnectionId UDPC_create_id_hostname(const char *hostname, uint16_t port) {
 
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = IPPROTO_UDP;
 
     addrinfo *lookupResult;
     int error = getaddrinfo(hostname, nullptr, &hints, &lookupResult);
@@ -3058,7 +3059,7 @@ UDPC_IPV6_ADDR_TYPE UDPC_a4toa6(uint32_t a4_be) {
 
     uint32_t a4 = ntohl(a4_be);
 
-    if(a4 == 0x0100007F) {
+    if(a4 == 0x7F000001) {
         return in6addr_loopback;
     }
 
