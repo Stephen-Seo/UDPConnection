@@ -321,7 +321,7 @@ TEST(UDPC, NetworkOrderEndianness) {
 
 TEST(UDPC, a4toa6) {
     EXPECT_EQ(UDPC_a4toa6(0), in6addr_any);
-    uint32_t a4 = htonl(0x7F000001);
+    uint32_t a4 = htonl(0x0100007F);
     EXPECT_EQ(UDPC_a4toa6(a4), in6addr_loopback);
 
     UDPC_IPV6_ADDR_TYPE a6 = UDPC_strtoa("::FFFF:0102:0304");

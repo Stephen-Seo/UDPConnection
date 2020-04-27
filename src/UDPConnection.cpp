@@ -3058,7 +3058,7 @@ UDPC_IPV6_ADDR_TYPE UDPC_a4toa6(uint32_t a4_be) {
 
     uint32_t a4 = ntohl(a4_be);
 
-    if(a4 == 0x7F000001) {
+    if(a4 == 0x0100007F) {
         return in6addr_loopback;
     }
 
