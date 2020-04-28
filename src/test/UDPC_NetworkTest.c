@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <threads.h>
 #include <assert.h>
 
 #ifdef UDPC_LIBSODIUM_ENABLED
@@ -9,6 +8,13 @@
 #endif
 
 #include <UDPC.h>
+
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+#include <synchapi.h>
+#include <ws2tcpip.h>
+#elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
+#include <threads.h>
+#endif
 
 #define QUEUED_MAX_SIZE 32
 #define SEND_IDS_SIZE 64
@@ -33,10 +39,14 @@ void usage() {
 }
 
 void sleep_seconds(unsigned int seconds) {
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+    Sleep(seconds * 1000);
+#elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
     struct timespec duration;
     duration.tv_sec = seconds;
     duration.tv_nsec = 0;
     thrd_sleep(&duration, NULL);
+#endif
 }
 
 int main(int argc, char **argv) {
