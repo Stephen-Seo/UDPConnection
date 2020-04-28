@@ -125,10 +125,15 @@ typedef enum {
     UDPC_DEBUG
 } UDPC_LoggingType;
 
+/// Note auth policy will only take effect if public key verification of packets
+/// is enabled (if libsodium is enabled).
 typedef enum {
+    /// All peers will not be denied regardless of use of public key verification
     UDPC_AUTH_POLICY_FALLBACK=0,
+    /// Only peers with public key verification will be allowed
     UDPC_AUTH_POLICY_STRICT,
-    UDPC_AUTH_POLICY_SIZE /// Used internally to get max size of enum
+    // Used internally to get max size of enum
+    UDPC_AUTH_POLICY_SIZE
 } UDPC_AuthPolicy;
 
 /*!
@@ -654,18 +659,133 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);
  */
 void UDPC_free_PacketInfo(UDPC_PacketInfo pInfo);
 
+/*!
+ * \brief Sets public/private keys used for packet verification
+ *
+ * If keys are not set and packet verification is enabled, for each new
+ * connection new keys will be generated then used. The auto-generated keys
+ * used will be unique per connection. Conversely if keys are set, then new
+ * connections will use the given keys.
+ *
+ * Note that connections established before calling this function will not use
+ * the given keys.
+ *
+ * Note that public key verification will not occur if it is not enabled during
+ * the call to UDPC_init().
+ *
+ * \return Non-zero if keys were successfully set, zero if context is invalid or
+ * libsodium is not enabled
+ */
 int UDPC_set_libsodium_keys(UDPC_HContext ctx, const unsigned char *sk, const unsigned char *pk);
 
+/*!
+ * \brief Sets the public/private keys used for packet verification
+ *
+ * This function is almost identical with UDPC_set_libsodium_keys, except it
+ * will utilize libsodium to generate the associated public key with the given
+ * private key.
+ *
+ * Note that public key verification will not occur if it is not enabled during
+ * the call to UDPC_init().
+ *
+ * \return Non-zero if keys were successfully set, zero if context is invalid or
+ * libsodium is not enabled
+ */
 int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, const unsigned char *sk);
 
+/*!
+ * \brief Removes set keys if any used for packet verification
+ *
+ * Note that public key verification will not occur if it is not enabled during
+ * the call to UDPC_init().
+ *
+ * \return Zero if context is invalid or libsodium is not enabled
+ */
 int UDPC_unset_libsodium_keys(UDPC_HContext ctx);
 
+/*!
+ * \brief Adds a public key to the whitelist
+ *
+ * By default the whitelist is empty and any peer regardless of key will not be
+ * denied connection.
+ *
+ * This function adds one public key to the whitelist. If the whitelist is not
+ * empty, then all peers that do not have the matching public key will be
+ * denied connection.
+ *
+ * Note that public key verification will not occur if it is not enabled during
+ * the call to UDPC_init().
+ *
+ * \return The size of the whitelist on success, zero otherwise
+ */
 int UDPC_add_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
+
+/*!
+ * \brief Checks if a public key is in the whitelist
+ *
+ * Note that public key verification will not occur if it is not enabled during
+ * the call to UDPC_init().
+ *
+ * \return Non-zero if the given public key is in the whitelist
+ */
 int UDPC_has_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
+
+/*!
+ * \brief Removes a public key from the whitelist
+ *
+ * Note that public key verification will not occur if it is not enabled during
+ * the call to UDPC_init().
+ *
+ * \return Non-zero if a public key was removed
+ */
 int UDPC_remove_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
+
+/*!
+ * \brief Clears the public key whitelist
+ *
+ * If the whitelist is empty, then no connections will be denied.
+ *
+ * If there are keys in the whitelist, then new connections will only be allowed
+ * if the peer uses a public key in the whitelist.
+ *
+ * Note that public key verification will not occur if it is not enabled during
+ * the call to UDPC_init().
+ *
+ * \return Zero if the context is invalid or libsodium is not enabled, non-zero
+ * if the whitelist was successfully cleared
+ */
 int UDPC_clear_whitelist(UDPC_HContext ctx);
 
+/*!
+ * \brief Gets how peers are handled regarding public key verification
+ *
+ * If libsodium is enabled and the auth policy is "strict", then peers
+ * attempting to connect will be denied if they do not have public key
+ * verification enabled. Otherwise if the auth policy is "fallback", then peers
+ * will not be denied a connection regardless of whether or not they use
+ * public key verification of packets.
+ *
+ * Note that public key verification will not occur if it is not enabled during
+ * the call to UDPC_init().
+ *
+ * \return The current auth policy (see \ref UDPC_AuthPolicy) , or zero on fail
+ */
 int UDPC_get_auth_policy(UDPC_HContext ctx);
+
+/*!
+ * \brief Sets how peers are handled regarding public key verification
+ *
+ * If libsodium is enabled and the auth policy is "strict", then peers
+ * attempting to connect will be denied if they do not have public key
+ * verification enabled. Otherwise if the auth policy is "fallback", then peers
+ * will not be denied a connection regardless of whether or not they use
+ * public key verification of packets.
+ *
+ * Note that public key verification will not occur if it is not enabled during
+ * the call to UDPC_init().
+ *
+ * \return The previous auth policy (see \ref UDPC_AuthPolicy), or zero on fail
+ */
 int UDPC_set_auth_policy(UDPC_HContext ctx, int value);
 
 const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
