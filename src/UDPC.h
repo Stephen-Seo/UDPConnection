@@ -97,6 +97,12 @@
 #  endif
 # endif
 
+# if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+#  define UDPC_EXPORT __declspec(dllexport)
+# else
+#  define UDPC_EXPORT
+# endif
+
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
 #ifdef __cplusplus
@@ -110,7 +116,7 @@ extern "C" {
 struct UDPC_Context;
 typedef struct UDPC_Context *UDPC_HContext;
 
-typedef enum {
+typedef enum UDPC_EXPORT UDPC_LoggingType {
     /// Does not log anything
     UDPC_SILENT,
     /// Only log errors
@@ -127,7 +133,7 @@ typedef enum {
 
 /// Note auth policy will only take effect if public key verification of packets
 /// is enabled (if libsodium is enabled).
-typedef enum {
+typedef enum UDPC_EXPORT UDPC_AuthPolicy {
     /// All peers will not be denied regardless of use of public key verification
     UDPC_AUTH_POLICY_FALLBACK=0,
     /// Only peers with public key verification will be allowed
@@ -144,7 +150,7 @@ typedef enum {
  * create one. This struct does not hold dynamic data, so there is no need to
  * free it.
  */
-typedef struct {
+typedef struct UDPC_EXPORT UDPC_ConnectionId {
     UDPC_IPV6_ADDR_TYPE addr;
     uint32_t scope_id;
     uint16_t port;
@@ -158,7 +164,7 @@ typedef struct {
  * \warning This struct must be free'd with a call to UDPC_free_PacketInfo to
  * avoid a memory leak.
  */
-typedef struct {
+typedef struct UDPC_EXPORT UDPC_PacketInfo {
     /*!
      * A char array of size \ref dataSize. Will be NULL if this UDPC_PacketInfo
      * is invalid.
@@ -212,7 +218,7 @@ typedef struct {
  * \p conId in the UDPC_Event which refers to the peer with which the event
  * ocurred.
  */
-typedef enum {
+typedef enum UDPC_EXPORT UDPC_EventType {
     UDPC_ET_NONE,
     UDPC_ET_REQUEST_CONNECT,
     UDPC_ET_REQUEST_DISCONNECT,
@@ -233,7 +239,7 @@ typedef enum {
  * valid UDPC_ConnectionId \p conId that identifies the peer that the event is
  * referring to.
  */
-typedef struct {
+typedef struct UDPC_EXPORT UDPC_Event {
     UDPC_EventType type;
     UDPC_ConnectionId conId;
     union Value {
@@ -252,7 +258,7 @@ typedef struct {
  *
  * \return An initialized UDPC_ConnectionId
  */
-UDPC_ConnectionId UDPC_create_id(UDPC_IPV6_ADDR_TYPE addr, uint16_t port);
+UDPC_EXPORT UDPC_ConnectionId UDPC_create_id(UDPC_IPV6_ADDR_TYPE addr, uint16_t port);
 
 /*!
  * \brief Creates an UDPC_ConnectionId with the given addr, scope_id, and port
@@ -261,7 +267,7 @@ UDPC_ConnectionId UDPC_create_id(UDPC_IPV6_ADDR_TYPE addr, uint16_t port);
  *
  * \return An initialized UDPC_ConnectionId
  */
-UDPC_ConnectionId UDPC_create_id_full(UDPC_IPV6_ADDR_TYPE addr, uint32_t scope_id, uint16_t port);
+UDPC_EXPORT UDPC_ConnectionId UDPC_create_id_full(UDPC_IPV6_ADDR_TYPE addr, uint32_t scope_id, uint16_t port);
 
 /*!
  * \brief Creates an UDPC_ConnectionId with the given port
@@ -272,7 +278,7 @@ UDPC_ConnectionId UDPC_create_id_full(UDPC_IPV6_ADDR_TYPE addr, uint32_t scope_i
  *
  * \return An initialized UDPC_ConnectionId
  */
-UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
+UDPC_EXPORT UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
 
 /*!
  * \brief Creates an UDPC_ConnectionId with the given addr string and port
@@ -284,9 +290,9 @@ UDPC_ConnectionId UDPC_create_id_anyaddr(uint16_t port);
  *
  * \return An initialized UDPC_ConnectionId
  */
-UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port);
+UDPC_EXPORT UDPC_ConnectionId UDPC_create_id_easy(const char *addrString, uint16_t port);
 
-UDPC_ConnectionId UDPC_create_id_hostname(const char *hostname, uint16_t port);
+UDPC_EXPORT UDPC_ConnectionId UDPC_create_id_hostname(const char *hostname, uint16_t port);
 
 /*!
  * \brief Creates an UDPC_HContext that holds state for connections
@@ -304,7 +310,7 @@ UDPC_ConnectionId UDPC_create_id_hostname(const char *hostname, uint16_t port);
  *
  * \return A UDPC context
  */
-UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLibsodium);
+UDPC_EXPORT UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLibsodium);
 /*!
  * \brief Creates an UDPC_HContext that holds state for connections that
  * auto-updates via a thread.
@@ -324,7 +330,7 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLib
  *
  * \return A UDPC context
  */
-UDPC_HContext UDPC_init_threaded_update(
+UDPC_EXPORT UDPC_HContext UDPC_init_threaded_update(
     UDPC_ConnectionId listenId,
     int isClient,
     int isUsingLibsodium);
@@ -347,7 +353,7 @@ UDPC_HContext UDPC_init_threaded_update(
  *
  * \return A UDPC context
  */
-UDPC_HContext UDPC_init_threaded_update_ms(
+UDPC_EXPORT UDPC_HContext UDPC_init_threaded_update_ms(
     UDPC_ConnectionId listenId,
     int isClient,
     int updateMS,
@@ -362,7 +368,7 @@ UDPC_HContext UDPC_init_threaded_update_ms(
  * \return non-zero if auto updating is enabled. If the context already had auto
  * updating enabled, this function will return zero.
  */
-int UDPC_enable_threaded_update(UDPC_HContext ctx);
+UDPC_EXPORT int UDPC_enable_threaded_update(UDPC_HContext ctx);
 /*!
  * \brief Enables auto updating on a separate thread for the given UDPC_HContext
  * with the specified update interval
@@ -373,7 +379,7 @@ int UDPC_enable_threaded_update(UDPC_HContext ctx);
  * \return non-zero if auto updating is enabled. If the context already had auto
  * updating enabled, this function will return zero.
  */
-int UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS);
+UDPC_EXPORT int UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS);
 /*!
  * \brief Disables auto updating on a separate thread for the given
  * UDPC_HContext
@@ -382,14 +388,14 @@ int UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS);
  * \return non-zero if auto updating is disabled. If the context already had
  * auto updating disabled, this function will return zero.
  */
-int UDPC_disable_threaded_update(UDPC_HContext ctx);
+UDPC_EXPORT int UDPC_disable_threaded_update(UDPC_HContext ctx);
 
 /*!
  * \brief Checks if the given UDPC_HContext is valid (successfully initialized)
  *
  * \return non-zero if the given context is valid
  */
-int UDPC_is_valid_context(UDPC_HContext ctx);
+UDPC_EXPORT int UDPC_is_valid_context(UDPC_HContext ctx);
 
 /*!
  * \brief Cleans up the UDPC_HContext
@@ -400,7 +406,7 @@ int UDPC_is_valid_context(UDPC_HContext ctx);
  * \warning This function must be called after a UDPC_HContext is no longer used
  * to avoid memory leaks.
  */
-void UDPC_destroy(UDPC_HContext ctx);
+UDPC_EXPORT void UDPC_destroy(UDPC_HContext ctx);
 
 /*!
  * \brief Updates the context
@@ -424,7 +430,7 @@ void UDPC_destroy(UDPC_HContext ctx);
  * enabled via UDPC_init_threaded_update(), UDPC_init_threaded_update_ms(),
  * UDPC_enable_threaded_update(), or UDPC_enable_threaded_update_ms().
  */
-void UDPC_update(UDPC_HContext ctx);
+UDPC_EXPORT void UDPC_update(UDPC_HContext ctx);
 
 /*!
  * \brief Initiate a connection to a server peer
@@ -436,7 +442,7 @@ void UDPC_update(UDPC_HContext ctx);
  * \param enableLibSodium If packet headers should be verified with the server
  * peer (Fails if UDPC was not compiled with libsodium support)
  */
-void UDPC_client_initiate_connection(
+UDPC_EXPORT void UDPC_client_initiate_connection(
     UDPC_HContext ctx,
     UDPC_ConnectionId connectionId,
     int enableLibSodium);
@@ -459,7 +465,7 @@ void UDPC_client_initiate_connection(
  * \param data A pointer to data to be sent in a packet
  * \param size The size in bytes of the data to be sent
  */
-void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
+UDPC_EXPORT void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
                      int isChecked, const void *data, uint32_t size);
 
 /*!
@@ -478,7 +484,7 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
  *
  * \return The size of the queue
  */
-unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx);
+UDPC_EXPORT unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx);
 
 /*!
  * \brief Gets the size of a connection's queue of queued packets
@@ -496,7 +502,7 @@ unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx);
  *
  * \return The size of a connection's queue
  */
-unsigned long UDPC_get_queued_size(UDPC_HContext ctx, UDPC_ConnectionId id, int *exists);
+UDPC_EXPORT unsigned long UDPC_get_queued_size(UDPC_HContext ctx, UDPC_ConnectionId id, int *exists);
 
 /*!
  * \brief Gets the size limit of a connection's queue of queued packets
@@ -506,7 +512,7 @@ unsigned long UDPC_get_queued_size(UDPC_HContext ctx, UDPC_ConnectionId id, int 
  *
  * \return The size limit of a connection's queue
  */
-unsigned long UDPC_get_max_queued_size();
+UDPC_EXPORT unsigned long UDPC_get_max_queued_size();
 
 /*!
  * \brief Set whether or not the UDPC context will accept new connections
@@ -514,7 +520,7 @@ unsigned long UDPC_get_max_queued_size();
  * \param isAccepting Set to non-zero to accept connections
  * \return The previous setting (1 if accepting, 0 if not)
  */
-int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);
+UDPC_EXPORT int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);
 
 /*!
  * \brief Drops an existing connection to a peer
@@ -527,7 +533,7 @@ int UDPC_set_accept_new_connections(UDPC_HContext ctx, int isAccepting);
  * \param dropAllWithAddr Set to non-zero to drop all peers with the ip address
  * specified in \p connectionId
  */
-void UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, int dropAllWithAddr);
+UDPC_EXPORT void UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, int dropAllWithAddr);
 
 /*!
  * \brief Checks if a connection exists to the peer identified by the given
@@ -538,7 +544,7 @@ void UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, int
  *
  * \return non-zero if a connection to the peer exists
  */
-int UDPC_has_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
+UDPC_EXPORT int UDPC_has_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
 /*!
  * \brief Gets a dynamically allocated array of connected peers' identifiers
@@ -554,13 +560,13 @@ int UDPC_has_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
  * (set to NULL to not get a size)
  * \return A dynamically allocated array of identifiers
  */
-UDPC_ConnectionId* UDPC_get_list_connected(UDPC_HContext ctx, unsigned int *size);
+UDPC_EXPORT UDPC_ConnectionId* UDPC_get_list_connected(UDPC_HContext ctx, unsigned int *size);
 
 /*!
  * \brief Cleans up a dynamically allocated array of connected peers' identifiers
  * \param list The array to clean up
  */
-void UDPC_free_list_connected(UDPC_ConnectionId *list);
+UDPC_EXPORT void UDPC_free_list_connected(UDPC_ConnectionId *list);
 
 /*!
  * \brief Gets the protocol id of the UDPC context
@@ -573,7 +579,7 @@ void UDPC_free_list_connected(UDPC_ConnectionId *list);
  * \param ctx The UDPC context
  * \return The protocol id of the given UDPC context
  */
-uint32_t UDPC_get_protocol_id(UDPC_HContext ctx);
+UDPC_EXPORT uint32_t UDPC_get_protocol_id(UDPC_HContext ctx);
 
 /*!
  * \brief Sets the protocol id of the UDPC context
@@ -585,7 +591,7 @@ uint32_t UDPC_get_protocol_id(UDPC_HContext ctx);
  * \param id The new id to use as the protocol id
  * \return The previous protocol id of the UDPC context
  */
-uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id);
+UDPC_EXPORT uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id);
 
 /*!
  * \brief Gets the logging type of the UDPC context
@@ -595,7 +601,7 @@ uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id);
  * \param ctx The UDPC context
  * \return The logging type of the UDPC context
  */
-UDPC_LoggingType UDPC_get_logging_type(UDPC_HContext ctx);
+UDPC_EXPORT UDPC_LoggingType UDPC_get_logging_type(UDPC_HContext ctx);
 
 /*!
  * \brief Sets the logging type of the UDPC context
@@ -606,7 +612,7 @@ UDPC_LoggingType UDPC_get_logging_type(UDPC_HContext ctx);
  * \param loggingType The logging type to set to
  * \return The previously set logging type
  */
-UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingType);
+UDPC_EXPORT UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggingType);
 
 /*!
  * \brief Returns non-zero if the UDPC context will record events
@@ -616,7 +622,7 @@ UDPC_LoggingType UDPC_set_logging_type(UDPC_HContext ctx, UDPC_LoggingType loggi
  * \param ctx The UDPC context
  * \return non-zero if receiving events
  */
-int UDPC_get_receiving_events(UDPC_HContext ctx);
+UDPC_EXPORT int UDPC_get_receiving_events(UDPC_HContext ctx);
 
 /*!
  * \brief Sets whether or not UDPC will record events
@@ -627,7 +633,7 @@ int UDPC_get_receiving_events(UDPC_HContext ctx);
  * \param isReceivingEvents Set to non-zero to receive events
  * \return non-zero if UDPC was previously receiving events
  */
-int UDPC_set_receiving_events(UDPC_HContext ctx, int isReceivingEvents);
+UDPC_EXPORT int UDPC_set_receiving_events(UDPC_HContext ctx, int isReceivingEvents);
 
 /*!
  * \brief Gets a recorded event
@@ -640,7 +646,7 @@ int UDPC_set_receiving_events(UDPC_HContext ctx, int isReceivingEvents);
  * \return An UDPC_Event (will be of type UDPC_ET_NONE if there are no more
  * events)
  */
-UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining);
+UDPC_EXPORT UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining);
 
 /*!
  * \brief Get a received packet from a given UDPC context.
@@ -648,7 +654,7 @@ UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining);
  * \warning The received packet (if valid) must be free'd with a call to
  * \ref UDPC_free_PacketInfo() to avoid a memory leak.
  */
-UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);
+UDPC_EXPORT UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);
 
 /*!
  * \brief Frees a UDPC_PacketInfo.
@@ -657,7 +663,7 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);
  * set to NULL and \ref UDPC_PacketInfo::dataSize will be set to 0 if the given
  * packet is valid.
  */
-void UDPC_free_PacketInfo(UDPC_PacketInfo pInfo);
+UDPC_EXPORT void UDPC_free_PacketInfo(UDPC_PacketInfo pInfo);
 
 /*!
  * \brief Sets public/private keys used for packet verification
@@ -676,7 +682,7 @@ void UDPC_free_PacketInfo(UDPC_PacketInfo pInfo);
  * \return Non-zero if keys were successfully set, zero if context is invalid or
  * libsodium is not enabled
  */
-int UDPC_set_libsodium_keys(UDPC_HContext ctx, const unsigned char *sk, const unsigned char *pk);
+UDPC_EXPORT int UDPC_set_libsodium_keys(UDPC_HContext ctx, const unsigned char *sk, const unsigned char *pk);
 
 /*!
  * \brief Sets the public/private keys used for packet verification
@@ -691,7 +697,7 @@ int UDPC_set_libsodium_keys(UDPC_HContext ctx, const unsigned char *sk, const un
  * \return Non-zero if keys were successfully set, zero if context is invalid or
  * libsodium is not enabled
  */
-int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, const unsigned char *sk);
+UDPC_EXPORT int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, const unsigned char *sk);
 
 /*!
  * \brief Removes set keys if any used for packet verification
@@ -701,7 +707,7 @@ int UDPC_set_libsodium_key_easy(UDPC_HContext ctx, const unsigned char *sk);
  *
  * \return Zero if context is invalid or libsodium is not enabled
  */
-int UDPC_unset_libsodium_keys(UDPC_HContext ctx);
+UDPC_EXPORT int UDPC_unset_libsodium_keys(UDPC_HContext ctx);
 
 /*!
  * \brief Adds a public key to the whitelist
@@ -718,7 +724,7 @@ int UDPC_unset_libsodium_keys(UDPC_HContext ctx);
  *
  * \return The size of the whitelist on success, zero otherwise
  */
-int UDPC_add_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
+UDPC_EXPORT int UDPC_add_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
 
 /*!
  * \brief Checks if a public key is in the whitelist
@@ -728,7 +734,7 @@ int UDPC_add_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
  *
  * \return Non-zero if the given public key is in the whitelist
  */
-int UDPC_has_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
+UDPC_EXPORT int UDPC_has_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
 
 /*!
  * \brief Removes a public key from the whitelist
@@ -738,7 +744,7 @@ int UDPC_has_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
  *
  * \return Non-zero if a public key was removed
  */
-int UDPC_remove_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
+UDPC_EXPORT int UDPC_remove_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
 
 /*!
  * \brief Clears the public key whitelist
@@ -754,7 +760,7 @@ int UDPC_remove_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk);
  * \return Zero if the context is invalid or libsodium is not enabled, non-zero
  * if the whitelist was successfully cleared
  */
-int UDPC_clear_whitelist(UDPC_HContext ctx);
+UDPC_EXPORT int UDPC_clear_whitelist(UDPC_HContext ctx);
 
 /*!
  * \brief Gets how peers are handled regarding public key verification
@@ -770,7 +776,7 @@ int UDPC_clear_whitelist(UDPC_HContext ctx);
  *
  * \return The current auth policy (see \ref UDPC_AuthPolicy) , or zero on fail
  */
-int UDPC_get_auth_policy(UDPC_HContext ctx);
+UDPC_EXPORT int UDPC_get_auth_policy(UDPC_HContext ctx);
 
 /*!
  * \brief Sets how peers are handled regarding public key verification
@@ -786,28 +792,28 @@ int UDPC_get_auth_policy(UDPC_HContext ctx);
  *
  * \return The previous auth policy (see \ref UDPC_AuthPolicy), or zero on fail
  */
-int UDPC_set_auth_policy(UDPC_HContext ctx, int value);
+UDPC_EXPORT int UDPC_set_auth_policy(UDPC_HContext ctx, int value);
 
-const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
+UDPC_EXPORT const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
-const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr);
+UDPC_EXPORT const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr);
 
 // =============================================================================
 // Helpers
 
 /// addrStr must be a valid ipv6 address or a valid ipv4 address
-UDPC_IPV6_ADDR_TYPE UDPC_strtoa(const char *addrStr);
+UDPC_EXPORT UDPC_IPV6_ADDR_TYPE UDPC_strtoa(const char *addrStr);
 
-UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out);
+UDPC_EXPORT UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(const char *addrStr, uint32_t *linkId_out);
 
-UDPC_IPV6_ADDR_TYPE UDPC_a4toa6(uint32_t a4_be);
+UDPC_EXPORT UDPC_IPV6_ADDR_TYPE UDPC_a4toa6(uint32_t a4_be);
 
-int UDPC_is_big_endian();
-uint16_t UDPC_no16i(uint16_t i);
-uint32_t UDPC_no32i(uint32_t i);
-uint64_t UDPC_no64i(uint64_t i);
-float UDPC_no32f(float f);
-double UDPC_no64f(double f);
+UDPC_EXPORT int UDPC_is_big_endian();
+UDPC_EXPORT uint16_t UDPC_no16i(uint16_t i);
+UDPC_EXPORT uint32_t UDPC_no32i(uint32_t i);
+UDPC_EXPORT uint64_t UDPC_no64i(uint64_t i);
+UDPC_EXPORT float UDPC_no32f(float f);
+UDPC_EXPORT double UDPC_no64f(double f);
 
 #ifdef __cplusplus
 }
