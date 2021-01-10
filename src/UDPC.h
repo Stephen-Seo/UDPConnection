@@ -183,6 +183,14 @@ typedef struct UDPC_EXPORT UDPC_PacketInfo {
      */
     uint32_t flags;
     /*!
+     * \brief The packet's id.
+     *
+     * Packets start with id = 0, and will wrap around.
+     * This can be used to determine specifically how out of order a packet may
+     * be.
+     */
+    uint32_t id;
+    /*!
      * \brief The size in bytes of the received packet's data inside the \ref data
      * pointer member variable.
      *

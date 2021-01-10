@@ -1719,6 +1719,7 @@ void UDPC::Context::update_impl() {
         recPktInfo.sender.port = ntohs(receivedData.sin6_port);
         recPktInfo.receiver.port = ntohs(socketInfo.sin6_port);
         recPktInfo.rtt = durationToMS(iter->second.rtt);
+        recPktInfo.id = seqID;
 
         std::lock_guard<std::mutex> receivedPktsLock(receivedPktsMutex);
         receivedPkts.push_back(recPktInfo);
@@ -1739,6 +1740,7 @@ void UDPC::Context::update_impl() {
         recPktInfo.sender.port = ntohs(receivedData.sin6_port);
         recPktInfo.receiver.port = ntohs(socketInfo.sin6_port);
         recPktInfo.rtt = durationToMS(iter->second.rtt);
+        recPktInfo.id = seqID;
 
         std::lock_guard<std::mutex> receivedPktsLock(receivedPktsMutex);
         receivedPkts.push_back(recPktInfo);
@@ -1858,6 +1860,7 @@ UDPC_PacketInfo UDPC::get_empty_pinfo() {
     return UDPC_PacketInfo {
         0,       // data (ptr)
         0,       // flags
+        0,       // id
         0,       // dataSize
         0,       // rtt
         {        // sender

@@ -3,3 +3,4 @@ build*/
 compile_commands.json
 *.o
 doxygen_out/
+/tags
