@@ -44,4 +44,4 @@ available.
 
 # Links
 https://github.com/Stephen-Seo/UDPConnection  
-https://git.seodisparate.com/stephen/UDPConnection
+https://git.seodisparate.com/stephenseo/UDPConnection
