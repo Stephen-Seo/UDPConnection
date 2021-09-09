@@ -10,8 +10,7 @@ in the future.
 
 ## Documentation
 
-`src/UDPC.h` is documented with Doxygen style comments. The doxygen docs can be
-created by invoking `doxygen Doxyfile` in the root directory of the project.
+[See the gh-pages generated Doxygen documentation here.](https://stephen-seo.github.io/UDPConnection/)
 
 ## Compiling
 
