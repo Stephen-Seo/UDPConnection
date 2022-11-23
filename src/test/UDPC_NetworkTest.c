@@ -13,7 +13,19 @@
 #include <synchapi.h>
 #include <ws2tcpip.h>
 #elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
-#include <threads.h>
+#include <time.h>
+#endif
+
+#if UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
+#include <signal.h>
+
+static int receivedSIGINT = 0;
+
+static void handleSIGINT(int signal) {
+    if (signal == SIGINT) {
+        receivedSIGINT = 1;
+    }
+}
 #endif
 
 #define QUEUED_MAX_SIZE 32
@@ -45,7 +57,7 @@ void sleep_seconds(unsigned int seconds) {
     struct timespec duration;
     duration.tv_sec = seconds;
     duration.tv_nsec = 0;
-    thrd_sleep(&duration, NULL);
+    nanosleep(&duration, NULL);
 #endif
 }
 
@@ -299,7 +311,17 @@ int main(int argc, char **argv) {
     unsigned int sendIdsSize = 0;
     UDPC_PacketInfo received;
     UDPC_Event event;
+#if UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
+    struct sigaction sa;
+    sa.sa_handler = handleSIGINT;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+
+    sigaction(SIGINT, &sa, NULL);
+    while(receivedSIGINT == 0) {
+#else
     while(1) {
+#endif
         sleep_seconds(1);
         if(isClient && UDPC_has_connection(context, connectionId) == 0) {
 
