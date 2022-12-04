@@ -1116,639 +1116,701 @@ void UDPC::Context::update_impl() {
     deletionMap.clear();
 
     // receive packet
-    UDPC_IPV6_SOCKADDR_TYPE receivedData;
-    socklen_t receivedDataSize = sizeof(receivedData);
-    int bytes = recvfrom(
-        socketHandle,
-        recvBuf,
-        UDPC_PACKET_MAX_SIZE,
-        0,
-        (struct sockaddr*) &receivedData,
-        &receivedDataSize);
+    do {
+        UDPC_IPV6_SOCKADDR_TYPE receivedData;
+        socklen_t receivedDataSize = sizeof(receivedData);
+        int bytes = recvfrom(
+            socketHandle,
+            recvBuf,
+            UDPC_PACKET_MAX_SIZE,
+            0,
+            (struct sockaddr*) &receivedData,
+            &receivedDataSize);
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
-    if(bytes == 0) {
-        // connection closed
-        return;
-    } else if(bytes == SOCKET_ERROR) {
-        int error = WSAGetLastError();
-        if(error != WSAEWOULDBLOCK) {
-            UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
-                "Error receiving packet, ", error);
-        }
-        return;
-    }
-#else
-    if(bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-        // no packet was received
-        return;
-    }
-#endif
-    else if(bytes < UDPC_MIN_HEADER_SIZE) {
-        // packet size is too small, invalid packet
-        UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_VERBOSE,
-            "Received packet is smaller than header, ignoring packet from ",
-            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-            ", port = ",
-            ntohs(receivedData.sin6_port));
-        return;
-    }
-
-    uint32_t temp;
-    std::memcpy(&temp, recvBuf, 4);
-    temp = ntohl(temp);
-    if(temp != protocolID) {
-        // Invalid protocol id in packet
-        UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_VERBOSE,
-            "Received packet has invalid protocol id, ignoring packet from ",
-            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-            ", port = ",
-            ntohs(receivedData.sin6_port));
-        return;
-    }
-
-    std::memcpy(&temp, recvBuf + 4, 4);
-    uint32_t conID = ntohl(temp);
-    std::memcpy(&temp, recvBuf + 8, 4);
-    uint32_t seqID = ntohl(temp);
-    std::memcpy(&temp, recvBuf + 12, 4);
-    uint32_t rseq = ntohl(temp);
-    std::memcpy(&temp, recvBuf + 16, 4);
-    uint32_t ack = ntohl(temp);
-
-    bool isConnect = conID & UDPC_ID_CONNECT;
-    bool isPing = conID & UDPC_ID_PING;
-    bool isNotRecChecked = conID & UDPC_ID_NO_REC_CHK;
-    bool isResending = conID & UDPC_ID_RESENDING;
-    conID &= 0x0FFFFFFF;
-    UDPC_ConnectionId identifier = UDPC_create_id_full(receivedData.sin6_addr,
-                                                       receivedData.sin6_scope_id,
-                                                       ntohs(receivedData.sin6_port));
-
-    if(isConnect && !isPing && bytes < (int)(UDPC_CON_HEADER_SIZE)) {
-        // invalid packet size
-        UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_VERBOSE,
-            "Got connect packet of invalid size from ",
-            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-            ", port = ",
-            ntohs(receivedData.sin6_port),
-            ", ignoring");
-        return;
-    } else if ((!isConnect || (isConnect && isPing))
-            && bytes < (int)UDPC_NSFULL_HEADER_SIZE) {
-        // packet is too small
-        UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_VERBOSE,
-            "Got non-connect packet of invalid size from ",
-            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-            ", port = ",
-            ntohs(receivedData.sin6_port),
-            ", ignoring");
-        return;
-    }
-
-    uint32_t pktType;
-    if(isConnect && !isPing) {
-        std::memcpy(&pktType, recvBuf + UDPC_MIN_HEADER_SIZE, 4);
-        pktType = ntohl(pktType);
-        switch(pktType) {
-        case 0: // client/server connect with libsodium disabled
-            break;
-        case 1: // client connect with libsodium enabled
-            break;
-        case 2: // server connect with libsodium enabled
-            break;
-        default:
-            UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
-                "Got invalid connect pktType from ",
-                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-                ", port ", ntohs(receivedData.sin6_port));
+        if(bytes == 0) {
+            // connection closed
+            return;
+        } else if(bytes == SOCKET_ERROR) {
+            int error = WSAGetLastError();
+            if(error != WSAEWOULDBLOCK) {
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                    "Error receiving packet, ", error);
+            }
             return;
         }
-    } else {
-        if(recvBuf[UDPC_MIN_HEADER_SIZE] == 0) {
-            // not signed
-            pktType = 0;
-        } else if(recvBuf[UDPC_MIN_HEADER_SIZE] == 1) {
-            // signed
-            pktType = 1;
-        } else {
-            UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
-                "Got invalid pktType from ",
-                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-                ", port ", ntohs(receivedData.sin6_port));
+#else
+        if(bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            // no packet was received
             return;
         }
-    }
-
-    if(isConnect && !isPing) {
-        // is connect packet and is accepting new connections
-        std::lock_guard<std::mutex> conMapLock(conMapMutex);
-        if(!flags.test(1)
-                && conMap.find(identifier) == conMap.end()
-                && isAcceptNewConnections.load()) {
-            // is receiving as server, connection did not already exist
-            int authPolicy = this->authPolicy.load();
-            if(pktType == 1 && !flags.test(2)
-                    && authPolicy == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
-                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
-                    "Client peer ",
-                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-                    " port ",
-                    ntohs(receivedData.sin6_port),
-                    " attempted connection with packet authentication "
-                    "enabled, but auth is disabled and AuthPolicy is STRICT");
-                return;
-            } else if(pktType == 0 && flags.test(2)
-                    && authPolicy == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
-                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
-                    "Client peer ",
-                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-                    " port ",
-                    ntohs(receivedData.sin6_port),
-                    " attempted connection with packet authentication "
-                    "disabled, but auth is enabled and AuthPolicy is STRICT");
-                return;
-            }
-            unsigned char *sk = nullptr;
-            unsigned char *pk = nullptr;
-            if(keysSet.load()) {
-                sk = this->sk;
-                pk = this->pk;
-            }
-            UDPC::ConnectionData newConnection(
-                true,
-                this,
-                receivedData.sin6_addr,
-                receivedData.sin6_scope_id,
-                ntohs(receivedData.sin6_port),
-#ifdef UDPC_LIBSODIUM_ENABLED
-                pktType == 1 && flags.test(2),
-                sk, pk);
-#else
-                false,
-                sk, pk);
 #endif
-
-            if(newConnection.flags.test(5)) {
-                UDPC_CHECK_LOG(this,
-                    UDPC_LoggingType::UDPC_ERROR,
-                    "Failed to init ConnectionData instance (libsodium init "
-                    "fail) while server establishing connection with ",
-                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-                    ", port = ",
-                    ntohs(receivedData.sin6_port));
-                return;
-            }
-            if(pktType == 1 && flags.test(2)) {
-#ifdef UDPC_LIBSODIUM_ENABLED
-                std::memcpy(
-                    newConnection.peer_pk,
-                    recvBuf + UDPC_MIN_HEADER_SIZE + 4,
-                    crypto_sign_PUBLICKEYBYTES);
-                {
-                    std::lock_guard<std::mutex> pkWhitelistLock(peerPKWhitelistMutex);
-                    if(!peerPKWhitelist.empty() && peerPKWhitelist.find(UDPC::PKContainer(newConnection.peer_pk)) == peerPKWhitelist.end()) {
-                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
-                            "peer_pk is not in whitelist, not establishing "
-                            "connection with client");
-                        return;
-                    }
-                }
-                newConnection.verifyMessage = std::unique_ptr<char[]>(new char[crypto_sign_BYTES]);
-                std::time_t currentTime = std::time(nullptr);
-                uint64_t receivedTime;
-                std::memcpy(
-                    &receivedTime,
-                    recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES + 4,
-                    8);
-                UDPC::be64((char*)&receivedTime);
-# ifndef NDEBUG
-                if(willLog(UDPC_LoggingType::UDPC_DEBUG)) {
-                    log_impl(UDPC_LoggingType::UDPC_DEBUG,
-                        "Server got verification epoch time \"",
-                        receivedTime, "\"");
-                }
-# endif
-                std::time_t receivedTimeT = receivedTime;
-                if(currentTime < receivedTimeT || currentTime - receivedTimeT > 3) {
-                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
-                        "Got invalid epoch time from client, ignoring");
-                    return;
-                }
-                crypto_sign_detached(
-                    (unsigned char*)newConnection.verifyMessage.get(),
-                    nullptr,
-                    (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES),
-                    12,
-                    newConnection.sk);
-#else
-                assert(!"libsodium disabled, invalid state");
-                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
-                    "libsodium is disabled, cannot process received packet");
-                return;
-#endif
-            }
+        else if(bytes < UDPC_MIN_HEADER_SIZE) {
+            // packet size is too small, invalid packet
             UDPC_CHECK_LOG(this,
-                UDPC_LoggingType::UDPC_INFO,
-                "Establishing connection with client ",
+                UDPC_LoggingType::UDPC_VERBOSE,
+                "Received packet is smaller than header, ignoring packet from ",
                 UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                 ", port = ",
-                ntohs(receivedData.sin6_port),
-                ", giving client id = ", newConnection.id,
-                pktType == 1 && flags.test(2) ?
-                    ", libsodium enabled" : ", libsodium disabled");
-
-            idMap.insert(std::make_pair(newConnection.id, identifier));
-            conMap.insert(std::make_pair(identifier, std::move(newConnection)));
-            auto addrConIter = addrConMap.find(identifier.addr);
-            if(addrConIter == addrConMap.end()) {
-                auto insertResult = addrConMap.insert(
-                    std::make_pair(
-                        identifier.addr,
-                        std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher>{}
-                    ));
-                assert(insertResult.second
-                        && "Must successfully insert into addrConMap");
-                addrConIter = insertResult.first;
-            }
-            addrConIter->second.insert(identifier);
-            if(isReceivingEvents.load()) {
-                std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
-                externalEvents.push_back(UDPC_Event{
-                    UDPC_ET_CONNECTED,
-                    identifier,
-                    false});
-            }
-        } else if (flags.test(1)) {
-            // is client
-            auto iter = conMap.find(identifier);
-            if(iter == conMap.end() || !iter->second.flags.test(3)) {
-                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
-                    "client dropped pkt from ",
-                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-                    ", port ", ntohs(receivedData.sin6_port));
-                return;
-            }
-            int authPolicy = this->authPolicy.load();
-            if(pktType == 2 && !iter->second.flags.test(6)
-                    && authPolicy == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
-                // This block actually should never happen, because the server
-                // receives a packet first. If client requests without auth,
-                // then the server will either deny connection (if strict) or
-                // fallback to a connection without auth (if fallback).
-                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
-                    "Server peer ",
-                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-                    " port ",
-                    ntohs(receivedData.sin6_port),
-                    " attempted connection with packet authentication "
-                    "enabled, but auth is disabled and AuthPolicy is STRICT");
-                return;
-            } else if(pktType == 0 && iter->second.flags.test(6)
-                    && authPolicy == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
-                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
-                    "Server peer ",
-                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-                    " port ",
-                    ntohs(receivedData.sin6_port),
-                    " attempted connection with packet authentication "
-                    "disabled, but auth is enabled and AuthPolicy is STRICT");
-                return;
-            }
-
-            if(pktType == 2 && flags.test(2) && iter->second.flags.test(6)) {
-#ifdef UDPC_LIBSODIUM_ENABLED
-                std::memcpy(iter->second.peer_pk,
-                    recvBuf + UDPC_MIN_HEADER_SIZE + 4,
-                    crypto_sign_PUBLICKEYBYTES);
-                {
-                    std::lock_guard<std::mutex> pkWhitelistLock(peerPKWhitelistMutex);
-                    if(!peerPKWhitelist.empty() && peerPKWhitelist.find(UDPC::PKContainer(iter->second.peer_pk)) == peerPKWhitelist.end()) {
-                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
-                            "peer_pk is not in whitelist, not establishing "
-                            "connection with server");
-                        return;
-                    }
-                }
-                if(crypto_sign_verify_detached(
-                    (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4 + crypto_sign_PUBLICKEYBYTES),
-                    (unsigned char*)(iter->second.verifyMessage.get()),
-                    12,
-                    iter->second.peer_pk) != 0) {
-                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
-                        "Failed to verify peer (server) ",
-                        UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-                        ", port = ",
-                        ntohs(receivedData.sin6_port));
-                    return;
-                }
-#else
-                assert(!"libsodium disabled, invalid state");
-                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
-                    "libsodium is disabled, cannot process received packet");
-                return;
-#endif
-            } else if(pktType == 0 && iter->second.flags.test(6)) {
-                iter->second.flags.reset(6);
-                if(iter->second.flags.test(7)) {
-                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
-                        "peer is not using libsodium, but peer_pk was "
-                        "pre-set, dropping to no-verification mode");
-                }
-            }
-
-            iter->second.flags.reset(3);
-            iter->second.id = conID;
-            iter->second.flags.set(4);
-            UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_INFO,
-                "Established connection with server ",
-                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-                ", port = ",
-                ntohs(receivedData.sin6_port),
-                ", got id = ", conID,
-                flags.test(2) && iter->second.flags.test(6) ?
-                    ", libsodium enabled" : ", libsodium disabled");
-            if(isReceivingEvents.load()) {
-                std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
-                externalEvents.push_back(UDPC_Event{
-                    UDPC_ET_CONNECTED,
-                    identifier,
-                    false});
-            }
+                ntohs(receivedData.sin6_port));
+            return;
         }
-        return;
-    }
 
-    std::lock_guard<std::mutex> conMapLock(conMapMutex);
-    auto iter = conMap.find(identifier);
-    if(iter == conMap.end() || iter->second.flags.test(3)
-            || !iter->second.flags.test(4) || iter->second.id != conID) {
-        return;
-    } else if(isPing && !isConnect) {
-        iter->second.flags.set(0);
-    }
+        uint32_t temp;
+        std::memcpy(&temp, recvBuf, 4);
+        temp = ntohl(temp);
+        if(temp != protocolID) {
+            // Invalid protocol id in packet
+            UDPC_CHECK_LOG(this,
+                UDPC_LoggingType::UDPC_VERBOSE,
+                "Received packet has invalid protocol id, ignoring packet "
+                "from ",
+                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                ", port = ",
+                ntohs(receivedData.sin6_port));
+            return;
+        }
 
-    if(pktType == 1) {
-#ifdef UDPC_LIBSODIUM_ENABLED
-        // verify signature of header
-        unsigned char sig[crypto_sign_BYTES];
-        std::memcpy(sig, recvBuf + UDPC_MIN_HEADER_SIZE + 1, crypto_sign_BYTES);
-        std::memset(recvBuf + UDPC_MIN_HEADER_SIZE + 1, 0, crypto_sign_BYTES);
-        if(crypto_sign_verify_detached(
-            sig,
-            (unsigned char*)recvBuf,
-            bytes,
-            iter->second.peer_pk) != 0) {
-            UDPC_CHECK_LOG(
-                this,
-                UDPC_LoggingType::UDPC_INFO,
-                "Failed to verify received packet from",
+        std::memcpy(&temp, recvBuf + 4, 4);
+        uint32_t conID = ntohl(temp);
+        std::memcpy(&temp, recvBuf + 8, 4);
+        uint32_t seqID = ntohl(temp);
+        std::memcpy(&temp, recvBuf + 12, 4);
+        uint32_t rseq = ntohl(temp);
+        std::memcpy(&temp, recvBuf + 16, 4);
+        uint32_t ack = ntohl(temp);
+
+        bool isConnect = conID & UDPC_ID_CONNECT;
+        bool isPing = conID & UDPC_ID_PING;
+        bool isNotRecChecked = conID & UDPC_ID_NO_REC_CHK;
+        bool isResending = conID & UDPC_ID_RESENDING;
+        conID &= 0x0FFFFFFF;
+        UDPC_ConnectionId identifier =
+            UDPC_create_id_full(receivedData.sin6_addr,
+                                receivedData.sin6_scope_id,
+                                ntohs(receivedData.sin6_port));
+
+        if(isConnect && !isPing && bytes < (int)(UDPC_CON_HEADER_SIZE)) {
+            // invalid packet size
+            UDPC_CHECK_LOG(this,
+                UDPC_LoggingType::UDPC_VERBOSE,
+                "Got connect packet of invalid size from ",
+                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                ", port = ",
+                ntohs(receivedData.sin6_port),
+                ", ignoring");
+            return;
+        } else if ((!isConnect || (isConnect && isPing))
+                && bytes < (int)UDPC_NSFULL_HEADER_SIZE) {
+            // packet is too small
+            UDPC_CHECK_LOG(this,
+                UDPC_LoggingType::UDPC_VERBOSE,
+                "Got non-connect packet of invalid size from ",
                 UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                 ", port = ",
                 ntohs(receivedData.sin6_port),
                 ", ignoring");
             return;
         }
-#else
-        assert(!"libsodium disabled, invalid state");
-        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
-            "libsodium is disabled, cannot process received packet");
-        return;
-#endif
-    }
 
-    // packet is valid
-    UDPC_CHECK_LOG(this,
-        UDPC_LoggingType::UDPC_VERBOSE,
-        "Received valid packet from ",
-        UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
-        ", port = ",
-        ntohs(receivedData.sin6_port),
-        ", packet id = ", seqID,
-        ", good mode = ", iter->second.flags.test(1) ? "yes" : "no",
-        isPing && !isConnect ? ", ping"
-            : (isPing && isConnect ? ", disc" : ""));
-
-    // check if is delete
-    if(isConnect && isPing) {
-        auto conIter = conMap.find(identifier);
-        if(conIter != conMap.end()) {
-            UDPC_CHECK_LOG(this,
-                UDPC_LoggingType::UDPC_VERBOSE,
-                "Packet is request-disconnect packet, deleting connection...");
-            if(conIter->second.flags.test(4)) {
-                idMap.erase(conIter->second.id);
+        uint32_t pktType;
+        if(isConnect && !isPing) {
+            std::memcpy(&pktType, recvBuf + UDPC_MIN_HEADER_SIZE, 4);
+            pktType = ntohl(pktType);
+            switch(pktType) {
+            case 0: // client/server connect with libsodium disabled
+                break;
+            case 1: // client connect with libsodium enabled
+                break;
+            case 2: // server connect with libsodium enabled
+                break;
+            default:
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                    "Got invalid connect pktType from ",
+                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    ", port ", ntohs(receivedData.sin6_port));
+                return;
             }
-            auto addrConIter = addrConMap.find(identifier.addr);
-            if(addrConIter != addrConMap.end()) {
-                addrConIter->second.erase(identifier);
-                if(addrConIter->second.empty()) {
-                    addrConMap.erase(addrConIter);
+        } else {
+            if(recvBuf[UDPC_MIN_HEADER_SIZE] == 0) {
+                // not signed
+                pktType = 0;
+            } else if(recvBuf[UDPC_MIN_HEADER_SIZE] == 1) {
+                // signed
+                pktType = 1;
+            } else {
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                    "Got invalid pktType from ",
+                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    ", port ", ntohs(receivedData.sin6_port));
+                return;
+            }
+        }
+
+        if(isConnect && !isPing) {
+            // is connect packet and is accepting new connections
+            std::lock_guard<std::mutex> conMapLock(conMapMutex);
+            if(!flags.test(1)
+                    && conMap.find(identifier) == conMap.end()
+                    && isAcceptNewConnections.load()) {
+                // is receiving as server, connection did not already exist
+                int authPolicy = this->authPolicy.load();
+                if(pktType == 1 && !flags.test(2)
+                        && authPolicy
+                            == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                        "Client peer ",
+                        UDPC_atostr(
+                            (UDPC_HContext)this, receivedData.sin6_addr),
+                        " port ",
+                        ntohs(receivedData.sin6_port),
+                        " attempted connection with packet authentication "
+                        "enabled, but auth is disabled and AuthPolicy is "
+                        "STRICT");
+                    return;
+                } else if(pktType == 0 && flags.test(2)
+                        && authPolicy
+                            == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                        "Client peer ",
+                        UDPC_atostr(
+                            (UDPC_HContext)this, receivedData.sin6_addr),
+                        " port ",
+                        ntohs(receivedData.sin6_port),
+                        " attempted connection with packet authentication "
+                        "disabled, but auth is enabled and AuthPolicy is "
+                        "STRICT");
+                    return;
+                }
+                unsigned char *sk = nullptr;
+                unsigned char *pk = nullptr;
+                if(keysSet.load()) {
+                    sk = this->sk;
+                    pk = this->pk;
+                }
+                UDPC::ConnectionData newConnection(
+                    true,
+                    this,
+                    receivedData.sin6_addr,
+                    receivedData.sin6_scope_id,
+                    ntohs(receivedData.sin6_port),
+#ifdef UDPC_LIBSODIUM_ENABLED
+                    pktType == 1 && flags.test(2),
+                    sk, pk);
+#else
+                    false,
+                    sk, pk);
+#endif
+
+                if(newConnection.flags.test(5)) {
+                    UDPC_CHECK_LOG(this,
+                        UDPC_LoggingType::UDPC_ERROR,
+                        "Failed to init ConnectionData instance (libsodium init"
+                        " fail) while server establishing connection with ",
+                        UDPC_atostr(
+                            (UDPC_HContext)this, receivedData.sin6_addr),
+                        ", port = ",
+                        ntohs(receivedData.sin6_port));
+                    return;
+                }
+                if(pktType == 1 && flags.test(2)) {
+#ifdef UDPC_LIBSODIUM_ENABLED
+                    std::memcpy(
+                        newConnection.peer_pk,
+                        recvBuf + UDPC_MIN_HEADER_SIZE + 4,
+                        crypto_sign_PUBLICKEYBYTES);
+                    {
+                        std::lock_guard<std::mutex>
+                            pkWhitelistLock(peerPKWhitelistMutex);
+                        if(!peerPKWhitelist.empty()
+                                && peerPKWhitelist.find(
+                                    UDPC::PKContainer(newConnection.peer_pk))
+                                        == peerPKWhitelist.end()) {
+                            UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                                "peer_pk is not in whitelist, not establishing "
+                                "connection with client");
+                            return;
+                        }
+                    }
+                    newConnection.verifyMessage =
+                        std::unique_ptr<char[]>(new char[crypto_sign_BYTES]);
+                    std::time_t currentTime = std::time(nullptr);
+                    uint64_t receivedTime;
+                    std::memcpy(
+                        &receivedTime,
+                        recvBuf + UDPC_MIN_HEADER_SIZE + 4
+                            + crypto_sign_PUBLICKEYBYTES + 4,
+                        8);
+                    UDPC::be64((char*)&receivedTime);
+# ifndef NDEBUG
+                    if(willLog(UDPC_LoggingType::UDPC_DEBUG)) {
+                        log_impl(UDPC_LoggingType::UDPC_DEBUG,
+                            "Server got verification epoch time \"",
+                            receivedTime, "\"");
+                    }
+# endif
+                    std::time_t receivedTimeT = receivedTime;
+                    if(currentTime < receivedTimeT
+                            || currentTime - receivedTimeT > 3) {
+                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                            "Got invalid epoch time from client, ignoring");
+                        return;
+                    }
+                    crypto_sign_detached(
+                        (unsigned char*)newConnection.verifyMessage.get(),
+                        nullptr,
+                        (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4
+                            + crypto_sign_PUBLICKEYBYTES),
+                        12,
+                        newConnection.sk);
+#else
+                    assert(!"libsodium disabled, invalid state");
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                        "libsodium is disabled, cannot process received "
+                        "packet");
+                    return;
+#endif
+                }
+                UDPC_CHECK_LOG(this,
+                    UDPC_LoggingType::UDPC_INFO,
+                    "Establishing connection with client ",
+                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    ", port = ",
+                    ntohs(receivedData.sin6_port),
+                    ", giving client id = ", newConnection.id,
+                    pktType == 1 && flags.test(2) ?
+                        ", libsodium enabled" : ", libsodium disabled");
+
+                idMap.insert(std::make_pair(newConnection.id, identifier));
+                conMap.insert(std::make_pair(identifier,
+                                             std::move(newConnection)));
+                auto addrConIter = addrConMap.find(identifier.addr);
+                if(addrConIter == addrConMap.end()) {
+                    auto insertResult = addrConMap.insert(
+                        std::make_pair(
+                            identifier.addr,
+                            std::unordered_set<UDPC_ConnectionId,
+                                               UDPC::ConnectionIdHasher>{}
+                        ));
+                    assert(insertResult.second
+                            && "Must successfully insert into addrConMap");
+                    addrConIter = insertResult.first;
+                }
+                addrConIter->second.insert(identifier);
+                if(isReceivingEvents.load()) {
+                    std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
+                    externalEvents.push_back(UDPC_Event{
+                        UDPC_ET_CONNECTED,
+                        identifier,
+                        false});
+                }
+            } else if (flags.test(1)) {
+                // is client
+                auto iter = conMap.find(identifier);
+                if(iter == conMap.end() || !iter->second.flags.test(3)) {
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
+                        "client dropped pkt from ",
+                        UDPC_atostr(
+                            (UDPC_HContext)this, receivedData.sin6_addr),
+                        ", port ", ntohs(receivedData.sin6_port));
+                    return;
+                }
+                int authPolicy = this->authPolicy.load();
+                if(pktType == 2 && !iter->second.flags.test(6)
+                        && authPolicy
+                            == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
+                    // This block actually should never happen, because the
+                    // server receives a packet first. If client requests
+                    // without auth, then the server will either deny
+                    // connection (if strict) or fallback to a connection
+                    // without auth (if fallback).
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                        "Server peer ",
+                        UDPC_atostr(
+                            (UDPC_HContext)this, receivedData.sin6_addr),
+                        " port ",
+                        ntohs(receivedData.sin6_port),
+                        " attempted connection with packet authentication "
+                        "enabled, but auth is disabled and AuthPolicy is "
+                        "STRICT");
+                    return;
+                } else if(pktType == 0 && iter->second.flags.test(6)
+                        && authPolicy
+                            == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                        "Server peer ",
+                        UDPC_atostr(
+                            (UDPC_HContext)this, receivedData.sin6_addr),
+                        " port ",
+                        ntohs(receivedData.sin6_port),
+                        " attempted connection with packet authentication "
+                        "disabled, but auth is enabled and AuthPolicy is "
+                        "STRICT");
+                    return;
+                }
+
+                if(pktType == 2 && flags.test(2)
+                        && iter->second.flags.test(6)) {
+#ifdef UDPC_LIBSODIUM_ENABLED
+                    std::memcpy(iter->second.peer_pk,
+                        recvBuf + UDPC_MIN_HEADER_SIZE + 4,
+                        crypto_sign_PUBLICKEYBYTES);
+                    {
+                        std::lock_guard<std::mutex>
+                            pkWhitelistLock(peerPKWhitelistMutex);
+                        if(!peerPKWhitelist.empty()
+                                && peerPKWhitelist.find(
+                                    UDPC::PKContainer(iter->second.peer_pk))
+                                        == peerPKWhitelist.end()) {
+                            UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                                "peer_pk is not in whitelist, not establishing "
+                                "connection with server");
+                            return;
+                        }
+                    }
+                    if(crypto_sign_verify_detached(
+                        (unsigned char*)(recvBuf + UDPC_MIN_HEADER_SIZE + 4
+                            + crypto_sign_PUBLICKEYBYTES),
+                        (unsigned char*)(iter->second.verifyMessage.get()),
+                        12,
+                        iter->second.peer_pk) != 0) {
+                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                            "Failed to verify peer (server) ",
+                            UDPC_atostr(
+                                (UDPC_HContext)this, receivedData.sin6_addr),
+                            ", port = ",
+                            ntohs(receivedData.sin6_port));
+                        return;
+                    }
+#else
+                    assert(!"libsodium disabled, invalid state");
+                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                        "libsodium is disabled, cannot process received "
+                        "packet");
+                    return;
+#endif
+                } else if(pktType == 0 && iter->second.flags.test(6)) {
+                    iter->second.flags.reset(6);
+                    if(iter->second.flags.test(7)) {
+                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                            "peer is not using libsodium, but peer_pk was "
+                            "pre-set, dropping to no-verification mode");
+                    }
+                }
+
+                iter->second.flags.reset(3);
+                iter->second.id = conID;
+                iter->second.flags.set(4);
+                UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_INFO,
+                    "Established connection with server ",
+                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    ", port = ",
+                    ntohs(receivedData.sin6_port),
+                    ", got id = ", conID,
+                    flags.test(2) && iter->second.flags.test(6) ?
+                        ", libsodium enabled" : ", libsodium disabled");
+                if(isReceivingEvents.load()) {
+                    std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
+                    externalEvents.push_back(UDPC_Event{
+                        UDPC_ET_CONNECTED,
+                        identifier,
+                        false});
                 }
             }
-            if(isReceivingEvents.load()) {
-                std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
-                externalEvents.push_back(UDPC_Event{
-                    UDPC_ET_DISCONNECTED, identifier, false});
-            }
-            conMap.erase(conIter);
             return;
         }
-    }
 
-    // update rtt
-    for(auto sentIter = iter->second.sentPkts.rbegin(); sentIter != iter->second.sentPkts.rend(); ++sentIter) {
-        uint32_t id;
-        std::memcpy(&id, sentIter->data + 8, 4);
-        id = ntohl(id);
-        if(id == rseq) {
-            auto sentInfoIter = iter->second.sentInfoMap.find(id);
-            assert(sentInfoIter != iter->second.sentInfoMap.end()
-                    && "sentInfoMap should have known stored id");
-            auto diff = now - sentInfoIter->second->sentTime;
-            if(diff > iter->second.rtt) {
-                iter->second.rtt += (diff - iter->second.rtt) / 10;
-            } else {
-                iter->second.rtt -= (iter->second.rtt - diff) / 10;
+        std::lock_guard<std::mutex> conMapLock(conMapMutex);
+        auto iter = conMap.find(identifier);
+        if(iter == conMap.end() || iter->second.flags.test(3)
+                || !iter->second.flags.test(4) || iter->second.id != conID) {
+            return;
+        } else if(isPing && !isConnect) {
+            iter->second.flags.set(0);
+        }
+
+        if(pktType == 1) {
+#ifdef UDPC_LIBSODIUM_ENABLED
+            // verify signature of header
+            unsigned char sig[crypto_sign_BYTES];
+            std::memcpy(sig,
+                        recvBuf + UDPC_MIN_HEADER_SIZE + 1,
+                        crypto_sign_BYTES);
+            std::memset(recvBuf + UDPC_MIN_HEADER_SIZE + 1,
+                        0,
+                        crypto_sign_BYTES);
+            if(crypto_sign_verify_detached(
+                sig,
+                (unsigned char*)recvBuf,
+                bytes,
+                iter->second.peer_pk) != 0) {
+                UDPC_CHECK_LOG(
+                    this,
+                    UDPC_LoggingType::UDPC_INFO,
+                    "Failed to verify received packet from",
+                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    ", port = ",
+                    ntohs(receivedData.sin6_port),
+                    ", ignoring");
+                return;
             }
-
-            iter->second.flags.set(2, iter->second.rtt <= UDPC::GOOD_RTT_LIMIT);
-
-            UDPC_CHECK_LOG(this,
-                UDPC_LoggingType::UDPC_VERBOSE,
-                "RTT: ",
-                UDPC::durationToFSec(iter->second.rtt) * 1000.0f,
-                " milliseconds");
-            break;
-        }
-    }
-
-    iter->second.received = now;
-
-    // check pkt timeout
-    --rseq;
-    for(; ack != 0; ack = ack << 1) {
-        if((ack & 0x80000000) != 0) {
-            --rseq;
-            continue;
+#else
+            assert(!"libsodium disabled, invalid state");
+            UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
+                "libsodium is disabled, cannot process received packet");
+            return;
+#endif
         }
 
-        // pkt not received yet, find it in sent to check if it timed out
-        for(auto sentIter = iter->second.sentPkts.rbegin(); sentIter != iter->second.sentPkts.rend(); ++sentIter) {
-            uint32_t sentID;
-            std::memcpy(&sentID, sentIter->data + 8, 4);
-            sentID = ntohl(sentID);
-            if(sentID == rseq) {
-                if((sentIter->flags & 0x4) != 0 || (sentIter->flags & 0x8) != 0) {
-                    // already resent or not rec-checked pkt
-                    break;
+        // packet is valid
+        UDPC_CHECK_LOG(this,
+            UDPC_LoggingType::UDPC_VERBOSE,
+            "Received valid packet from ",
+            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+            ", port = ",
+            ntohs(receivedData.sin6_port),
+            ", packet id = ", seqID,
+            ", good mode = ", iter->second.flags.test(1) ? "yes" : "no",
+            isPing && !isConnect ? ", ping"
+                : (isPing && isConnect ? ", disc" : ""));
+
+        // check if is delete
+        if(isConnect && isPing) {
+            auto conIter = conMap.find(identifier);
+            if(conIter != conMap.end()) {
+                UDPC_CHECK_LOG(this,
+                    UDPC_LoggingType::UDPC_VERBOSE,
+                    "Packet is request-disconnect packet, deleting "
+                    "connection...");
+                if(conIter->second.flags.test(4)) {
+                    idMap.erase(conIter->second.id);
                 }
-                auto sentInfoIter = iter->second.sentInfoMap.find(sentID);
+                auto addrConIter = addrConMap.find(identifier.addr);
+                if(addrConIter != addrConMap.end()) {
+                    addrConIter->second.erase(identifier);
+                    if(addrConIter->second.empty()) {
+                        addrConMap.erase(addrConIter);
+                    }
+                }
+                if(isReceivingEvents.load()) {
+                    std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
+                    externalEvents.push_back(UDPC_Event{
+                        UDPC_ET_DISCONNECTED, identifier, false});
+                }
+                conMap.erase(conIter);
+                return;
+            }
+        }
+
+        // update rtt
+        for(auto sentIter = iter->second.sentPkts.rbegin();
+                sentIter != iter->second.sentPkts.rend();
+                ++sentIter) {
+            uint32_t id;
+            std::memcpy(&id, sentIter->data + 8, 4);
+            id = ntohl(id);
+            if(id == rseq) {
+                auto sentInfoIter = iter->second.sentInfoMap.find(id);
                 assert(sentInfoIter != iter->second.sentInfoMap.end()
-                        && "Every entry in sentPkts must have a corresponding entry in sentInfoMap");
-                auto duration = now - sentInfoIter->second->sentTime;
-                if(duration > UDPC::PACKET_TIMEOUT_TIME) {
-                    bool pktSigned = sentIter->data[UDPC_MIN_HEADER_SIZE] == 1;
-                    if((pktSigned && sentIter->dataSize <= UDPC_LSFULL_HEADER_SIZE)
-                        || (!pktSigned && sentIter->dataSize <= UDPC_NSFULL_HEADER_SIZE)) {
-                        UDPC_CHECK_LOG(this,
-                            UDPC_LoggingType::UDPC_VERBOSE,
-                            "Timed out packet has no payload (probably "
-                            "heartbeat packet), ignoring it");
-                        sentIter->flags |= 0x8;
-                        break;
-                    }
-
-                    UDPC_PacketInfo resendingData = UDPC::get_empty_pinfo();
-                    if(pktSigned) {
-                        resendingData.dataSize = sentIter->dataSize - UDPC_LSFULL_HEADER_SIZE;
-                        resendingData.data = (char*)std::malloc(resendingData.dataSize);
-                        std::memcpy(resendingData.data,
-                            sentIter->data + UDPC_LSFULL_HEADER_SIZE,
-                            resendingData.dataSize);
-                    } else {
-                        resendingData.dataSize = sentIter->dataSize - UDPC_NSFULL_HEADER_SIZE;
-                        resendingData.data = (char*)std::malloc(resendingData.dataSize);
-                        std::memcpy(resendingData.data,
-                            sentIter->data + UDPC_NSFULL_HEADER_SIZE,
-                            resendingData.dataSize);
-                    }
-                    resendingData.flags = 0;
-                    iter->second.priorityPkts.push_back(resendingData);
+                        && "sentInfoMap should have known stored id");
+                auto diff = now - sentInfoIter->second->sentTime;
+                if(diff > iter->second.rtt) {
+                    iter->second.rtt += (diff - iter->second.rtt) / 10;
+                } else {
+                    iter->second.rtt -= (iter->second.rtt - diff) / 10;
                 }
+
+                iter->second.flags.set(
+                    2, iter->second.rtt <= UDPC::GOOD_RTT_LIMIT);
+
+                UDPC_CHECK_LOG(this,
+                    UDPC_LoggingType::UDPC_VERBOSE,
+                    "RTT: ",
+                    UDPC::durationToFSec(iter->second.rtt) * 1000.0f,
+                    " milliseconds");
                 break;
             }
         }
 
+        iter->second.received = now;
+
+        // check pkt timeout
         --rseq;
-    }
-
-    // calculate sequence and ack
-    bool isOutOfOrder = false;
-    uint32_t diff = 0;
-    if(seqID > iter->second.rseq) {
-        diff = seqID - iter->second.rseq;
-        if(diff <= 0x7FFFFFFF) {
-            // sequence is more recent
-            iter->second.rseq = seqID;
-            iter->second.ack = (iter->second.ack >> diff) | 0x80000000;
-        } else {
-            // sequence is older, recalc diff
-            diff = 0xFFFFFFFF - seqID + 1 + iter->second.rseq;
-            if((iter->second.ack & (0x80000000 >> (diff - 1))) != 0) {
-                // already received packet
-                UDPC_CHECK_LOG(this,
-                    UDPC_LoggingType::UDPC_VERBOSE,
-                    "Received packet is already marked as received, ignoring it");
-                return;
+        for(; ack != 0; ack = ack << 1) {
+            if((ack & 0x80000000) != 0) {
+                --rseq;
+                continue;
             }
-            iter->second.ack |= 0x80000000 >> (diff - 1);
-            isOutOfOrder = true;
-        }
-    } else if(seqID < iter->second.rseq) {
-        diff = iter->second.rseq - seqID;
-        if(diff <= 0x7FFFFFFF) {
-            // sequence is older
-            if((iter->second.ack & (0x80000000 >> (diff - 1))) != 0) {
-                // already received packet
-                UDPC_CHECK_LOG(this,
-                    UDPC_LoggingType::UDPC_VERBOSE,
-                    "Received packet is already marked as received, ignoring it");
-                return;
+
+            // pkt not received yet, find it in sent to check if it timed out
+            for(auto sentIter = iter->second.sentPkts.rbegin();
+                    sentIter != iter->second.sentPkts.rend();
+                    ++sentIter) {
+                uint32_t sentID;
+                std::memcpy(&sentID, sentIter->data + 8, 4);
+                sentID = ntohl(sentID);
+                if(sentID == rseq) {
+                    if((sentIter->flags & 0x4) != 0
+                            || (sentIter->flags & 0x8) != 0) {
+                        // already resent or not rec-checked pkt
+                        break;
+                    }
+                    auto sentInfoIter = iter->second.sentInfoMap.find(sentID);
+                    assert(sentInfoIter != iter->second.sentInfoMap.end()
+                            && "Every entry in sentPkts must have a "
+                            "corresponding entry in sentInfoMap");
+                    auto duration = now - sentInfoIter->second->sentTime;
+                    if(duration > UDPC::PACKET_TIMEOUT_TIME) {
+                        bool pktSigned =
+                            sentIter->data[UDPC_MIN_HEADER_SIZE] == 1;
+                        if((pktSigned
+                                && sentIter->dataSize
+                                    <= UDPC_LSFULL_HEADER_SIZE
+                                ) ||
+                                    (!pktSigned
+                                    && sentIter->dataSize
+                                        <= UDPC_NSFULL_HEADER_SIZE)) {
+                            UDPC_CHECK_LOG(this,
+                                UDPC_LoggingType::UDPC_VERBOSE,
+                                "Timed out packet has no payload (probably "
+                                "heartbeat packet), ignoring it");
+                            sentIter->flags |= 0x8;
+                            break;
+                        }
+
+                        UDPC_PacketInfo resendingData = UDPC::get_empty_pinfo();
+                        if(pktSigned) {
+                            resendingData.dataSize =
+                                sentIter->dataSize - UDPC_LSFULL_HEADER_SIZE;
+                            resendingData.data =
+                                (char*)std::malloc(resendingData.dataSize);
+                            std::memcpy(resendingData.data,
+                                sentIter->data + UDPC_LSFULL_HEADER_SIZE,
+                                resendingData.dataSize);
+                        } else {
+                            resendingData.dataSize =
+                                sentIter->dataSize - UDPC_NSFULL_HEADER_SIZE;
+                            resendingData.data =
+                                (char*)std::malloc(resendingData.dataSize);
+                            std::memcpy(resendingData.data,
+                                sentIter->data + UDPC_NSFULL_HEADER_SIZE,
+                                resendingData.dataSize);
+                        }
+                        resendingData.flags = 0;
+                        iter->second.priorityPkts.push_back(resendingData);
+                    }
+                    break;
+                }
             }
-            iter->second.ack |= 0x80000000 >> (diff - 1);
-            isOutOfOrder = true;
-        } else {
-            // sequence is more recent, recalc diff
-            diff = 0xFFFFFFFF - iter->second.rseq + 1 + seqID;
-            iter->second.rseq = seqID;
-            iter->second.ack = (iter->second.ack >> diff) | 0x80000000;
+
+            --rseq;
         }
-    } else {
-        // already received packet
-        UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_VERBOSE,
-            "Received packet is already marked as received, ignoring it");
-        return;
-    }
 
-    if(isOutOfOrder) {
-        UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_INFO,
-            "Received packet is out of order");
-    }
+        // calculate sequence and ack
+        bool isOutOfOrder = false;
+        uint32_t diff = 0;
+        if(seqID > iter->second.rseq) {
+            diff = seqID - iter->second.rseq;
+            if(diff <= 0x7FFFFFFF) {
+                // sequence is more recent
+                iter->second.rseq = seqID;
+                iter->second.ack = (iter->second.ack >> diff) | 0x80000000;
+            } else {
+                // sequence is older, recalc diff
+                diff = 0xFFFFFFFF - seqID + 1 + iter->second.rseq;
+                if((iter->second.ack & (0x80000000 >> (diff - 1))) != 0) {
+                    // already received packet
+                    UDPC_CHECK_LOG(this,
+                        UDPC_LoggingType::UDPC_VERBOSE,
+                        "Received packet is already marked as received, "
+                        "ignoring it");
+                    return;
+                }
+                iter->second.ack |= 0x80000000 >> (diff - 1);
+                isOutOfOrder = true;
+            }
+        } else if(seqID < iter->second.rseq) {
+            diff = iter->second.rseq - seqID;
+            if(diff <= 0x7FFFFFFF) {
+                // sequence is older
+                if((iter->second.ack & (0x80000000 >> (diff - 1))) != 0) {
+                    // already received packet
+                    UDPC_CHECK_LOG(this,
+                        UDPC_LoggingType::UDPC_VERBOSE,
+                        "Received packet is already marked as received, "
+                        "ignoring it");
+                    return;
+                }
+                iter->second.ack |= 0x80000000 >> (diff - 1);
+                isOutOfOrder = true;
+            } else {
+                // sequence is more recent, recalc diff
+                diff = 0xFFFFFFFF - iter->second.rseq + 1 + seqID;
+                iter->second.rseq = seqID;
+                iter->second.ack = (iter->second.ack >> diff) | 0x80000000;
+            }
+        } else {
+            // already received packet
+            UDPC_CHECK_LOG(this,
+                UDPC_LoggingType::UDPC_VERBOSE,
+                "Received packet is already marked as received, ignoring it");
+            return;
+        }
 
-    if(pktType == 0 && bytes > (int)UDPC_NSFULL_HEADER_SIZE) {
-        UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
-        recPktInfo.dataSize = bytes - UDPC_NSFULL_HEADER_SIZE;
-        recPktInfo.data = (char*)std::malloc(recPktInfo.dataSize);
-        std::memcpy(recPktInfo.data,
-                    recvBuf + UDPC_NSFULL_HEADER_SIZE,
-                    recPktInfo.dataSize);
-        recPktInfo.flags =
-            (isConnect ? 0x1 : 0)
-            | (isPing ? 0x2 : 0)
-            | (isNotRecChecked ? 0x4 : 0)
-            | (isResending ? 0x8 : 0);
-        recPktInfo.sender.addr = receivedData.sin6_addr;
-        recPktInfo.receiver.addr = in6addr_loopback;
-        recPktInfo.sender.port = ntohs(receivedData.sin6_port);
-        recPktInfo.receiver.port = ntohs(socketInfo.sin6_port);
-        recPktInfo.rtt = durationToMS(iter->second.rtt);
-        recPktInfo.id = seqID;
+        if(isOutOfOrder) {
+            UDPC_CHECK_LOG(this,
+                UDPC_LoggingType::UDPC_INFO,
+                "Received packet is out of order");
+        }
 
-        std::lock_guard<std::mutex> receivedPktsLock(receivedPktsMutex);
-        receivedPkts.push_back(recPktInfo);
-    } else if(pktType == 1 && bytes > (int)UDPC_LSFULL_HEADER_SIZE) {
-        UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
-        recPktInfo.dataSize = bytes - UDPC_LSFULL_HEADER_SIZE;
-        recPktInfo.data = (char*)std::malloc(recPktInfo.dataSize);
-        std::memcpy(recPktInfo.data,
-                    recvBuf + UDPC_LSFULL_HEADER_SIZE,
-                    recPktInfo.dataSize);
-        recPktInfo.flags =
-            (isConnect ? 0x1 : 0)
-            | (isPing ? 0x2 : 0)
-            | (isNotRecChecked ? 0x4 : 0)
-            | (isResending ? 0x8 : 0);
-        recPktInfo.sender.addr = receivedData.sin6_addr;
-        recPktInfo.receiver.addr = in6addr_loopback;
-        recPktInfo.sender.port = ntohs(receivedData.sin6_port);
-        recPktInfo.receiver.port = ntohs(socketInfo.sin6_port);
-        recPktInfo.rtt = durationToMS(iter->second.rtt);
-        recPktInfo.id = seqID;
+        if(pktType == 0 && bytes > (int)UDPC_NSFULL_HEADER_SIZE) {
+            UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
+            recPktInfo.dataSize = bytes - UDPC_NSFULL_HEADER_SIZE;
+            recPktInfo.data = (char*)std::malloc(recPktInfo.dataSize);
+            std::memcpy(recPktInfo.data,
+                        recvBuf + UDPC_NSFULL_HEADER_SIZE,
+                        recPktInfo.dataSize);
+            recPktInfo.flags =
+                (isConnect ? 0x1 : 0)
+                | (isPing ? 0x2 : 0)
+                | (isNotRecChecked ? 0x4 : 0)
+                | (isResending ? 0x8 : 0);
+            recPktInfo.sender.addr = receivedData.sin6_addr;
+            recPktInfo.receiver.addr = in6addr_loopback;
+            recPktInfo.sender.port = ntohs(receivedData.sin6_port);
+            recPktInfo.receiver.port = ntohs(socketInfo.sin6_port);
+            recPktInfo.rtt = durationToMS(iter->second.rtt);
+            recPktInfo.id = seqID;
 
-        std::lock_guard<std::mutex> receivedPktsLock(receivedPktsMutex);
-        receivedPkts.push_back(recPktInfo);
-    } else {
-        UDPC_CHECK_LOG(this,
-            UDPC_LoggingType::UDPC_VERBOSE,
-            "Received packet has no payload (probably heartbeat packet)");
-    }
+            std::lock_guard<std::mutex> receivedPktsLock(receivedPktsMutex);
+            receivedPkts.push_back(recPktInfo);
+        } else if(pktType == 1 && bytes > (int)UDPC_LSFULL_HEADER_SIZE) {
+            UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
+            recPktInfo.dataSize = bytes - UDPC_LSFULL_HEADER_SIZE;
+            recPktInfo.data = (char*)std::malloc(recPktInfo.dataSize);
+            std::memcpy(recPktInfo.data,
+                        recvBuf + UDPC_LSFULL_HEADER_SIZE,
+                        recPktInfo.dataSize);
+            recPktInfo.flags =
+                (isConnect ? 0x1 : 0)
+                | (isPing ? 0x2 : 0)
+                | (isNotRecChecked ? 0x4 : 0)
+                | (isResending ? 0x8 : 0);
+            recPktInfo.sender.addr = receivedData.sin6_addr;
+            recPktInfo.receiver.addr = in6addr_loopback;
+            recPktInfo.sender.port = ntohs(receivedData.sin6_port);
+            recPktInfo.receiver.port = ntohs(socketInfo.sin6_port);
+            recPktInfo.rtt = durationToMS(iter->second.rtt);
+            recPktInfo.id = seqID;
+
+            std::lock_guard<std::mutex> receivedPktsLock(receivedPktsMutex);
+            receivedPkts.push_back(recPktInfo);
+        } else {
+            UDPC_CHECK_LOG(this,
+                UDPC_LoggingType::UDPC_VERBOSE,
+                "Received packet has no payload (probably heartbeat packet)");
+        }
+    } while (true);
 }
 
 UDPC::Context *UDPC::verifyContext(UDPC_HContext ctx) {
