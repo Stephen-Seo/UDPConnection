@@ -1826,7 +1826,7 @@ Variables</h2></td></tr>
 <li>Checking if a peer has not received a packet and queuing that packet to be resent (this is done by using an ack)</li>
 </ul>
 <p >If auto updating was enabled for the context, then there is no need to call this function.</p>
-<p >Note that the context can only receive at most one packet per call to update (due to the fact that UDPC created its UDP socket to not block on receive checks). This is why it is expected to either call this function several times a second (such as in a game's update loop), or have auto-updating enabled via <a class="el" href="UDPC_8h.html#a614e2a058b89839d53fe9d348a058323" title="Creates an UDPC_HContext that holds state for connections that auto-updates via a thread.">UDPC_init_threaded_update()</a>, <a class="el" href="UDPC_8h.html#ab9a5258877ad3084f7d29954be525bd6" title="Creates an UDPC_HContext that holds state for connections that auto-updates via a thread at a specifi...">UDPC_init_threaded_update_ms()</a>, <a class="el" href="UDPC_8h.html#a0fafce547e9185c29f42d06213b0ff4f" title="Enables auto updating on a separate thread for the given UDPC_HContext.">UDPC_enable_threaded_update()</a>, or <a class="el" href="UDPC_8h.html#a1a50763773d55aa7a2a9c7ad69575833" title="Enables auto updating on a separate thread for the given UDPC_HContext with the specified update inte...">UDPC_enable_threaded_update_ms()</a>. </p>
+<p >Previously, update would only receive one packet per call to update. Now, each individual call to update will process all packets that have been received but haven't been processed yet. </p>
 
 </div>
 </div>
