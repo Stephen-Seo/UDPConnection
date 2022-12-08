@@ -431,12 +431,9 @@ UDPC_EXPORT void UDPC_destroy(UDPC_HContext ctx);
  * If auto updating was enabled for the context, then there is no need to call
  * this function.
  *
- * Note that the context can only receive at most one packet per call to update
- * (due to the fact that UDPC created its UDP socket to not block on receive
- * checks). This is why it is expected to either call this function several
- * times a second (such as in a game's update loop), or have auto-updating
- * enabled via UDPC_init_threaded_update(), UDPC_init_threaded_update_ms(),
- * UDPC_enable_threaded_update(), or UDPC_enable_threaded_update_ms().
+ * Previously, update would only receive one packet per call to update. Now,
+ * each individual call to update will process all packets that have been
+ * received but haven't been processed yet.
  */
 UDPC_EXPORT void UDPC_update(UDPC_HContext ctx);
 
