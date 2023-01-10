@@ -1130,19 +1130,19 @@ void UDPC::Context::update_impl() {
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
         if(bytes == 0) {
             // connection closed
-            return;
+            break;
         } else if(bytes == SOCKET_ERROR) {
             int error = WSAGetLastError();
             if(error != WSAEWOULDBLOCK) {
                 UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                     "Error receiving packet, ", error);
             }
-            return;
+            break;
         }
 #else
         if(bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
             // no packet was received
-            return;
+            break;
         }
 #endif
         else if(bytes < UDPC_MIN_HEADER_SIZE) {
@@ -1153,7 +1153,7 @@ void UDPC::Context::update_impl() {
                 UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                 ", port = ",
                 ntohs(receivedData.sin6_port));
-            return;
+            continue;
         }
 
         uint32_t temp;
@@ -1168,7 +1168,7 @@ void UDPC::Context::update_impl() {
                 UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                 ", port = ",
                 ntohs(receivedData.sin6_port));
-            return;
+            continue;
         }
 
         std::memcpy(&temp, recvBuf + 4, 4);
@@ -1199,7 +1199,7 @@ void UDPC::Context::update_impl() {
                 ", port = ",
                 ntohs(receivedData.sin6_port),
                 ", ignoring");
-            return;
+            continue;
         } else if ((!isConnect || (isConnect && isPing))
                 && bytes < (int)UDPC_NSFULL_HEADER_SIZE) {
             // packet is too small
@@ -1210,7 +1210,7 @@ void UDPC::Context::update_impl() {
                 ", port = ",
                 ntohs(receivedData.sin6_port),
                 ", ignoring");
-            return;
+            continue;
         }
 
         uint32_t pktType;
@@ -1229,7 +1229,7 @@ void UDPC::Context::update_impl() {
                     "Got invalid connect pktType from ",
                     UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                     ", port ", ntohs(receivedData.sin6_port));
-                return;
+                continue;
             }
         } else {
             if(recvBuf[UDPC_MIN_HEADER_SIZE] == 0) {
@@ -1243,7 +1243,7 @@ void UDPC::Context::update_impl() {
                     "Got invalid pktType from ",
                     UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
                     ", port ", ntohs(receivedData.sin6_port));
-                return;
+                continue;
             }
         }
 
@@ -1267,7 +1267,7 @@ void UDPC::Context::update_impl() {
                         " attempted connection with packet authentication "
                         "enabled, but auth is disabled and AuthPolicy is "
                         "STRICT");
-                    return;
+                    continue;
                 } else if(pktType == 0 && flags.test(2)
                         && authPolicy
                             == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
@@ -1280,7 +1280,7 @@ void UDPC::Context::update_impl() {
                         " attempted connection with packet authentication "
                         "disabled, but auth is enabled and AuthPolicy is "
                         "STRICT");
-                    return;
+                    continue;
                 }
                 unsigned char *sk = nullptr;
                 unsigned char *pk = nullptr;
@@ -1311,7 +1311,7 @@ void UDPC::Context::update_impl() {
                             (UDPC_HContext)this, receivedData.sin6_addr),
                         ", port = ",
                         ntohs(receivedData.sin6_port));
-                    return;
+                    continue;
                 }
                 if(pktType == 1 && flags.test(2)) {
 #ifdef UDPC_LIBSODIUM_ENABLED
@@ -1329,7 +1329,7 @@ void UDPC::Context::update_impl() {
                             UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
                                 "peer_pk is not in whitelist, not establishing "
                                 "connection with client");
-                            return;
+                            continue;
                         }
                     }
                     newConnection.verifyMessage =
@@ -1354,7 +1354,7 @@ void UDPC::Context::update_impl() {
                             || currentTime - receivedTimeT > 3) {
                         UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
                             "Got invalid epoch time from client, ignoring");
-                        return;
+                        continue;
                     }
                     crypto_sign_detached(
                         (unsigned char*)newConnection.verifyMessage.get(),
@@ -1368,7 +1368,7 @@ void UDPC::Context::update_impl() {
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                         "libsodium is disabled, cannot process received "
                         "packet");
-                    return;
+                    continue;
 #endif
                 }
                 UDPC_CHECK_LOG(this,
@@ -1413,7 +1413,7 @@ void UDPC::Context::update_impl() {
                         UDPC_atostr(
                             (UDPC_HContext)this, receivedData.sin6_addr),
                         ", port ", ntohs(receivedData.sin6_port));
-                    return;
+                    continue;
                 }
                 int authPolicy = this->authPolicy.load();
                 if(pktType == 2 && !iter->second.flags.test(6)
@@ -1433,7 +1433,7 @@ void UDPC::Context::update_impl() {
                         " attempted connection with packet authentication "
                         "enabled, but auth is disabled and AuthPolicy is "
                         "STRICT");
-                    return;
+                    continue;
                 } else if(pktType == 0 && iter->second.flags.test(6)
                         && authPolicy
                             == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
@@ -1446,7 +1446,7 @@ void UDPC::Context::update_impl() {
                         " attempted connection with packet authentication "
                         "disabled, but auth is enabled and AuthPolicy is "
                         "STRICT");
-                    return;
+                    continue;
                 }
 
                 if(pktType == 2 && flags.test(2)
@@ -1465,7 +1465,7 @@ void UDPC::Context::update_impl() {
                             UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
                                 "peer_pk is not in whitelist, not establishing "
                                 "connection with server");
-                            return;
+                            continue;
                         }
                     }
                     if(crypto_sign_verify_detached(
@@ -1480,14 +1480,14 @@ void UDPC::Context::update_impl() {
                                 (UDPC_HContext)this, receivedData.sin6_addr),
                             ", port = ",
                             ntohs(receivedData.sin6_port));
-                        return;
+                        continue;
                     }
 #else
                     assert(!"libsodium disabled, invalid state");
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                         "libsodium is disabled, cannot process received "
                         "packet");
-                    return;
+                    continue;
 #endif
                 } else if(pktType == 0 && iter->second.flags.test(6)) {
                     iter->second.flags.reset(6);
@@ -1517,14 +1517,14 @@ void UDPC::Context::update_impl() {
                         false});
                 }
             }
-            return;
+            continue;
         }
 
         std::lock_guard<std::mutex> conMapLock(conMapMutex);
         auto iter = conMap.find(identifier);
         if(iter == conMap.end() || iter->second.flags.test(3)
                 || !iter->second.flags.test(4) || iter->second.id != conID) {
-            return;
+            continue;
         } else if(isPing && !isConnect) {
             iter->second.flags.set(0);
         }
@@ -1552,13 +1552,13 @@ void UDPC::Context::update_impl() {
                     ", port = ",
                     ntohs(receivedData.sin6_port),
                     ", ignoring");
-                return;
+                continue;
             }
 #else
             assert(!"libsodium disabled, invalid state");
             UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                 "libsodium is disabled, cannot process received packet");
-            return;
+            continue;
 #endif
         }
 
@@ -1598,7 +1598,7 @@ void UDPC::Context::update_impl() {
                         UDPC_ET_DISCONNECTED, identifier, false});
                 }
                 conMap.erase(conIter);
-                return;
+                continue;
             }
         }
 
@@ -1724,7 +1724,7 @@ void UDPC::Context::update_impl() {
                         UDPC_LoggingType::UDPC_VERBOSE,
                         "Received packet is already marked as received, "
                         "ignoring it");
-                    return;
+                    continue;
                 }
                 iter->second.ack |= 0x80000000 >> (diff - 1);
                 isOutOfOrder = true;
@@ -1739,7 +1739,7 @@ void UDPC::Context::update_impl() {
                         UDPC_LoggingType::UDPC_VERBOSE,
                         "Received packet is already marked as received, "
                         "ignoring it");
-                    return;
+                    continue;
                 }
                 iter->second.ack |= 0x80000000 >> (diff - 1);
                 isOutOfOrder = true;
@@ -1754,7 +1754,7 @@ void UDPC::Context::update_impl() {
             UDPC_CHECK_LOG(this,
                 UDPC_LoggingType::UDPC_VERBOSE,
                 "Received packet is already marked as received, ignoring it");
-            return;
+            continue;
         }
 
         if(isOutOfOrder) {
