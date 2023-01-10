@@ -12,6 +12,7 @@
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
 #include <synchapi.h>
 #include <ws2tcpip.h>
+#include <windows.h>
 #elif UDPC_PLATFORM == UDPC_PLATFORM_MAC || UDPC_PLATFORM == UDPC_PLATFORM_LINUX
 #include <time.h>
 #endif
@@ -60,6 +61,25 @@ void sleep_seconds(unsigned int seconds) {
     nanosleep(&duration, NULL);
 #endif
 }
+
+#if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+static BOOL windows_ctrl_handler_invoked = FALSE;
+
+BOOL WINAPI CtrlHandler (DWORD fdwCtrlType) {
+    switch(fdwCtrlType) {
+        case CTRL_C_EVENT:
+            printf("Ctrl-C event\n");
+            windows_ctrl_handler_invoked = TRUE;
+            return TRUE;
+        case CTRL_CLOSE_EVENT:
+            printf("Ctrl-Close event\n");
+            windows_ctrl_handler_invoked = TRUE;
+            return TRUE;
+        default:
+            return FALSE;
+    }
+}
+#endif
 
 int main(int argc, char **argv) {
     --argc; ++argv;
@@ -319,6 +339,14 @@ int main(int argc, char **argv) {
 
     sigaction(SIGINT, &sa, NULL);
     while(receivedSIGINT == 0) {
+#elif UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
+    if (SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
+        printf("Windows CtrlHandler enabled\n");
+    } else {
+        printf("WARNING: Unable to set Windows CtrlHandler\n");
+    }
+
+    while(!windows_ctrl_handler_invoked) {
 #else
     while(1) {
 #endif
