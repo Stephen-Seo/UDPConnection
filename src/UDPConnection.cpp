@@ -1919,23 +1919,9 @@ float UDPC::timePointsToFSec(
 }
 
 UDPC_PacketInfo UDPC::get_empty_pinfo() {
-    return UDPC_PacketInfo {
-        0,       // data (ptr)
-        0,       // flags
-        0,       // id
-        0,       // dataSize
-        0,       // rtt
-        {        // sender
-            {0},   // ipv6 addr
-            0,     // scope_id
-            0      // port
-        },
-        {        // receiver
-            {0},   // ipv6 addr
-            0,     // scope_id
-            0      // port
-        },
-    };
+    UDPC_PacketInfo pinfo;
+    std::memset(&pinfo, 0, sizeof(UDPC_PacketInfo));
+    return pinfo;
 }
 
 void UDPC::threadedUpdate(Context *ctx) {
