@@ -337,4 +337,5 @@ TEST(UDPC, free_packet_ptr) {
 
     UDPC_free_PacketInfo_ptr(&pinfo);
     UDPC_free_PacketInfo_ptr(&pinfo);
+    UDPC_free_PacketInfo_ptr(nullptr);
 }
