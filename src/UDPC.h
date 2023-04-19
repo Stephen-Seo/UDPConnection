@@ -161,8 +161,9 @@ typedef struct UDPC_EXPORT UDPC_ConnectionId {
  *
  * If \ref data is NULL or \ref dataSize is 0, then this packet is invalid.
  *
- * \warning This struct must be free'd with a call to UDPC_free_PacketInfo to
- * avoid a memory leak.
+ * \warning This struct must be free'd with a call to
+ * \ref UDPC_free_PacketInfo_ptr or \ref UDPC_free_PacketInfo to avoid a memory
+ * leak.
  */
 typedef struct UDPC_EXPORT UDPC_PacketInfo {
     /*!
@@ -657,18 +658,36 @@ UDPC_EXPORT UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remainin
  * \brief Get a received packet from a given UDPC context.
  *
  * \warning The received packet (if valid) must be free'd with a call to
- * \ref UDPC_free_PacketInfo() to avoid a memory leak.
+ * \ref UDPC_free_PacketInfo_ptr or \ref UDPC_free_PacketInfo to avoid a memory
+ * leak.
  */
 UDPC_EXPORT UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining);
 
 /*!
  * \brief Frees a UDPC_PacketInfo.
  *
- * Internally, the member variable \ref UDPC_PacketInfo::data will be free'd and
- * set to NULL and \ref UDPC_PacketInfo::dataSize will be set to 0 if the given
- * packet is valid.
+ * Internally, the member variable \ref UDPC_PacketInfo::data will be free'd.
+ * \ref UDPC_free_PacketInfo_ptr is safer to use than this function, as it
+ * also zeros out the relevant data to avoid double frees.
  */
 UDPC_EXPORT void UDPC_free_PacketInfo(UDPC_PacketInfo pInfo);
+
+/*!
+ * \brief Frees a UDPC_PacketInfo.
+ *
+ * This is a safer alternative to \ref UDPC_free_PacketInfo because it
+ * internally zeroes out the internal pointer and size variables, making it
+ * safe to pass the same ptr multiple times to this function as it avoids a
+ * double free.
+ *
+ * Usage:
+ * \code{.c}
+ * UDPC_PacketInfo pinfo = UDPC_get_received(ctx, NULL);
+ * UDPC_free_PacketInfo_ptr(&pinfo);
+ * UDPC_free_PacketInfo_ptr(&pinfo); // This is safe, no double free.
+ * \endcode
+ */
+UDPC_EXPORT void UDPC_free_PacketInfo_ptr(UDPC_PacketInfo *pInfoPtr);
 
 /*!
  * \brief Sets public/private keys used for packet verification

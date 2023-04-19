@@ -2496,8 +2496,14 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining) {
 void UDPC_free_PacketInfo(UDPC_PacketInfo pInfo) {
     if(pInfo.data && pInfo.dataSize > 0) {
         std::free(pInfo.data);
-        pInfo.data = 0;
-        pInfo.dataSize = 0;
+    }
+}
+
+void UDPC_free_PacketInfo_ptr(UDPC_PacketInfo *pInfoPtr) {
+    if (pInfoPtr->data && pInfoPtr->dataSize > 0) {
+        std::free(pInfoPtr->data);
+        pInfoPtr->data = nullptr;
+        pInfoPtr->dataSize = 0;
     }
 }
 

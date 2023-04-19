@@ -4,6 +4,7 @@
 #include <UDPC_Defines.hpp>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <future>
 
@@ -327,4 +328,13 @@ TEST(UDPC, a4toa6) {
     UDPC_IPV6_ADDR_TYPE a6 = UDPC_strtoa("::FFFF:0102:0304");
     a4 = htonl(0x01020304);
     EXPECT_EQ(UDPC_a4toa6(a4), a6);
+}
+
+TEST(UDPC, free_packet_ptr) {
+    UDPC_PacketInfo pinfo;
+    pinfo.dataSize = 8;
+    pinfo.data = (char*)std::malloc(pinfo.dataSize);
+
+    UDPC_free_PacketInfo_ptr(&pinfo);
+    UDPC_free_PacketInfo_ptr(&pinfo);
 }
