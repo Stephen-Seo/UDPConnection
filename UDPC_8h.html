@@ -241,6 +241,9 @@ UDPC_EXPORT <a class="el" href="structUDPC__ConnectionId.html">UDPC_ConnectionId
 <tr class="memitem:a68ed6dcb37c6024486fad28ab0bed845"><td class="memItemLeft" align="right" valign="top">UDPC_EXPORT void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="UDPC_8h.html#a68ed6dcb37c6024486fad28ab0bed845">UDPC_free_PacketInfo</a> (<a class="el" href="structUDPC__PacketInfo.html">UDPC_PacketInfo</a> pInfo)</td></tr>
 <tr class="memdesc:a68ed6dcb37c6024486fad28ab0bed845"><td class="mdescLeft">&#160;</td><td class="mdescRight">Frees a <a class="el" href="structUDPC__PacketInfo.html" title="Data representing a received/sent packet.">UDPC_PacketInfo</a>.  <a href="UDPC_8h.html#a68ed6dcb37c6024486fad28ab0bed845">More...</a><br /></td></tr>
 <tr class="separator:a68ed6dcb37c6024486fad28ab0bed845"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad77c746ea0401664e11bfd76c56e94f5"><td class="memItemLeft" align="right" valign="top">UDPC_EXPORT void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="UDPC_8h.html#ad77c746ea0401664e11bfd76c56e94f5">UDPC_free_PacketInfo_ptr</a> (<a class="el" href="structUDPC__PacketInfo.html">UDPC_PacketInfo</a> *pInfoPtr)</td></tr>
+<tr class="memdesc:ad77c746ea0401664e11bfd76c56e94f5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Frees a <a class="el" href="structUDPC__PacketInfo.html" title="Data representing a received/sent packet.">UDPC_PacketInfo</a>.  <a href="UDPC_8h.html#ad77c746ea0401664e11bfd76c56e94f5">More...</a><br /></td></tr>
+<tr class="separator:ad77c746ea0401664e11bfd76c56e94f5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abd0a7d5c0a17cf3351dbe5abf5f70df1"><td class="memItemLeft" align="right" valign="top">UDPC_EXPORT int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="UDPC_8h.html#abd0a7d5c0a17cf3351dbe5abf5f70df1">UDPC_set_libsodium_keys</a> (UDPC_HContext ctx, const unsigned char *sk, const unsigned char *pk)</td></tr>
 <tr class="memdesc:abd0a7d5c0a17cf3351dbe5abf5f70df1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sets public/private keys used for packet verification.  <a href="UDPC_8h.html#abd0a7d5c0a17cf3351dbe5abf5f70df1">More...</a><br /></td></tr>
 <tr class="separator:abd0a7d5c0a17cf3351dbe5abf5f70df1"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -447,7 +450,7 @@ Variables</h2></td></tr>
 
 <p>Data representing a received/sent packet. </p>
 <p >If data is NULL or dataSize is 0, then this packet is invalid.</p>
-<dl class="section warning"><dt>Warning</dt><dd>This struct must be free'd with a call to UDPC_free_PacketInfo to avoid a memory leak. </dd></dl>
+<dl class="section warning"><dt>Warning</dt><dd>This struct must be free'd with a call to <a class="el" href="UDPC_8h.html#ad77c746ea0401664e11bfd76c56e94f5">UDPC_free_PacketInfo_ptr</a> or <a class="el" href="UDPC_8h.html#a68ed6dcb37c6024486fad28ab0bed845">UDPC_free_PacketInfo</a> to avoid a memory leak. </dd></dl>
 
 </div>
 </div>
@@ -882,8 +885,35 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Frees a <a class="el" href="structUDPC__PacketInfo.html" title="Data representing a received/sent packet.">UDPC_PacketInfo</a>. </p>
-<p >Internally, the member variable UDPC_PacketInfo::data will be free'd and set to NULL and UDPC_PacketInfo::dataSize will be set to 0 if the given packet is valid. </p>
+<p >Internally, the member variable UDPC_PacketInfo::data will be free'd. <a class="el" href="UDPC_8h.html#ad77c746ea0401664e11bfd76c56e94f5">UDPC_free_PacketInfo_ptr</a> is safer to use than this function, as it also zeros out the relevant data to avoid double frees. </p>
 
+</div>
+</div>
+<a id="ad77c746ea0401664e11bfd76c56e94f5" name="ad77c746ea0401664e11bfd76c56e94f5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad77c746ea0401664e11bfd76c56e94f5">&#9670;&#160;</a></span>UDPC_free_PacketInfo_ptr()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">UDPC_EXPORT void UDPC_free_PacketInfo_ptr </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structUDPC__PacketInfo.html">UDPC_PacketInfo</a> *&#160;</td>
+          <td class="paramname"><em>pInfoPtr</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Frees a <a class="el" href="structUDPC__PacketInfo.html" title="Data representing a received/sent packet.">UDPC_PacketInfo</a>. </p>
+<p >This is a safer alternative to <a class="el" href="UDPC_8h.html#a68ed6dcb37c6024486fad28ab0bed845">UDPC_free_PacketInfo</a> because it internally zeroes out the internal pointer and size variables, making it safe to pass the same ptr multiple times to this function as it avoids a double free.</p>
+<p >Usage: </p><div class="fragment"><div class="line"><a class="code hl_struct" href="structUDPC__PacketInfo.html">UDPC_PacketInfo</a> pinfo = <a class="code hl_function" href="UDPC_8h.html#affa8655a4e7e3475be441060e92213b3">UDPC_get_received</a>(ctx, NULL);</div>
+<div class="line"><a class="code hl_function" href="UDPC_8h.html#ad77c746ea0401664e11bfd76c56e94f5">UDPC_free_PacketInfo_ptr</a>(&amp;pinfo);</div>
+<div class="line"><a class="code hl_function" href="UDPC_8h.html#ad77c746ea0401664e11bfd76c56e94f5">UDPC_free_PacketInfo_ptr</a>(&amp;pinfo); <span class="comment">// This is safe, no double free.</span></div>
+<div class="ttc" id="aUDPC_8h_html_ad77c746ea0401664e11bfd76c56e94f5"><div class="ttname"><a href="UDPC_8h.html#ad77c746ea0401664e11bfd76c56e94f5">UDPC_free_PacketInfo_ptr</a></div><div class="ttdeci">UDPC_EXPORT void UDPC_free_PacketInfo_ptr(UDPC_PacketInfo *pInfoPtr)</div><div class="ttdoc">Frees a UDPC_PacketInfo.</div></div>
+<div class="ttc" id="aUDPC_8h_html_affa8655a4e7e3475be441060e92213b3"><div class="ttname"><a href="UDPC_8h.html#affa8655a4e7e3475be441060e92213b3">UDPC_get_received</a></div><div class="ttdeci">UDPC_EXPORT UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining)</div><div class="ttdoc">Get a received packet from a given UDPC context.</div></div>
+<div class="ttc" id="astructUDPC__PacketInfo_html"><div class="ttname"><a href="structUDPC__PacketInfo.html">UDPC_PacketInfo</a></div><div class="ttdoc">Data representing a received/sent packet.</div><div class="ttdef"><b>Definition:</b> UDPC.h:168</div></div>
+</div><!-- fragment --> 
 </div>
 </div>
 <a id="ab79769e36a92c346c6c410be158ddfe4" name="ab79769e36a92c346c6c410be158ddfe4"></a>
@@ -1154,7 +1184,7 @@ Variables</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Get a received packet from a given UDPC context. </p>
-<dl class="section warning"><dt>Warning</dt><dd>The received packet (if valid) must be free'd with a call to <a class="el" href="UDPC_8h.html#a68ed6dcb37c6024486fad28ab0bed845">UDPC_free_PacketInfo()</a> to avoid a memory leak. </dd></dl>
+<dl class="section warning"><dt>Warning</dt><dd>The received packet (if valid) must be free'd with a call to <a class="el" href="UDPC_8h.html#ad77c746ea0401664e11bfd76c56e94f5">UDPC_free_PacketInfo_ptr</a> or <a class="el" href="UDPC_8h.html#a68ed6dcb37c6024486fad28ab0bed845">UDPC_free_PacketInfo</a> to avoid a memory leak. </dd></dl>
 
 </div>
 </div>
