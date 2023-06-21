@@ -230,7 +230,6 @@ public:
     std::atomic_uint_fast8_t loggingType;
     // See UDPC_AuthPolicy enum in UDPC.h for possible values
     std::atomic_uint_fast8_t authPolicy;
-    std::atomic_uint32_t atostrBufIndex;
     char atostrBuf[UDPC_ATOSTR_SIZE];
 
     UDPC_SOCKETTYPE socketHandle;
@@ -266,6 +265,9 @@ public:
     unsigned char sk[crypto_sign_SECRETKEYBYTES];
     unsigned char pk[crypto_sign_PUBLICKEYBYTES];
     std::atomic_bool keysSet;
+
+    std::mutex atostrBufIndexMutex;
+    std::uint32_t atostrBufIndex;
 
 }; // struct Context
 

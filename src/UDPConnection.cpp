@@ -223,12 +223,12 @@ loggingType(UDPC_DEBUG),
 #else
 loggingType(UDPC_WARNING),
 #endif
-atostrBufIndex(0),
 receivedPkts(),
 cSendPkts(),
 rng_engine(),
 conMapMutex(),
-peerPKWhitelistMutex()
+peerPKWhitelistMutex(),
+atostrBufIndex(0)
 {
     std::memset(atostrBuf, 0, UDPC_ATOSTR_SIZE);
 
@@ -2633,8 +2633,13 @@ const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr) {
     if(!c) {
         return nullptr;
     }
-    const uint32_t headIndex =
-        c->atostrBufIndex.fetch_add(UDPC_ATOSTR_BUFSIZE) % UDPC_ATOSTR_SIZE;
+    uint32_t headIndex;
+    {
+        // Use a lock to ensure that "atostrBufIndex" is always a valid value.
+        std::lock_guard<std::mutex> indexLock(c->atostrBufIndexMutex);
+        c->atostrBufIndex = (c->atostrBufIndex + UDPC_ATOSTR_BUFSIZE) % UDPC_ATOSTR_SIZE;
+        headIndex = c->atostrBufIndex;
+    }
     uint32_t index = headIndex;
     bool usedDouble = false;
 
