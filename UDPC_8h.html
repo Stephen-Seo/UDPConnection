@@ -278,6 +278,18 @@ UDPC_EXPORT const char *&#160;</td><td class="memItemRight" valign="bottom"><b>U
 <tr class="memitem:a9e2401b133c0aae43c5d69304dabbdcc"><td class="memItemLeft" align="right" valign="top">UDPC_EXPORT const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="UDPC_8h.html#a9e2401b133c0aae43c5d69304dabbdcc">UDPC_atostr</a> (UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr)</td></tr>
 <tr class="memdesc:a9e2401b133c0aae43c5d69304dabbdcc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a pointer to a null-terminated address string derived from the given address.  <a href="UDPC_8h.html#a9e2401b133c0aae43c5d69304dabbdcc">More...</a><br /></td></tr>
 <tr class="separator:a9e2401b133c0aae43c5d69304dabbdcc"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a939b6c407297f6cf913f2983869f051f"><td class="memItemLeft" align="right" valign="top">UDPC_EXPORT const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="UDPC_8h.html#a939b6c407297f6cf913f2983869f051f">UDPC_atostr_unsafe</a> (UDPC_IPV6_ADDR_TYPE addr)</td></tr>
+<tr class="memdesc:a939b6c407297f6cf913f2983869f051f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Similar to UPDC_atostr(), but the returned ptr must be free'd.  <a href="UDPC_8h.html#a939b6c407297f6cf913f2983869f051f">More...</a><br /></td></tr>
+<tr class="separator:a939b6c407297f6cf913f2983869f051f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1549eee3edacbc23ca144eec72d274bb"><td class="memItemLeft" align="right" valign="top">UDPC_EXPORT const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="UDPC_8h.html#a1549eee3edacbc23ca144eec72d274bb">UDPC_atostr_unsafe_cid</a> (<a class="el" href="structUDPC__ConnectionId.html">UDPC_ConnectionId</a> cid)</td></tr>
+<tr class="memdesc:a1549eee3edacbc23ca144eec72d274bb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Similar to UPDC_atostr(), but the returned ptr must be free'd.  <a href="UDPC_8h.html#a1549eee3edacbc23ca144eec72d274bb">More...</a><br /></td></tr>
+<tr class="separator:a1549eee3edacbc23ca144eec72d274bb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5c6fe261f7d53e7ccae4c7233c42c76b"><td class="memItemLeft" align="right" valign="top">UDPC_EXPORT void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="UDPC_8h.html#a5c6fe261f7d53e7ccae4c7233c42c76b">UDPC_atostr_unsafe_free</a> (const char *addrBuf)</td></tr>
+<tr class="memdesc:a5c6fe261f7d53e7ccae4c7233c42c76b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Free an addr string created with <a class="el" href="UDPC_8h.html#a939b6c407297f6cf913f2983869f051f" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe()</a>.  <a href="UDPC_8h.html#a5c6fe261f7d53e7ccae4c7233c42c76b">More...</a><br /></td></tr>
+<tr class="separator:a5c6fe261f7d53e7ccae4c7233c42c76b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2e47fb8779abe3a9db72a08bf494dc75"><td class="memItemLeft" align="right" valign="top">UDPC_EXPORT void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="UDPC_8h.html#a2e47fb8779abe3a9db72a08bf494dc75">UDPC_atostr_unsafe_free_ptr</a> (const char **addrBuf)</td></tr>
+<tr class="memdesc:a2e47fb8779abe3a9db72a08bf494dc75"><td class="mdescLeft">&#160;</td><td class="mdescRight">Free an addr string created with <a class="el" href="UDPC_8h.html#a939b6c407297f6cf913f2983869f051f" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe()</a> and zeroes the pointer.  <a href="UDPC_8h.html#a2e47fb8779abe3a9db72a08bf494dc75">More...</a><br /></td></tr>
+<tr class="separator:a2e47fb8779abe3a9db72a08bf494dc75"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2ae8e7d87f785dd3b3353a00005c3dc6"><td class="memItemLeft" align="right" valign="top"><a id="a2ae8e7d87f785dd3b3353a00005c3dc6" name="a2ae8e7d87f785dd3b3353a00005c3dc6"></a>
 UDPC_EXPORT UDPC_IPV6_ADDR_TYPE&#160;</td><td class="memItemRight" valign="bottom"><b>UDPC_strtoa</b> (const char *addrStr)</td></tr>
 <tr class="memdesc:a2ae8e7d87f785dd3b3353a00005c3dc6"><td class="mdescLeft">&#160;</td><td class="mdescRight">addrStr must be a valid ipv6 address or a valid ipv4 address <br /></td></tr>
@@ -520,8 +532,105 @@ Variables</h2></td></tr>
 <dl class="section warning"><dt>Warning</dt><dd>You must NOT free the pointer returned by this function, as it refers to a buffer allocated by the UDPC Context specifically to hold address strings.</dd></dl>
 <p>The current implementation uses a buffer that can hold up to 32 address strings at once. When this function is called, an internal counter is used to pick the next spot in the buffer to store the address string and return its pointer. This buffer is used like a "ring-buffer"; when the end of the buffer is reached, the counter wraps-around to the beginning of the buffer, which has the effect of overwriting the oldest addr-string entry on every invocation (if this function was called more than 32 times).</p>
 <p >This function is mostly thread-safe. If this function is called more than 32 times at once in parallel, some of the strings in the buffer may be clobbered by other invocations of this function as a race-condition, and may be considered undefined behavior.</p>
-<p >It may be easier to use <a class="el" href="UDPC_8h.html#a5a3c613a0d96a075ccddfba1e8900828" title="Returns the result of UDPC_atostr() with the addr data inside the given UDPC_ConnectionId instance.">UDPC_atostr_cid()</a>. </p>
+<p >It may be easier to use <a class="el" href="UDPC_8h.html#a5a3c613a0d96a075ccddfba1e8900828" title="Returns the result of UDPC_atostr() with the addr data inside the given UDPC_ConnectionId instance.">UDPC_atostr_cid()</a>.</p>
+<p >UDPC internally uses <a class="el" href="UDPC_8h.html#a9e2401b133c0aae43c5d69304dabbdcc" title="Returns a pointer to a null-terminated address string derived from the given address.">UDPC_atostr()</a> for logging. This means that while UDPC is running, a string created with <a class="el" href="UDPC_8h.html#a9e2401b133c0aae43c5d69304dabbdcc" title="Returns a pointer to a null-terminated address string derived from the given address.">UDPC_atostr()</a> may be overwritten eventually by UDPC. To avoid this situation, <a class="el" href="UDPC_8h.html#a939b6c407297f6cf913f2983869f051f" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe()</a> or <a class="el" href="UDPC_8h.html#a1549eee3edacbc23ca144eec72d274bb" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe_cid()</a> may be used as the ptr returned by it will not be overwritten by UDPC as time passes. </p>
 
+</div>
+</div>
+<a id="a939b6c407297f6cf913f2983869f051f" name="a939b6c407297f6cf913f2983869f051f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a939b6c407297f6cf913f2983869f051f">&#9670;&#160;</a></span>UDPC_atostr_unsafe()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">UDPC_EXPORT const char * UDPC_atostr_unsafe </td>
+          <td>(</td>
+          <td class="paramtype">UDPC_IPV6_ADDR_TYPE&#160;</td>
+          <td class="paramname"><em>addr</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Similar to UPDC_atostr(), but the returned ptr must be free'd. </p>
+<dl class="section warning"><dt>Warning</dt><dd>The returned pointer must be freed with free(), or <a class="el" href="UDPC_8h.html#a5c6fe261f7d53e7ccae4c7233c42c76b" title="Free an addr string created with UDPC_atostr_unsafe().">UDPC_atostr_unsafe_free()</a>, or <a class="el" href="UDPC_8h.html#a2e47fb8779abe3a9db72a08bf494dc75" title="Free an addr string created with UDPC_atostr_unsafe() and zeroes the pointer.">UDPC_atostr_unsafe_free_ptr()</a>.</dd></dl>
+<p>This function is thread-safe.</p>
+<p >UDPC internally uses <a class="el" href="UDPC_8h.html#a9e2401b133c0aae43c5d69304dabbdcc" title="Returns a pointer to a null-terminated address string derived from the given address.">UDPC_atostr()</a> for logging. This means that while UDPC is running, a string created with <a class="el" href="UDPC_8h.html#a9e2401b133c0aae43c5d69304dabbdcc" title="Returns a pointer to a null-terminated address string derived from the given address.">UDPC_atostr()</a> may be overwritten eventually by UDPC. To avoid this situation, <a class="el" href="UDPC_8h.html#a939b6c407297f6cf913f2983869f051f" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe()</a> or <a class="el" href="UDPC_8h.html#a1549eee3edacbc23ca144eec72d274bb" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe_cid()</a> may be used as the ptr returned by it will not be overwritten by UDPC as time passes.</p>
+<p >It may be easier to use <a class="el" href="UDPC_8h.html#a1549eee3edacbc23ca144eec72d274bb" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe_cid()</a>. </p>
+
+</div>
+</div>
+<a id="a1549eee3edacbc23ca144eec72d274bb" name="a1549eee3edacbc23ca144eec72d274bb"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1549eee3edacbc23ca144eec72d274bb">&#9670;&#160;</a></span>UDPC_atostr_unsafe_cid()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">UDPC_EXPORT const char * UDPC_atostr_unsafe_cid </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structUDPC__ConnectionId.html">UDPC_ConnectionId</a>&#160;</td>
+          <td class="paramname"><em>cid</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Similar to UPDC_atostr(), but the returned ptr must be free'd. </p>
+<dl class="section warning"><dt>Warning</dt><dd>The returned pointer must be freed with free(), or <a class="el" href="UDPC_8h.html#a5c6fe261f7d53e7ccae4c7233c42c76b" title="Free an addr string created with UDPC_atostr_unsafe().">UDPC_atostr_unsafe_free()</a>, or <a class="el" href="UDPC_8h.html#a2e47fb8779abe3a9db72a08bf494dc75" title="Free an addr string created with UDPC_atostr_unsafe() and zeroes the pointer.">UDPC_atostr_unsafe_free_ptr()</a>.</dd></dl>
+<p>This function is thread-safe.</p>
+<p >UDPC internally uses <a class="el" href="UDPC_8h.html#a9e2401b133c0aae43c5d69304dabbdcc" title="Returns a pointer to a null-terminated address string derived from the given address.">UDPC_atostr()</a> for logging. This means that while UDPC is running, a string created with <a class="el" href="UDPC_8h.html#a9e2401b133c0aae43c5d69304dabbdcc" title="Returns a pointer to a null-terminated address string derived from the given address.">UDPC_atostr()</a> may be overwritten eventually by UDPC. To avoid this situation, <a class="el" href="UDPC_8h.html#a939b6c407297f6cf913f2983869f051f" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe()</a> or <a class="el" href="UDPC_8h.html#a1549eee3edacbc23ca144eec72d274bb" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe_cid()</a> may be used as the ptr returned by it will not be overwritten by UDPC as time passes. </p>
+
+</div>
+</div>
+<a id="a5c6fe261f7d53e7ccae4c7233c42c76b" name="a5c6fe261f7d53e7ccae4c7233c42c76b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5c6fe261f7d53e7ccae4c7233c42c76b">&#9670;&#160;</a></span>UDPC_atostr_unsafe_free()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">UDPC_EXPORT void UDPC_atostr_unsafe_free </td>
+          <td>(</td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>addrBuf</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Free an addr string created with <a class="el" href="UDPC_8h.html#a939b6c407297f6cf913f2983869f051f" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe()</a>. </p>
+<p >This function is thread-safe. </p>
+
+</div>
+</div>
+<a id="a2e47fb8779abe3a9db72a08bf494dc75" name="a2e47fb8779abe3a9db72a08bf494dc75"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2e47fb8779abe3a9db72a08bf494dc75">&#9670;&#160;</a></span>UDPC_atostr_unsafe_free_ptr()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">UDPC_EXPORT void UDPC_atostr_unsafe_free_ptr </td>
+          <td>(</td>
+          <td class="paramtype">const char **&#160;</td>
+          <td class="paramname"><em>addrBuf</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Free an addr string created with <a class="el" href="UDPC_8h.html#a939b6c407297f6cf913f2983869f051f" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe()</a> and zeroes the pointer. </p>
+<p >This function is thread-safe.</p>
+<div class="fragment"><div class="line"><a class="code hl_struct" href="structUDPC__ConnectionId.html">UDPC_ConnectionId</a> aConnectionId = ...;</div>
+<div class="line"><span class="keyword">const</span> <span class="keywordtype">char</span> *addrString = <a class="code hl_function" href="UDPC_8h.html#a1549eee3edacbc23ca144eec72d274bb">UDPC_atostr_unsafe_cid</a>(aConnectionId);</div>
+<div class="line"><span class="comment">// Use addrString somewhere...</span></div>
+<div class="line"><a class="code hl_function" href="UDPC_8h.html#a2e47fb8779abe3a9db72a08bf494dc75">UDPC_atostr_unsafe_free_ptr</a>(&amp;addrString);</div>
+<div class="ttc" id="aUDPC_8h_html_a1549eee3edacbc23ca144eec72d274bb"><div class="ttname"><a href="UDPC_8h.html#a1549eee3edacbc23ca144eec72d274bb">UDPC_atostr_unsafe_cid</a></div><div class="ttdeci">UDPC_EXPORT const char * UDPC_atostr_unsafe_cid(UDPC_ConnectionId cid)</div><div class="ttdoc">Similar to UPDC_atostr(), but the returned ptr must be free'd.</div></div>
+<div class="ttc" id="aUDPC_8h_html_a2e47fb8779abe3a9db72a08bf494dc75"><div class="ttname"><a href="UDPC_8h.html#a2e47fb8779abe3a9db72a08bf494dc75">UDPC_atostr_unsafe_free_ptr</a></div><div class="ttdeci">UDPC_EXPORT void UDPC_atostr_unsafe_free_ptr(const char **addrBuf)</div><div class="ttdoc">Free an addr string created with UDPC_atostr_unsafe() and zeroes the pointer.</div></div>
+<div class="ttc" id="astructUDPC__ConnectionId_html"><div class="ttname"><a href="structUDPC__ConnectionId.html">UDPC_ConnectionId</a></div><div class="ttdoc">Data identifying a peer via addr, port, and scope_id.</div><div class="ttdef"><b>Definition:</b> UDPC.h:153</div></div>
+</div><!-- fragment --> 
 </div>
 </div>
 <a id="a0e2e0c6a6a442db2cb3223d26f849d26" name="a0e2e0c6a6a442db2cb3223d26f849d26"></a>
