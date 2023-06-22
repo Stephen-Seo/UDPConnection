@@ -155,6 +155,101 @@ TEST(UDPC, atostr_concurrent) {
     }
 }
 
+TEST(UDPC, atostr_unsafe) {
+    const char* results[64] = {
+        "::1111:1",
+        "::1111:2",
+        "::1111:3",
+        "::1111:4",
+        "::1111:5",
+        "::1111:6",
+        "::1111:7",
+        "::1111:8",
+        "::1111:9",
+        "::1111:a",
+        "::1111:b",
+        "::1111:c",
+        "::1111:d",
+        "::1111:e",
+        "::1111:f",
+        "::1111:10",
+        "::1111:11",
+        "::1111:12",
+        "::1111:13",
+        "::1111:14",
+        "::1111:15",
+        "::1111:16",
+        "::1111:17",
+        "::1111:18",
+        "::1111:19",
+        "::1111:1a",
+        "::1111:1b",
+        "::1111:1c",
+        "::1111:1d",
+        "::1111:1e",
+        "::1111:1f",
+        "::1111:20",
+        "::1111:21",
+        "::1111:22",
+        "::1111:23",
+        "::1111:24",
+        "::1111:25",
+        "::1111:26",
+        "::1111:27",
+        "::1111:28",
+        "::1111:29",
+        "::1111:2a",
+        "::1111:2b",
+        "::1111:2c",
+        "::1111:2d",
+        "::1111:2e",
+        "::1111:2f",
+        "::1111:30",
+        "::1111:31",
+        "::1111:32",
+        "::1111:33",
+        "::1111:34",
+        "::1111:35",
+        "::1111:36",
+        "::1111:37",
+        "::1111:38",
+        "::1111:39",
+        "::1111:3a",
+        "::1111:3b",
+        "::1111:3c",
+        "::1111:3d",
+        "::1111:3e",
+        "::1111:3f",
+        "::1111:40"
+    };
+    std::future<void> futures[32];
+    const char* ptrs[32];
+    for(unsigned int i = 0; i < 2; ++i) {
+        for(unsigned int j = 0; j < 32; ++j) {
+            futures[j] = std::async(std::launch::async, [] (unsigned int id, const char** ptr) {
+                UDPC_ConnectionId conId = {
+                    {0, 0, 0, 0,
+                    0, 0, 0, 0,
+                    0, 0, 0, 0,
+                    0x11, 0x11, 0x0, (unsigned char)(id + 1)},
+                    0,
+                    0
+                };
+                ptr[id] = UDPC_atostr_unsafe(conId.addr);
+            }, j, ptrs);
+        }
+        for(unsigned int j = 0; j < 32; ++j) {
+            ASSERT_TRUE(futures[j].valid());
+            futures[j].wait();
+        }
+        for(unsigned int j = 0; j < 32; ++j) {
+            EXPECT_STREQ(ptrs[j], results[j]);
+            UDPC_atostr_unsafe_free_ptr(ptrs + j);
+            UDPC_atostr_unsafe_free_ptr(ptrs + j);
+        }
+    }
+}
+
 TEST(UDPC, strtoa) {
     struct in6_addr addr;
 

@@ -2666,42 +2666,33 @@ const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId) {
     return UDPC_atostr(ctx, connectionId.addr);
 }
 
-const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr) {
-    UDPC::Context *c = UDPC::verifyContext(ctx);
-    if(!c) {
-        return nullptr;
-    }
-    uint32_t headIndex;
-    {
-        // Use a lock to ensure that "atostrBufIndex" is always a valid value.
-        std::lock_guard<std::mutex> indexLock(c->atostrBufIndexMutex);
-        c->atostrBufIndex = (c->atostrBufIndex + UDPC_ATOSTR_BUFSIZE) % UDPC_ATOSTR_SIZE;
-        headIndex = c->atostrBufIndex;
-    }
+void UDPC_Helper_atostr(char *buffer,
+                        UDPC_IPV6_ADDR_TYPE addr,
+                        const uint32_t headIndex) {
     uint32_t index = headIndex;
     bool usedDouble = false;
 
     for(unsigned int i = 0; i < 16; ++i) {
         if(i != 0 && i % 2 == 0) {
-            if(headIndex - index > 1 && c->atostrBuf[index - 1] == ':') {
+            if(headIndex - index > 1 && buffer[index - 1] == ':') {
                 if(usedDouble) {
-                    if(c->atostrBuf[index - 2] != ':') {
-                        c->atostrBuf[index++] = '0';
-                        c->atostrBuf[index++] = ':';
+                    if(buffer[index - 2] != ':') {
+                        buffer[index++] = '0';
+                        buffer[index++] = ':';
                     } else {
                         // continue use of double :, do nothing here
                     }
                 } else {
                     usedDouble = true;
-                    c->atostrBuf[index++] = ':';
+                    buffer[index++] = ':';
                 }
             } else {
-                c->atostrBuf[index++] = ':';
+                buffer[index++] = ':';
             }
         }
 
         if(UDPC_IPV6_ADDR_SUB(addr)[i] == 0
-                && (headIndex - index <= 1 || c->atostrBuf[index] == ':')) {
+                && (headIndex - index <= 1 || buffer[index] == ':')) {
             continue;
         } else {
             std::stringstream sstream;
@@ -2709,7 +2700,7 @@ const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr) {
                 << std::hex << (unsigned int) UDPC_IPV6_ADDR_SUB(addr)[i];
             std::string out(sstream.str());
             unsigned int outOffset = 0;
-            if(headIndex - index <= 1 || c->atostrBuf[index - 1] == ':') {
+            if(headIndex - index <= 1 || buffer[index - 1] == ':') {
                 if(out[0] == '0') {
                     if(out[1] == '0') {
                         outOffset = 2;
@@ -2722,23 +2713,65 @@ const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr) {
                 continue;
             } else if(outOffset == 1) {
                 if(out[outOffset] != '0') {
-                    std::memcpy(c->atostrBuf + index, out.c_str() + outOffset, 1);
+                    std::memcpy(buffer + index, out.c_str() + outOffset, 1);
                     ++index;
                 }
             } else {
-                std::memcpy(c->atostrBuf + index, out.c_str() + outOffset, 2);
+                std::memcpy(buffer + index, out.c_str() + outOffset, 2);
                 index += 2;
             }
         }
     }
-    if(c->atostrBuf[index - 1] == ':'
-            && (headIndex - index <= 2 || c->atostrBuf[index - 2] != ':')) {
-        c->atostrBuf[index++] = '0';
+    if(buffer[index - 1] == ':'
+            && (headIndex - index <= 2 || buffer[index - 2] != ':')) {
+        buffer[index++] = '0';
     }
 
-    c->atostrBuf[index] = 0;
+    buffer[index] = 0;
+}
+
+const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if(!c) {
+        return nullptr;
+    }
+    uint32_t headIndex;
+    {
+        // Use a lock to ensure that "atostrBufIndex" is always a valid value.
+        std::lock_guard<std::mutex> indexLock(c->atostrBufIndexMutex);
+        c->atostrBufIndex = (c->atostrBufIndex + UDPC_ATOSTR_BUFSIZE) % UDPC_ATOSTR_SIZE;
+        headIndex = c->atostrBufIndex;
+    }
+
+    UDPC_Helper_atostr(c->atostrBuf, addr, headIndex);
 
     return c->atostrBuf + headIndex;
+}
+
+const char *UDPC_atostr_unsafe(UDPC_IPV6_ADDR_TYPE addr) {
+    char *buf = (char*)std::malloc(40);
+    std::memset(buf, 0, 40);
+
+    UDPC_Helper_atostr(buf, addr, 0);
+
+    return buf;
+}
+
+const char *UDPC_atostr_unsafe_cid(UDPC_ConnectionId cid) {
+    return UDPC_atostr_unsafe(cid.addr);
+}
+
+void UDPC_atostr_unsafe_free(const char *addrBuf) {
+    if (addrBuf) {
+        std::free((void*)addrBuf);
+    }
+}
+
+void UDPC_atostr_unsafe_free_ptr(const char **addrBuf) {
+    if (addrBuf && *addrBuf) {
+        std::free((void*)*addrBuf);
+        *addrBuf = nullptr;
+    }
 }
 
 UDPC_IPV6_ADDR_TYPE UDPC_strtoa(const char *addrStr) {
