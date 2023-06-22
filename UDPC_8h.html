@@ -273,9 +273,10 @@ UDPC_EXPORT <a class="el" href="structUDPC__ConnectionId.html">UDPC_ConnectionId
 <tr class="separator:a8d0dbbd258e17844a2f9a0e277789581"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5a3c613a0d96a075ccddfba1e8900828"><td class="memItemLeft" align="right" valign="top"><a id="a5a3c613a0d96a075ccddfba1e8900828" name="a5a3c613a0d96a075ccddfba1e8900828"></a>
 UDPC_EXPORT const char *&#160;</td><td class="memItemRight" valign="bottom"><b>UDPC_atostr_cid</b> (UDPC_HContext ctx, <a class="el" href="structUDPC__ConnectionId.html">UDPC_ConnectionId</a> connectionId)</td></tr>
+<tr class="memdesc:a5a3c613a0d96a075ccddfba1e8900828"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns the result of <a class="el" href="UDPC_8h.html#a9e2401b133c0aae43c5d69304dabbdcc" title="Returns a pointer to a null-terminated address string derived from the given address.">UDPC_atostr()</a> with the addr data inside the given <a class="el" href="structUDPC__ConnectionId.html" title="Data identifying a peer via addr, port, and scope_id.">UDPC_ConnectionId</a> instance. <br /></td></tr>
 <tr class="separator:a5a3c613a0d96a075ccddfba1e8900828"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9e2401b133c0aae43c5d69304dabbdcc"><td class="memItemLeft" align="right" valign="top"><a id="a9e2401b133c0aae43c5d69304dabbdcc" name="a9e2401b133c0aae43c5d69304dabbdcc"></a>
-UDPC_EXPORT const char *&#160;</td><td class="memItemRight" valign="bottom"><b>UDPC_atostr</b> (UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr)</td></tr>
+<tr class="memitem:a9e2401b133c0aae43c5d69304dabbdcc"><td class="memItemLeft" align="right" valign="top">UDPC_EXPORT const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="UDPC_8h.html#a9e2401b133c0aae43c5d69304dabbdcc">UDPC_atostr</a> (UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr)</td></tr>
+<tr class="memdesc:a9e2401b133c0aae43c5d69304dabbdcc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a pointer to a null-terminated address string derived from the given address.  <a href="UDPC_8h.html#a9e2401b133c0aae43c5d69304dabbdcc">More...</a><br /></td></tr>
 <tr class="separator:a9e2401b133c0aae43c5d69304dabbdcc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2ae8e7d87f785dd3b3353a00005c3dc6"><td class="memItemLeft" align="right" valign="top"><a id="a2ae8e7d87f785dd3b3353a00005c3dc6" name="a2ae8e7d87f785dd3b3353a00005c3dc6"></a>
 UDPC_EXPORT UDPC_IPV6_ADDR_TYPE&#160;</td><td class="memItemRight" valign="bottom"><b>UDPC_strtoa</b> (const char *addrStr)</td></tr>
@@ -486,6 +487,40 @@ Variables</h2></td></tr>
 <p >This function adds one public key to the whitelist. If the whitelist is not empty, then all peers that do not have the matching public key will be denied connection.</p>
 <p >Note that public key verification will not occur if it is not enabled during the call to <a class="el" href="UDPC_8h.html#a89dee65fcd5b70d25abbf6d4a3ee59f2" title="Creates an UDPC_HContext that holds state for connections.">UDPC_init()</a>.</p>
 <dl class="section return"><dt>Returns</dt><dd>The size of the whitelist on success, zero otherwise </dd></dl>
+
+</div>
+</div>
+<a id="a9e2401b133c0aae43c5d69304dabbdcc" name="a9e2401b133c0aae43c5d69304dabbdcc"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9e2401b133c0aae43c5d69304dabbdcc">&#9670;&#160;</a></span>UDPC_atostr()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">UDPC_EXPORT const char * UDPC_atostr </td>
+          <td>(</td>
+          <td class="paramtype">UDPC_HContext&#160;</td>
+          <td class="paramname"><em>ctx</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">UDPC_IPV6_ADDR_TYPE&#160;</td>
+          <td class="paramname"><em>addr</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns a pointer to a null-terminated address string derived from the given address. </p>
+<dl class="section warning"><dt>Warning</dt><dd>You must NOT free the pointer returned by this function, as it refers to a buffer allocated by the UDPC Context specifically to hold address strings.</dd></dl>
+<p>The current implementation uses a buffer that can hold up to 32 address strings at once. When this function is called, an internal counter is used to pick the next spot in the buffer to store the address string and return its pointer. This buffer is used like a "ring-buffer"; when the end of the buffer is reached, the counter wraps-around to the beginning of the buffer, which has the effect of overwriting the oldest addr-string entry on every invocation (if this function was called more than 32 times).</p>
+<p >This function is mostly thread-safe. If this function is called more than 32 times at once in parallel, some of the strings in the buffer may be clobbered by other invocations of this function as a race-condition, and may be considered undefined behavior.</p>
+<p >It may be easier to use <a class="el" href="UDPC_8h.html#a5a3c613a0d96a075ccddfba1e8900828" title="Returns the result of UDPC_atostr() with the addr data inside the given UDPC_ConnectionId instance.">UDPC_atostr_cid()</a>. </p>
 
 </div>
 </div>
