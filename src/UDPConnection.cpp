@@ -336,7 +336,8 @@ void UDPC::Context::update_impl() {
                         UDPC_LoggingType::UDPC_ERROR,
                         "Failed to init ConnectionData instance (libsodium "
                         "init fail) while client establishing connection with ",
-                        UDPC_atostr((UDPC_HContext)this, event.conId.addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                           event.conId.addr),
                         " port ",
                         event.conId.port);
                     continue;
@@ -362,7 +363,8 @@ void UDPC::Context::update_impl() {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_INFO,
                         "Client initiating connection to ",
-                        UDPC_atostr((UDPC_HContext)this, event.conId.addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_INFO,
+                                           event.conId.addr),
                         " port ",
                         event.conId.port,
                         " ...");
@@ -370,7 +372,8 @@ void UDPC::Context::update_impl() {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_WARNING,
                         "Client initiate connection, already connected to peer ",
-                        UDPC_atostr((UDPC_HContext)this, event.conId.addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_WARNING,
+                                           event.conId.addr),
                         " port ",
                         event.conId.port);
                 }
@@ -419,7 +422,8 @@ void UDPC::Context::update_impl() {
                 UDPC_CHECK_LOG(this,
                     UDPC_LoggingType::UDPC_VERBOSE,
                     "Timed out connection with ",
-                    UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                    conditional_atostr(UDPC_LoggingType::UDPC_VERBOSE,
+                                       iter->first.addr),
                     ", port = ",
                     iter->second.port);
                 continue;
@@ -433,7 +437,8 @@ void UDPC::Context::update_impl() {
                 UDPC_CHECK_LOG(this,
                     UDPC_LoggingType::UDPC_VERBOSE,
                     "Switching to bad mode in connection with ",
-                    UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                    conditional_atostr(UDPC_LoggingType::UDPC_VERBOSE,
+                                       iter->first.addr),
                     ", port = ",
                     iter->second.port);
                 iter->second.flags.reset(1);
@@ -464,7 +469,8 @@ void UDPC::Context::update_impl() {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_VERBOSE,
                         "Switching to good mode in connection with ",
-                        UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_VERBOSE,
+                                           iter->first.addr),
                         ", port = ",
                         iter->second.port);
                     iter->second.flags.set(1);
@@ -544,8 +550,8 @@ void UDPC::Context::update_impl() {
                             UDPC_CHECK_LOG(this,
                                 UDPC_LoggingType::UDPC_DEBUG,
                                 "Not queueing packet to ",
-                                UDPC_atostr((UDPC_HContext)this,
-                                    next->receiver.addr),
+                                conditional_atostr(UDPC_LoggingType::UDPC_DEBUG,
+                                                   next->receiver.addr),
                                 ", port = ",
                                 next->receiver.port,
                                 ", connection's queue reached max size");
@@ -567,9 +573,8 @@ void UDPC::Context::update_impl() {
                         UDPC_CHECK_LOG(this,
                             UDPC_LoggingType::UDPC_WARNING,
                             "Dropped queued packets to ",
-                            UDPC_atostr(
-                                (UDPC_HContext)this,
-                                next->receiver.addr),
+                            conditional_atostr(UDPC_LoggingType::UDPC_WARNING,
+                                               next->receiver.addr),
                             ", port = ",
                             next->receiver.port,
                             " due to connection not existing");
@@ -628,7 +633,8 @@ void UDPC::Context::update_impl() {
                         iter->second.sk) != 0) {
                         UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                             "Failed to sign packet for peer ",
-                            UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                            conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                               iter->first.addr),
                             ", port ",
                             iter->second.port);
                         continue;
@@ -662,7 +668,8 @@ void UDPC::Context::update_impl() {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_ERROR,
                         "Failed to send disconnect packet to ",
-                        UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                           iter->first.addr),
                         ", port = ",
                         iter->second.port);
                     continue;
@@ -767,14 +774,20 @@ void UDPC::Context::update_impl() {
                         UDPC_CHECK_LOG(this,
                             UDPC_LoggingType::UDPC_ERROR,
                             "Failed to send packet to initiate connection to ",
-                            UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                            conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                               iter->first.addr),
                             ", port = ",
                             iter->second.port);
                         continue;
                     } else {
-                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_INFO, "Sent initiate connection to ",
-                            UDPC_atostr((UDPC_HContext)this, iter->first.addr),
-                            ", port = ", iter->second.port,
+                        UDPC_CHECK_LOG(
+                            this,
+                            UDPC_LoggingType::UDPC_INFO,
+                            "Sent initiate connection to ",
+                            conditional_atostr(UDPC_LoggingType::UDPC_INFO,
+                                               iter->first.addr),
+                            ", port = ",
+                            iter->second.port,
                             flags.test(2) && iter->second.flags.test(6) ?
                                 ", libsodium enabled" : ", libsodium disabled");
                     }
@@ -843,14 +856,16 @@ void UDPC::Context::update_impl() {
                         UDPC_CHECK_LOG(this,
                             UDPC_LoggingType::UDPC_ERROR,
                             "Failed to send packet to initiate connection to ",
-                            UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                            conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                               iter->first.addr),
                             ", port = ",
                             iter->second.port);
                         continue;
                     }
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
                         "Sent init pkt to client ",
-                        UDPC_atostr((UDPC_HContext)this, destinationInfo.sin6_addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_DEBUG,
+                                           destinationInfo.sin6_addr),
                         ", port ", iter->second.port);
                 }
                 continue;
@@ -893,7 +908,8 @@ void UDPC::Context::update_impl() {
                         iter->second.sk) != 0) {
                         UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                             "Failed to sign packet for peer ",
-                            UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                            conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                               iter->first.addr),
                             ", port ",
                             iter->second.port);
                         continue;
@@ -927,7 +943,8 @@ void UDPC::Context::update_impl() {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_ERROR,
                         "Failed to send heartbeat packet to ",
-                        UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                           iter->first.addr),
                         ", port = ",
                         iter->second.port);
                     continue;
@@ -997,7 +1014,8 @@ void UDPC::Context::update_impl() {
                         iter->second.sk) != 0) {
                         UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                             "Failed to sign packet for peer ",
-                            UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                            conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                               iter->first.addr),
                             ", port ",
                             iter->second.port);
                         std::free(pInfo.data);
@@ -1036,7 +1054,8 @@ void UDPC::Context::update_impl() {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_ERROR,
                         "Failed to send packet to ",
-                        UDPC_atostr((UDPC_HContext)this, iter->first.addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                           iter->first.addr),
                         ", port = ",
                         iter->second.port);
                     std::free(pInfo.data);
@@ -1150,7 +1169,8 @@ void UDPC::Context::update_impl() {
             UDPC_CHECK_LOG(this,
                 UDPC_LoggingType::UDPC_VERBOSE,
                 "Received packet is smaller than header, ignoring packet from ",
-                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                conditional_atostr(UDPC_LoggingType::UDPC_VERBOSE,
+                                   receivedData.sin6_addr),
                 ", port = ",
                 ntohs(receivedData.sin6_port));
             continue;
@@ -1165,7 +1185,8 @@ void UDPC::Context::update_impl() {
                 UDPC_LoggingType::UDPC_VERBOSE,
                 "Received packet has invalid protocol id, ignoring packet "
                 "from ",
-                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                conditional_atostr(UDPC_LoggingType::UDPC_VERBOSE,
+                                   receivedData.sin6_addr),
                 ", port = ",
                 ntohs(receivedData.sin6_port));
             continue;
@@ -1195,7 +1216,8 @@ void UDPC::Context::update_impl() {
             UDPC_CHECK_LOG(this,
                 UDPC_LoggingType::UDPC_VERBOSE,
                 "Got connect packet of invalid size from ",
-                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                conditional_atostr(UDPC_LoggingType::UDPC_VERBOSE,
+                                   receivedData.sin6_addr),
                 ", port = ",
                 ntohs(receivedData.sin6_port),
                 ", ignoring");
@@ -1206,7 +1228,8 @@ void UDPC::Context::update_impl() {
             UDPC_CHECK_LOG(this,
                 UDPC_LoggingType::UDPC_VERBOSE,
                 "Got non-connect packet of invalid size from ",
-                UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                conditional_atostr(UDPC_LoggingType::UDPC_VERBOSE,
+                                   receivedData.sin6_addr),
                 ", port = ",
                 ntohs(receivedData.sin6_port),
                 ", ignoring");
@@ -1227,7 +1250,8 @@ void UDPC::Context::update_impl() {
             default:
                 UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
                     "Got invalid connect pktType from ",
-                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    conditional_atostr(UDPC_LoggingType::UDPC_WARNING,
+                                       receivedData.sin6_addr),
                     ", port ", ntohs(receivedData.sin6_port));
                 continue;
             }
@@ -1241,7 +1265,8 @@ void UDPC::Context::update_impl() {
             } else {
                 UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
                     "Got invalid pktType from ",
-                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    conditional_atostr(UDPC_LoggingType::UDPC_WARNING,
+                                       receivedData.sin6_addr),
                     ", port ", ntohs(receivedData.sin6_port));
                 continue;
             }
@@ -1260,8 +1285,8 @@ void UDPC::Context::update_impl() {
                             == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                         "Client peer ",
-                        UDPC_atostr(
-                            (UDPC_HContext)this, receivedData.sin6_addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                           receivedData.sin6_addr),
                         " port ",
                         ntohs(receivedData.sin6_port),
                         " attempted connection with packet authentication "
@@ -1273,8 +1298,8 @@ void UDPC::Context::update_impl() {
                             == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                         "Client peer ",
-                        UDPC_atostr(
-                            (UDPC_HContext)this, receivedData.sin6_addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                           receivedData.sin6_addr),
                         " port ",
                         ntohs(receivedData.sin6_port),
                         " attempted connection with packet authentication "
@@ -1307,8 +1332,8 @@ void UDPC::Context::update_impl() {
                         UDPC_LoggingType::UDPC_ERROR,
                         "Failed to init ConnectionData instance (libsodium init"
                         " fail) while server establishing connection with ",
-                        UDPC_atostr(
-                            (UDPC_HContext)this, receivedData.sin6_addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                           receivedData.sin6_addr),
                         ", port = ",
                         ntohs(receivedData.sin6_port));
                     continue;
@@ -1374,7 +1399,8 @@ void UDPC::Context::update_impl() {
                 UDPC_CHECK_LOG(this,
                     UDPC_LoggingType::UDPC_INFO,
                     "Establishing connection with client ",
-                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    conditional_atostr(UDPC_LoggingType::UDPC_INFO,
+                                       receivedData.sin6_addr),
                     ", port = ",
                     ntohs(receivedData.sin6_port),
                     ", giving client id = ", newConnection.id,
@@ -1410,8 +1436,8 @@ void UDPC::Context::update_impl() {
                 if(iter == conMap.end() || !iter->second.flags.test(3)) {
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_DEBUG,
                         "client dropped pkt from ",
-                        UDPC_atostr(
-                            (UDPC_HContext)this, receivedData.sin6_addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_DEBUG,
+                                           receivedData.sin6_addr),
                         ", port ", ntohs(receivedData.sin6_port));
                     continue;
                 }
@@ -1426,8 +1452,8 @@ void UDPC::Context::update_impl() {
                     // without auth (if fallback).
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                         "Server peer ",
-                        UDPC_atostr(
-                            (UDPC_HContext)this, receivedData.sin6_addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                           receivedData.sin6_addr),
                         " port ",
                         ntohs(receivedData.sin6_port),
                         " attempted connection with packet authentication "
@@ -1439,8 +1465,8 @@ void UDPC::Context::update_impl() {
                             == UDPC_AuthPolicy::UDPC_AUTH_POLICY_STRICT) {
                     UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_ERROR,
                         "Server peer ",
-                        UDPC_atostr(
-                            (UDPC_HContext)this, receivedData.sin6_addr),
+                        conditional_atostr(UDPC_LoggingType::UDPC_ERROR,
+                                           receivedData.sin6_addr),
                         " port ",
                         ntohs(receivedData.sin6_port),
                         " attempted connection with packet authentication "
@@ -1476,8 +1502,8 @@ void UDPC::Context::update_impl() {
                         iter->second.peer_pk) != 0) {
                         UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
                             "Failed to verify peer (server) ",
-                            UDPC_atostr(
-                                (UDPC_HContext)this, receivedData.sin6_addr),
+                            conditional_atostr(UDPC_LoggingType::UDPC_WARNING,
+                                               receivedData.sin6_addr),
                             ", port = ",
                             ntohs(receivedData.sin6_port));
                         continue;
@@ -1503,7 +1529,8 @@ void UDPC::Context::update_impl() {
                 iter->second.flags.set(4);
                 UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_INFO,
                     "Established connection with server ",
-                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    conditional_atostr(UDPC_LoggingType::UDPC_INFO,
+                                       receivedData.sin6_addr),
                     ", port = ",
                     ntohs(receivedData.sin6_port),
                     ", got id = ", conID,
@@ -1548,7 +1575,8 @@ void UDPC::Context::update_impl() {
                     this,
                     UDPC_LoggingType::UDPC_INFO,
                     "Failed to verify received packet from",
-                    UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+                    conditional_atostr(UDPC_LoggingType::UDPC_INFO,
+                                       receivedData.sin6_addr),
                     ", port = ",
                     ntohs(receivedData.sin6_port),
                     ", ignoring");
@@ -1566,7 +1594,8 @@ void UDPC::Context::update_impl() {
         UDPC_CHECK_LOG(this,
             UDPC_LoggingType::UDPC_VERBOSE,
             "Received valid packet from ",
-            UDPC_atostr((UDPC_HContext)this, receivedData.sin6_addr),
+            conditional_atostr(UDPC_LoggingType::UDPC_VERBOSE,
+                               receivedData.sin6_addr),
             ", port = ",
             ntohs(receivedData.sin6_port),
             ", packet id = ", seqID,
@@ -1813,6 +1842,15 @@ void UDPC::Context::update_impl() {
     } while (true);
 }
 
+const char *UDPC::Context::conditional_atostr(UDPC_LoggingType logType,
+                                              UDPC_IPV6_ADDR_TYPE addr) {
+    if (willLog(logType)) {
+        return UDPC_atostr((UDPC_HContext)this, addr);
+    } else {
+        return "";
+    }
+}
+
 UDPC::Context *UDPC::verifyContext(UDPC_HContext ctx) {
     if(ctx == nullptr) {
         return nullptr;
@@ -2038,7 +2076,7 @@ UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLib
     ctx->authPolicy.exchange(UDPC_AuthPolicy::UDPC_AUTH_POLICY_FALLBACK);
 
     UDPC_CHECK_LOG(ctx, UDPC_LoggingType::UDPC_INFO, "Got listen addr ",
-        UDPC_atostr((UDPC_HContext)ctx, listenId.addr));
+        ctx->conditional_atostr(UDPC_LoggingType::UDPC_INFO, listenId.addr));
 
     if(isUsingLibsodium) {
 #ifdef UDPC_LIBSODIUM_ENABLED

@@ -215,6 +215,9 @@ private:
 public:
     void update_impl();
 
+    const char *conditional_atostr(UDPC_LoggingType logType,
+                                   UDPC_IPV6_ADDR_TYPE addr);
+
     uint_fast32_t _contextIdentifier;
 
     char recvBuf[UDPC_PACKET_MAX_SIZE];
