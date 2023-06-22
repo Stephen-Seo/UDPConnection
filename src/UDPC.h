@@ -818,8 +818,35 @@ UDPC_EXPORT int UDPC_get_auth_policy(UDPC_HContext ctx);
  */
 UDPC_EXPORT int UDPC_set_auth_policy(UDPC_HContext ctx, int value);
 
+/*!
+ * \brief Returns the result of UDPC_atostr() with the addr data inside the
+ * given UDPC_ConnectionId instance.
+ */
 UDPC_EXPORT const char *UDPC_atostr_cid(UDPC_HContext ctx, UDPC_ConnectionId connectionId);
 
+/*!
+ * \brief Returns a pointer to a null-terminated address string derived from
+ * the given address.
+ *
+ * \warning You must NOT free the pointer returned by this function, as it
+ * refers to a buffer allocated by the UDPC Context specifically to hold address
+ * strings.
+ *
+ * The current implementation uses a buffer that can hold up to 32 address
+ * strings at once. When this function is called, an internal counter is used
+ * to pick the next spot in the buffer to store the address string and return
+ * its pointer. This buffer is used like a "ring-buffer"; when the end of the
+ * buffer is reached, the counter wraps-around to the beginning of the buffer,
+ * which has the effect of overwriting the oldest addr-string entry on every
+ * invocation (if this function was called more than 32 times).
+ *
+ * This function is mostly thread-safe. If this function is called more than 32
+ * times at once in parallel, some of the strings in the buffer may be
+ * clobbered by other invocations of this function as a race-condition, and may
+ * be considered undefined behavior.
+ *
+ * It may be easier to use UDPC_atostr_cid().
+ */
 UDPC_EXPORT const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr);
 
 // =============================================================================
