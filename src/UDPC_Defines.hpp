@@ -212,11 +212,14 @@ private:
         log_impl_next(type, args...);
     } // }}}
 
+    template<typename... Targs>
+    void log_impl_next(UDPC_LoggingType type, UDPC_IPV6_ADDR_TYPE addr, Targs... args) { // {{{
+        std::cerr << UDPC_atostr((UDPC_HContext)this, addr);
+        log_impl_next(type, args...);
+    } // }}}
+
 public:
     void update_impl();
-
-    const char *conditional_atostr(UDPC_LoggingType logType,
-                                   UDPC_IPV6_ADDR_TYPE addr);
 
     uint_fast32_t _contextIdentifier;
 
