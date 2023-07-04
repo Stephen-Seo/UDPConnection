@@ -922,10 +922,197 @@ UDPC_EXPORT UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(const char *addrStr, uint32_t *
 UDPC_EXPORT UDPC_IPV6_ADDR_TYPE UDPC_a4toa6(uint32_t a4_be);
 
 UDPC_EXPORT int UDPC_is_big_endian();
+
+/*!
+ * \brief Converts a 16-bit int into/from network byte order (big endian).
+ *
+ * Typically, if one is sending integers/floats through UDPC, it is strongly
+ * recommended to use the UDPC_no* family of functions to convert to/back from
+ * network byte order. In other words, the integers/floats should be converted
+ * to network byte order prior to writing it into the buffer to send, and it
+ * should be converted back to native byte order when reading it from the
+ * received buffer.
+ *
+ * Note that on big-endian systems, this function has no effect. However, it is
+ * recommended to use this function as shown so that the endianness of the
+ * system is not a problem.
+ *
+ * \code{.c}
+ * // Sending
+ * uint16_t send_value = 13;
+ * char buffer[2];
+ * // to network byte order
+ * send_value = UDPC_no16i(send_value);
+ * memcpy(buffer, &value, 2);
+ * // send buffer
+ *
+ * // Receiving
+ * uint16_t receive_value;
+ * memcpy(&receive_value, buffer, 2);
+ * // to local byte order
+ * receive_value = UDPC_no16i(receive_value);
+ * // use receive_value
+ * \endcode
+ *
+ * When using a signed integer:
+ *
+ * \code{.c}
+ * int16_t send_value = 15000;
+ * // network byte order
+ * uint16_t *ptr = (uint16_t*)&send_value;
+ * *ptr = UDPC_no16i(*ptr);
+ * \endcode
+ */
 UDPC_EXPORT uint16_t UDPC_no16i(uint16_t i);
+
+/*!
+ * \brief Converts a 32-bit int into/from network byte order (big endian).
+ *
+ * Typically, if one is sending integers/floats through UDPC, it is strongly
+ * recommended to use the UDPC_no* family of functions to convert to/back from
+ * network byte order. In other words, the integers/floats should be converted
+ * to network byte order prior to writing it into the buffer to send, and it
+ * should be converted back to native byte order when reading it from the
+ * received buffer.
+ *
+ * Note that on big-endian systems, this function has no effect. However, it is
+ * recommended to use this function as shown so that the endianness of the
+ * system is not a problem.
+ *
+ * \code{.c}
+ * // Sending
+ * uint32_t send_value = 123456;
+ * char buffer[4];
+ * // to network byte order
+ * send_value = UDPC_no32i(send_value);
+ * memcpy(buffer, &value, 4);
+ * // send buffer
+ *
+ * // Receiving
+ * uint32_t receive_value;
+ * memcpy(&receive_value, buffer, 4);
+ * // to local byte order
+ * receive_value = UDPC_no32i(receive_value);
+ * // use receive_value
+ * \endcode
+ *
+ * When using a signed integer:
+ *
+ * \code{.c}
+ * int32_t send_value = 123456;
+ * // network byte order
+ * uint32_t *ptr = (uint32_t*)&send_value;
+ * *ptr = UDPC_no32i(*ptr);
+ * \endcode
+ */
 UDPC_EXPORT uint32_t UDPC_no32i(uint32_t i);
+
+/*!
+ * \brief Converts a 64-bit int into/from network byte order (big endian).
+ *
+ * Typically, if one is sending integers/floats through UDPC, it is strongly
+ * recommended to use the UDPC_no* family of functions to convert to/back from
+ * network byte order. In other words, the integers/floats should be converted
+ * to network byte order prior to writing it into the buffer to send, and it
+ * should be converted back to native byte order when reading it from the
+ * received buffer.
+ *
+ * Note that on big-endian systems, this function has no effect. However, it is
+ * recommended to use this function as shown so that the endianness of the
+ * system is not a problem.
+ *
+ * \code{.c}
+ * // Sending
+ * uint64_t send_value = 0xABCDEFABCDEFAAAA;
+ * char buffer[8];
+ * // to network byte order
+ * send_value = UDPC_no64i(send_value);
+ * memcpy(buffer, &value, 8);
+ * // send buffer
+ *
+ * // Receiving
+ * uint64_t receive_value;
+ * memcpy(&receive_value, buffer, 8);
+ * // to local byte order
+ * receive_value = UDPC_no64i(receive_value);
+ * // use receive_value
+ * \endcode
+ *
+ * When using a signed integer:
+ *
+ * \code{.c}
+ * int64_t send_value = 0x1111222233334444;
+ * // network byte order
+ * uint64_t *ptr = (uint64_t*)&send_value;
+ * *ptr = UDPC_no64i(*ptr);
+ * \endcode
+ */
 UDPC_EXPORT uint64_t UDPC_no64i(uint64_t i);
+
+/*!
+ * \brief Converts a 32-bit float into/from network byte order (big endian).
+ *
+ * Typically, if one is sending integers/floats through UDPC, it is strongly
+ * recommended to use the UDPC_no* family of functions to convert to/back from
+ * network byte order. In other words, the integers/floats should be converted
+ * to network byte order prior to writing it into the buffer to send, and it
+ * should be converted back to native byte order when reading it from the
+ * received buffer.
+ *
+ * Note that on big-endian systems, this function has no effect. However, it is
+ * recommended to use this function as shown so that the endianness of the
+ * system is not a problem.
+ *
+ * \code{.c}
+ * // Sending
+ * float send_value = 0.123F;
+ * char buffer[4];
+ * // to network byte order
+ * send_value = UDPC_no32f(send_value);
+ * memcpy(buffer, &value, 4);
+ * // send buffer
+ *
+ * // Receiving
+ * float receive_value;
+ * memcpy(&receive_value, buffer, 4);
+ * // to local byte order
+ * receive_value = UDPC_no32f(receive_value);
+ * // use receive_value
+ * \endcode
+ */
 UDPC_EXPORT float UDPC_no32f(float f);
+
+/*!
+ * \brief Converts a 64-bit float into/from network byte order (big endian).
+ *
+ * Typically, if one is sending integers/floats through UDPC, it is strongly
+ * recommended to use the UDPC_no* family of functions to convert to/back from
+ * network byte order. In other words, the integers/floats should be converted
+ * to network byte order prior to writing it into the buffer to send, and it
+ * should be converted back to native byte order when reading it from the
+ * received buffer.
+ *
+ * Note that on big-endian systems, this function has no effect. However, it is
+ * recommended to use this function as shown so that the endianness of the
+ * system is not a problem.
+ *
+ * \code{.c}
+ * // Sending
+ * double send_value = 0.123456;
+ * char buffer[8];
+ * // to network byte order
+ * send_value = UDPC_no64f(send_value);
+ * memcpy(buffer, &value, 8);
+ * // send buffer
+ *
+ * // Receiving
+ * double receive_value;
+ * memcpy(&receive_value, buffer, 8);
+ * // to local byte order
+ * receive_value = UDPC_no64f(receive_value);
+ * // use receive_value
+ * \endcode
+ */
 UDPC_EXPORT double UDPC_no64f(double f);
 
 #ifdef __cplusplus
