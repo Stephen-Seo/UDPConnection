@@ -77,3 +77,7 @@ available.
 # Links
 https://github.com/Stephen-Seo/UDPConnection  
 https://git.seodisparate.com/stephenseo/UDPConnection
+
+# Other Notes
+
+Inspired by [a series of blog posts about networking for games.](https://gafferongames.com/categories/game-networking/)
