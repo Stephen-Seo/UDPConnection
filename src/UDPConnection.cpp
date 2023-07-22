@@ -94,13 +94,16 @@ toggleT(UDPC::THIRTY_SECONDS),
 toggleTimer(std::chrono::steady_clock::duration::zero()),
 toggledTimer(std::chrono::steady_clock::duration::zero()),
 addr({0}),
+scope_id(0),
 port(0),
 sentPkts(),
 sendPkts(),
 priorityPkts(),
+sentInfoMap(),
 received(std::chrono::steady_clock::now()),
 sent(std::chrono::steady_clock::now()),
-rtt(std::chrono::steady_clock::duration::zero())
+rtt(std::chrono::steady_clock::duration::zero()),
+verifyMessage()
 {
     flags.set(0);
     flags.reset(1);
@@ -149,9 +152,11 @@ port(port),
 sentPkts(),
 sendPkts(),
 priorityPkts(),
+sentInfoMap(),
 received(std::chrono::steady_clock::now()),
 sent(std::chrono::steady_clock::now()),
-rtt(std::chrono::steady_clock::duration::zero())
+rtt(std::chrono::steady_clock::duration::zero()),
+verifyMessage()
 {
     flags.set(3);
     if(isServer) {
@@ -223,11 +228,34 @@ loggingType(UDPC_DEBUG),
 #else
 loggingType(UDPC_WARNING),
 #endif
+authPolicy(UDPC_AUTH_POLICY_FALLBACK),
+#if UDPC_PLATFORM == UPDC_PLATFORM_WINDOWS
+socketHandle(INVALID_SOCKET),
+#else
+socketHandle(0),
+#endif
+socketInfo(),
+lastUpdated(),
+conMap(),
+addrConMap(),
+idMap(),
+deletionMap(),
+peerPKWhitelist(),
 receivedPkts(),
+receivedPktsMutex(),
 cSendPkts(),
+internalEvents(),
+internalEventsMutex(),
+externalEvents(),
+externalEventsMutex(),
 rng_engine(),
+thread(),
+threadRunning(),
 conMapMutex(),
 peerPKWhitelistMutex(),
+threadedSleepTime(std::chrono::milliseconds(UDPC_UPDATE_MS_DEFAULT)),
+keysSet(),
+atostrBufIndexMutex(),
 atostrBufIndex(0)
 {
     std::memset(atostrBuf, 0, UDPC_ATOSTR_SIZE);

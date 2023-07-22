@@ -312,7 +312,7 @@ int main(int argc, char **argv) {
     if(isLibSodiumEnabled && whitelist_pk_files_index > 0) {
         puts("Enabling pubkey whitelist...");
         for(unsigned int i = 0; i < whitelist_pk_files_index; ++i) {
-            if(UDPC_add_whitelist_pk(context, whitelist_pks[i]) != i + 1) {
+            if((unsigned int)UDPC_add_whitelist_pk(context, whitelist_pks[i]) != i + 1) {
                 puts("Failed to add pubkey to whitelist");
                 return 1;
             }
@@ -323,7 +323,7 @@ int main(int argc, char **argv) {
 
     unsigned int tick = 0;
     unsigned int temp = 0;
-    unsigned int temp2, temp3;
+    unsigned int temp2;
     int temp4;
     unsigned long size;
     UDPC_ConnectionId *list = NULL;

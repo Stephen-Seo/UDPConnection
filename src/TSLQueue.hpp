@@ -67,6 +67,10 @@ class TSLQueue {
                  unsigned long *msize);
         ~TSLQIter();
 
+        // Disallow copy.
+        TSLQIter(const TSLQIter &) = delete;
+        TSLQIter& operator=(const TSLQIter &) = delete;
+
         std::unique_ptr<T> current();
         bool next();
         bool prev();
@@ -91,6 +95,7 @@ class TSLQueue {
 
 template <typename T>
 TSLQueue<T>::TSLQueue() :
+    mutex(),
     head(std::shared_ptr<TSLQNode>(new TSLQNode())),
     tail(std::shared_ptr<TSLQNode>(new TSLQNode())),
     msize(0)
@@ -296,6 +301,9 @@ unsigned long TSLQueue<T>::size() {
 
 template <typename T>
 TSLQueue<T>::TSLQNode::TSLQNode() :
+next(),
+prev(),
+data(),
 type(TSLQN_Type::TSLQN_NORMAL)
 {}
 
