@@ -84,8 +84,8 @@ private:
 
     Weak selfWeakPtr;
     std::mutex mutex;
-    std::atomic_uint read;
-    std::atomic_bool write;
+    unsigned int read;
+    bool write;
 
 };
 
