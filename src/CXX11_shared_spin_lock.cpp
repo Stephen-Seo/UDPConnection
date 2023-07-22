@@ -20,7 +20,7 @@ write(false)
 UDPC::LockObj<false> UDPC::SharedSpinLock::spin_read_lock() {
     while (true) {
         std::lock_guard<std::mutex> lock(mutex);
-        if (!write) {
+        if (!write.load()) {
             ++read;
             return LockObj<false>(selfWeakPtr, Badge{});
         }
@@ -29,7 +29,7 @@ UDPC::LockObj<false> UDPC::SharedSpinLock::spin_read_lock() {
 
 UDPC::LockObj<false> UDPC::SharedSpinLock::try_spin_read_lock() {
     std::lock_guard<std::mutex> lock(mutex);
-    if (!write) {
+    if (!write.load()) {
         ++read;
         return LockObj<false>(selfWeakPtr, Badge{});
     }
@@ -39,7 +39,7 @@ UDPC::LockObj<false> UDPC::SharedSpinLock::try_spin_read_lock() {
 void UDPC::SharedSpinLock::read_unlock(UDPC::Badge &&badge) {
     if (badge.isValid) {
         std::lock_guard<std::mutex> lock(mutex);
-        if (read > 0) {
+        if (read.load() > 0) {
             --read;
             badge.isValid = false;
         }
@@ -49,8 +49,8 @@ void UDPC::SharedSpinLock::read_unlock(UDPC::Badge &&badge) {
 UDPC::LockObj<true> UDPC::SharedSpinLock::spin_write_lock() {
     while (true) {
         std::lock_guard<std::mutex> lock(mutex);
-        if (!write && read == 0) {
-            write = true;
+        if (!write.load() && read.load() == 0) {
+            write.store(true);
             return LockObj<true>(selfWeakPtr, Badge{});
         }
     }
@@ -58,8 +58,8 @@ UDPC::LockObj<true> UDPC::SharedSpinLock::spin_write_lock() {
 
 UDPC::LockObj<true> UDPC::SharedSpinLock::try_spin_write_lock() {
     std::lock_guard<std::mutex> lock(mutex);
-    if (!write && read == 0) {
-        write = true;
+    if (!write.load() && read.load() == 0) {
+        write.store(true);
         return LockObj<true>(selfWeakPtr, Badge{});
     }
     return LockObj<true>(Badge{});
@@ -68,7 +68,7 @@ UDPC::LockObj<true> UDPC::SharedSpinLock::try_spin_write_lock() {
 void UDPC::SharedSpinLock::write_unlock(UDPC::Badge &&badge) {
     if (badge.isValid) {
         std::lock_guard<std::mutex> lock(mutex);
-        write = false;
+        write.store(false);
         badge.isValid = false;
     }
 }
