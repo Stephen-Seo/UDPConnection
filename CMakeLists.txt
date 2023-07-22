@@ -5,7 +5,6 @@ set(UDPC_VERSION 1.0)
 
 set(UDPC_SOURCES
     src/UDPConnection.cpp
-    src/CXX11_shared_spin_lock.cpp
 )
 
 add_compile_options(
@@ -63,7 +62,6 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
     find_package(GTest QUIET)
     if(GTEST_FOUND)
         set(UDPC_UnitTest_SOURCES
-            src/CXX11_shared_spin_lock.cpp
             src/test/UDPC_UnitTest.cpp
             src/test/TestTSLQueue.cpp
             src/test/TestUDPC.cpp
