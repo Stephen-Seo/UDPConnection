@@ -143,7 +143,8 @@ TEST(TSLQueue, Iterator) {
         // test that lock is held by iterator
         EXPECT_FALSE(q.push_nb(10));
         op = q.top_nb();
-        EXPECT_FALSE(op);
+        // Getting top and iterator both hold read locks so this should be true.
+        EXPECT_TRUE(op);
 
         // backwards iteration
         EXPECT_TRUE(iter.prev());
@@ -175,6 +176,21 @@ TEST(TSLQueue, Iterator) {
         op = iter.current();
         EXPECT_TRUE(op);
         EXPECT_EQ(*op, 2);
+
+        // second iterator
+        auto iter2 = q.begin();
+
+        // Still should be able to get top.
+        EXPECT_TRUE(iter2.current());
+
+        // Shouldn't be able to remove if 2 iterators exist.
+        EXPECT_FALSE(iter2.try_remove());
+
+        // This will never return since the first iterator has a "read" lock.
+        //EXPECT_FALSE(iter2.remove());
+
+        // Still should be able to get top.
+        EXPECT_TRUE(iter2.current());
     }
     EXPECT_EQ(q.size(), 9);
 
