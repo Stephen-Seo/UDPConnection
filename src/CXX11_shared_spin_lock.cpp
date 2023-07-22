@@ -39,7 +39,7 @@ UDPC::LockObj<false> UDPC::SharedSpinLock::try_spin_read_lock() {
         ++read;
         return LockObj<false>(selfWeakPtr, Badge{});
     }
-    return LockObj<false>(Badge{});
+    return LockObj<false>{};
 }
 
 void UDPC::SharedSpinLock::read_unlock(UDPC::Badge &&badge) {
@@ -68,7 +68,7 @@ UDPC::LockObj<true> UDPC::SharedSpinLock::try_spin_write_lock() {
         write = true;
         return LockObj<true>(selfWeakPtr, Badge{});
     }
-    return LockObj<true>(Badge{});
+    return LockObj<true>{};
 }
 
 void UDPC::SharedSpinLock::write_unlock(UDPC::Badge &&badge) {
@@ -92,7 +92,7 @@ UDPC::LockObj<false> UDPC::SharedSpinLock::trade_write_for_read_lock(UDPC::LockO
             }
         }
     } else {
-        return LockObj<false>(Badge{});
+        return LockObj<false>{};
     }
 }
 
@@ -107,7 +107,7 @@ UDPC::LockObj<false> UDPC::SharedSpinLock::try_trade_write_for_read_lock(UDPC::L
             return LockObj<false>(selfWeakPtr, Badge{});
         }
     }
-    return LockObj<false>(Badge{});
+    return LockObj<false>{};
 }
 
 UDPC::LockObj<true> UDPC::SharedSpinLock::trade_read_for_write_lock(UDPC::LockObj<false> &lockObj) {
@@ -123,7 +123,7 @@ UDPC::LockObj<true> UDPC::SharedSpinLock::trade_read_for_write_lock(UDPC::LockOb
             }
         }
     } else {
-        return LockObj<true>(Badge{});
+        return LockObj<true>{};
     }
 }
 
@@ -138,5 +138,5 @@ UDPC::LockObj<true> UDPC::SharedSpinLock::try_trade_read_for_write_lock(UDPC::Lo
             return LockObj<true>(selfWeakPtr, Badge{});
         }
     }
-    return LockObj<true>(Badge{});
+    return LockObj<true>{};
 }
