@@ -10,6 +10,8 @@
 #include <list>
 #include <type_traits>
 
+#include "CXX11_shared_spin_lock.hpp"
+
 template <typename T>
 class TSLQueue {
   public:
@@ -62,7 +64,7 @@ class TSLQueue {
 
     class TSLQIter {
     public:
-        TSLQIter(std::mutex *mutex,
+        TSLQIter(UDPC::SharedSpinLock::Weak sharedSpinLockWeak,
                  std::weak_ptr<TSLQNode> currentNode,
                  unsigned long *msize);
         ~TSLQIter();
@@ -77,7 +79,8 @@ class TSLQueue {
         bool remove();
 
     private:
-        std::mutex *mutex;
+        UDPC::SharedSpinLock::Weak sharedSpinLockWeak;
+        UDPC::LockObj<false> readLock;
         std::weak_ptr<TSLQNode> currentNode;
         unsigned long *const msize;
 
@@ -87,7 +90,7 @@ class TSLQueue {
     TSLQIter begin();
 
   private:
-    std::mutex mutex;
+    UDPC::SharedSpinLock::Ptr sharedSpinLock;
     std::shared_ptr<TSLQNode> head;
     std::shared_ptr<TSLQNode> tail;
     unsigned long msize;
@@ -95,7 +98,7 @@ class TSLQueue {
 
 template <typename T>
 TSLQueue<T>::TSLQueue() :
-    mutex(),
+    sharedSpinLock(UDPC::SharedSpinLock::newInstance()),
     head(std::shared_ptr<TSLQNode>(new TSLQNode())),
     tail(std::shared_ptr<TSLQNode>(new TSLQNode())),
     msize(0)
@@ -121,8 +124,8 @@ TSLQueue<T>::TSLQueue(TSLQueue &&other)
 
 template <typename T>
 TSLQueue<T> & TSLQueue<T>::operator=(TSLQueue &&other) {
-    std::lock_guard<std::mutex> lock(mutex);
-    std::lock_guard<std::mutex> otherLock(other.mutex);
+    auto selfWriteLock = sharedSpinLock->spin_write_lock();
+    auto otherWriteLock = other.sharedSpinLock->spin_write_lock();
     head = std::move(other.head);
     tail = std::move(other.tail);
     msize = std::move(other.msize);
@@ -130,7 +133,7 @@ TSLQueue<T> & TSLQueue<T>::operator=(TSLQueue &&other) {
 
 template <typename T>
 void TSLQueue<T>::push(const T &data) {
-    std::lock_guard<std::mutex> lock(mutex);
+    auto writeLock = sharedSpinLock->spin_write_lock();
     auto newNode = std::shared_ptr<TSLQNode>(new TSLQNode());
     newNode->data = std::unique_ptr<T>(new T(data));
 
@@ -146,7 +149,8 @@ void TSLQueue<T>::push(const T &data) {
 
 template <typename T>
 bool TSLQueue<T>::push_nb(const T &data) {
-    if(mutex.try_lock()) {
+    auto writeLock = sharedSpinLock->try_spin_write_lock();
+    if(writeLock.isValid()) {
         auto newNode = std::shared_ptr<TSLQNode>(new TSLQNode());
         newNode->data = std::unique_ptr<T>(new T(data));
 
@@ -159,7 +163,6 @@ bool TSLQueue<T>::push_nb(const T &data) {
         tail->prev = newNode;
         ++msize;
 
-        mutex.unlock();
         return true;
     } else {
         return false;
@@ -168,7 +171,7 @@ bool TSLQueue<T>::push_nb(const T &data) {
 
 template <typename T>
 std::unique_ptr<T> TSLQueue<T>::top() {
-    std::lock_guard<std::mutex> lock(mutex);
+    auto readLock = sharedSpinLock->spin_read_lock();
     std::unique_ptr<T> result;
     if(head->next != tail) {
         assert(head->next->data);
@@ -181,20 +184,20 @@ std::unique_ptr<T> TSLQueue<T>::top() {
 template <typename T>
 std::unique_ptr<T> TSLQueue<T>::top_nb() {
     std::unique_ptr<T> result;
-    if(mutex.try_lock()) {
+    auto readLock = sharedSpinLock->try_spin_read_lock();
+    if(readLock.isValid()) {
         if(head->next != tail) {
             assert(head->next->data);
             result = std::unique_ptr<T>(new T);
             *result = *head->next->data;
         }
-        mutex.unlock();
     }
     return result;
 }
 
 template <typename T>
 bool TSLQueue<T>::pop() {
-    std::lock_guard<std::mutex> lock(mutex);
+    auto writeLock = sharedSpinLock->spin_write_lock();
     if(head->next == tail) {
         return false;
     } else {
@@ -211,7 +214,7 @@ bool TSLQueue<T>::pop() {
 template <typename T>
 std::unique_ptr<T> TSLQueue<T>::top_and_pop() {
     std::unique_ptr<T> result;
-    std::lock_guard<std::mutex> lock(mutex);
+    auto writeLock = sharedSpinLock->spin_write_lock();
     if(head->next != tail) {
         assert(head->next->data);
         result = std::unique_ptr<T>(new T);
@@ -229,7 +232,7 @@ std::unique_ptr<T> TSLQueue<T>::top_and_pop() {
 template <typename T>
 std::unique_ptr<T> TSLQueue<T>::top_and_pop_and_empty(bool *isEmpty) {
     std::unique_ptr<T> result;
-    std::lock_guard<std::mutex> lock(mutex);
+    auto writeLock = sharedSpinLock->spin_write_lock();
     if(head->next == tail) {
         if(isEmpty) {
             *isEmpty = true;
@@ -255,7 +258,7 @@ std::unique_ptr<T> TSLQueue<T>::top_and_pop_and_empty(bool *isEmpty) {
 template <typename T>
 std::unique_ptr<T> TSLQueue<T>::top_and_pop_and_rsize(unsigned long *rsize) {
     std::unique_ptr<T> result;
-    std::lock_guard<std::mutex> lock(mutex);
+    auto writeLock = sharedSpinLock->spin_write_lock();
     if(head->next == tail) {
         if(rsize) {
             *rsize = 0;
@@ -280,7 +283,7 @@ std::unique_ptr<T> TSLQueue<T>::top_and_pop_and_rsize(unsigned long *rsize) {
 
 template <typename T>
 void TSLQueue<T>::clear() {
-    std::lock_guard<std::mutex> lock(mutex);
+    auto writeLock = sharedSpinLock->spin_write_lock();
 
     head->next = tail;
     tail->prev = head;
@@ -289,13 +292,13 @@ void TSLQueue<T>::clear() {
 
 template <typename T>
 bool TSLQueue<T>::empty() {
-    std::lock_guard<std::mutex> lock(mutex);
+    auto readLock = sharedSpinLock->spin_read_lock();
     return head->next == tail;
 }
 
 template <typename T>
 unsigned long TSLQueue<T>::size() {
-    std::lock_guard<std::mutex> lock(mutex);
+    auto readLock = sharedSpinLock->spin_read_lock();
     return msize;
 }
 
@@ -313,20 +316,17 @@ bool TSLQueue<T>::TSLQNode::isNormal() const {
 }
 
 template <typename T>
-TSLQueue<T>::TSLQIter::TSLQIter(std::mutex *mutex,
+TSLQueue<T>::TSLQIter::TSLQIter(UDPC::SharedSpinLock::Weak lockWeak,
                                 std::weak_ptr<TSLQNode> currentNode,
                                 unsigned long *msize) :
-mutex(mutex),
+sharedSpinLockWeak(lockWeak),
+readLock(lockWeak.lock()->spin_read_lock()),
 currentNode(currentNode),
 msize(msize)
-{
-    mutex->lock();
-}
+{}
 
 template <typename T>
-TSLQueue<T>::TSLQIter::~TSLQIter() {
-    mutex->unlock();
-}
+TSLQueue<T>::TSLQIter::~TSLQIter() {}
 
 template <typename T>
 std::unique_ptr<T> TSLQueue<T>::TSLQIter::current() {
@@ -389,7 +389,7 @@ bool TSLQueue<T>::TSLQIter::remove() {
 
 template <typename T>
 typename TSLQueue<T>::TSLQIter TSLQueue<T>::begin() {
-    return TSLQIter(&mutex, head->next, &msize);
+    return TSLQIter(sharedSpinLock, head->next, &msize);
 }
 
 #endif

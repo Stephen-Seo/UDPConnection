@@ -143,7 +143,8 @@ TEST(TSLQueue, Iterator) {
         // test that lock is held by iterator
         EXPECT_FALSE(q.push_nb(10));
         op = q.top_nb();
-        EXPECT_FALSE(op);
+        // Getting top and iterator use the read lock, so this should be true.
+        EXPECT_TRUE(op);
 
         // backwards iteration
         EXPECT_TRUE(iter.prev());
