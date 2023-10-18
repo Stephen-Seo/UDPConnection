@@ -2,7 +2,6 @@
 #define UDPC_CXX11_SHARED_SPIN_LOCK_H_
 
 #include <memory>
-#include <mutex>
 #include <atomic>
 
 namespace UDPC {
@@ -75,9 +74,9 @@ public:
     SharedSpinLock(const SharedSpinLock&) = delete;
     SharedSpinLock& operator=(const SharedSpinLock&) = delete;
 
-    // Allow move.
-    SharedSpinLock(SharedSpinLock&&) = default;
-    SharedSpinLock& operator=(SharedSpinLock&&) = default;
+    // Disallow move.
+    SharedSpinLock(SharedSpinLock&&) = delete;
+    SharedSpinLock& operator=(SharedSpinLock&&) = delete;
 
     LockObj<false> spin_read_lock();
     LockObj<false> try_spin_read_lock();
@@ -97,7 +96,10 @@ private:
     SharedSpinLock();
 
     Weak selfWeakPtr;
-    std::mutex mutex;
+
+    /// Used to lock the read/write member variables.
+    volatile std::atomic_bool spinLock;
+
     unsigned int read;
     bool write;
 
