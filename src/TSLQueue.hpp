@@ -2,7 +2,6 @@
 #define UDPC_THREADSAFE_LINKEDLIST_QUEUE_HPP
 
 #include <memory>
-#include <mutex>
 #include <thread>
 #include <chrono>
 #include <optional>
@@ -118,9 +117,14 @@ TSLQueue<T>::~TSLQueue() {
 }
 
 template <typename T>
-TSLQueue<T>::TSLQueue(TSLQueue &&other)
+TSLQueue<T>::TSLQueue(TSLQueue &&other) :
+    sharedSpinLock(UDPC::SharedSpinLock::newInstance()),
+    head(std::shared_ptr<TSLQNode>(new TSLQNode())),
+    tail(std::shared_ptr<TSLQNode>(new TSLQNode())),
+    msize(0)
 {
-    std::lock_guard<std::mutex> lock(other.mutex);
+    auto selfWriteLock = sharedSpinLock->spin_write_lock();
+    auto otherWriteLock = other.sharedSpinLock->spin_write_lock();
     head = std::move(other.head);
     tail = std::move(other.tail);
     msize = std::move(other.msize);
