@@ -45,6 +45,8 @@ The source of `NetworkTest` can be found in `src/test/UDPC_NetworkTest.c`.
 
 [See the gh-pages generated Doxygen documentation here.](https://stephen-seo.github.io/UDPConnection/)
 
+[Alternatively, see the generated Doxygen documentation on my website.](https://seodisparate.com/udpc_docs)
+
 ## Compiling
 
 ### Release builds
