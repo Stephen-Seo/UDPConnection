@@ -27,7 +27,7 @@ UDPC::LockObj<false> UDPC::SharedSpinLock::spin_read_lock() {
     bool expected;
     while (true) {
         expected = false;
-        if(spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+        if(spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
             if (!write) {
                 ++read;
                 spinLock.store(false, std::memory_order_release);
@@ -43,7 +43,7 @@ UDPC::LockObj<false> UDPC::SharedSpinLock::try_spin_read_lock() {
     bool expected;
     while (true) {
         expected = false;
-        if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+        if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
             if (!write) {
                 ++read;
                 spinLock.store(false, std::memory_order_release);
@@ -62,7 +62,7 @@ void UDPC::SharedSpinLock::read_unlock(UDPC::Badge &&badge) {
         bool expected;
         while (true) {
             expected = false;
-            if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+            if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
                 if (read > 0) {
                     --read;
                     badge.isValid = false;
@@ -78,7 +78,7 @@ UDPC::LockObj<true> UDPC::SharedSpinLock::spin_write_lock() {
     bool expected;
     while (true) {
         expected = false;
-        if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+        if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
             if (!write && read == 0) {
                 write = true;
                 spinLock.store(false, std::memory_order_release);
@@ -94,7 +94,7 @@ UDPC::LockObj<true> UDPC::SharedSpinLock::try_spin_write_lock() {
     bool expected;
     while (true) {
         expected = false;
-        if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+        if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
             if (!write && read == 0) {
                 write = true;
                 spinLock.store(false, std::memory_order_release);
@@ -113,7 +113,7 @@ void UDPC::SharedSpinLock::write_unlock(UDPC::Badge &&badge) {
         bool expected;
         while(true) {
             expected = false;
-            if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+            if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
                 if (write) {
                     write = false;
                     badge.isValid = false;
@@ -130,7 +130,7 @@ UDPC::LockObj<false> UDPC::SharedSpinLock::trade_write_for_read_lock(UDPC::LockO
         bool expected;
         while (true) {
             expected = false;
-            if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+            if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
                 if (write && read == 0) {
                     read = 1;
                     write = false;
@@ -153,7 +153,7 @@ UDPC::LockObj<false> UDPC::SharedSpinLock::try_trade_write_for_read_lock(UDPC::L
         bool expected;
         while (true) {
             expected = false;
-            if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+            if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
                 if (write && read == 0) {
                     read = 1;
                     write = false;
@@ -176,7 +176,7 @@ UDPC::LockObj<true> UDPC::SharedSpinLock::trade_read_for_write_lock(UDPC::LockOb
         bool expected;
         while (true) {
             expected = false;
-            if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+            if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
                 if (!write && read == 1) {
                     read = 0;
                     write = true;
@@ -199,7 +199,7 @@ UDPC::LockObj<true> UDPC::SharedSpinLock::try_trade_read_for_write_lock(UDPC::Lo
         bool expected;
         while (true) {
             expected = false;
-            if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+            if (spinLock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
                 if (!write && read == 1) {
                     read = 0;
                     write = true;
