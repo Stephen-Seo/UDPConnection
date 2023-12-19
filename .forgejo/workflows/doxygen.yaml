@@ -8,6 +8,7 @@ jobs:
   doxygen-gen-and-publish:
     runs-on: archLinux
     steps:
-      - run: git clone https://git.seodisparate.com/stephenseo/UDPConnection.git UDPC
+      - run: git clone --depth=1 --no-single-branch https://git.seodisparate.com/stephenseo/UDPConnection.git UDPC
+      - run: cd UDPC && git checkout master
       - run: cd UDPC && doxygen
-      - run: rsync -rt --delete UDPC/doxygen_out/html/ /srv/http/udpc_docs/
+      - run: rsync -r --delete UDPC/doxygen_out/html/ /srv/http/udpc_docs/
