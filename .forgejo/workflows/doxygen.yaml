@@ -1,0 +1,13 @@
+name: Publish doxygen documentation to seodisparate.com
+on:
+  push:
+    branches:
+      - 'master'
+
+jobs:
+  doxygen-gen-and-publish:
+    runs-on: archLinux
+    steps:
+      - run: git clone https://git.seodisparate.com/stephenseo/UDPConnection.git UDPC
+      - run: cd UDPC && doxygen
+      - run: cp -r UDPC/doxygen_out/html/* /srv/http/udpc_docs/
