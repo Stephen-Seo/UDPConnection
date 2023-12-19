@@ -10,4 +10,4 @@ jobs:
     steps:
       - run: git clone https://git.seodisparate.com/stephenseo/UDPConnection.git UDPC
       - run: cd UDPC && doxygen
-      - run: cp -r UDPC/doxygen_out/html/* /srv/http/udpc_docs/
+      - run: rsync -rt --delete UDPC/doxygen_out/html/ /srv/http/udpc_docs/
