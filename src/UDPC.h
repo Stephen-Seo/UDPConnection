@@ -6,6 +6,9 @@
 /*!
  * \file UDPC.h
  * \brief Public API for UDPConnection
+ *
+ * Note that all functions are thread-safe unless mentioned otherwise in the
+ * function's documentation.
  */
 
 #ifndef UDPC_CONNECTION_H
@@ -861,8 +864,6 @@ UDPC_EXPORT const char *UDPC_atostr(UDPC_HContext ctx, UDPC_IPV6_ADDR_TYPE addr)
  * \warning The returned pointer must be freed with free(), or
  * UDPC_atostr_unsafe_free(), or UDPC_atostr_unsafe_free_ptr().
  *
- * This function is thread-safe.
- *
  * UDPC internally uses UDPC_atostr() for logging. This means that while UDPC
  * is running, a string created with UDPC_atostr() may be overwritten
  * eventually by UDPC. To avoid this situation, UDPC_atostr_unsafe() or
@@ -879,8 +880,6 @@ UDPC_EXPORT const char *UDPC_atostr_unsafe(UDPC_IPV6_ADDR_TYPE addr);
  * \warning The returned pointer must be freed with free(), or
  * UDPC_atostr_unsafe_free(), or UDPC_atostr_unsafe_free_ptr().
  *
- * This function is thread-safe.
- *
  * UDPC internally uses UDPC_atostr() for logging. This means that while UDPC
  * is running, a string created with UDPC_atostr() may be overwritten
  * eventually by UDPC. To avoid this situation, UDPC_atostr_unsafe() or
@@ -891,16 +890,12 @@ UDPC_EXPORT const char *UDPC_atostr_unsafe_cid(UDPC_ConnectionId cid);
 
 /*!
  * \brief Free an addr string created with UDPC_atostr_unsafe().
- *
- * This function is thread-safe.
  */
 UDPC_EXPORT void UDPC_atostr_unsafe_free(const char *addrBuf);
 
 /*!
  * \brief Free an addr string created with UDPC_atostr_unsafe() and zeroes the
  * pointer.
- *
- * This function is thread-safe.
  *
  * \code{.c}
  * UDPC_ConnectionId aConnectionId = ...;
