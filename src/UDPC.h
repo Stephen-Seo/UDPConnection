@@ -1,6 +1,9 @@
 /*!
  * \mainpage UDPConnection
  * \ref UDPC.h
+ *
+ * To use this library, it must be compiled. Only the \ref UDPC.h header is
+ * necessary as UDPC_Defines.hpp is only meant to be used internally by UDPC.
  */
 
 /*!
