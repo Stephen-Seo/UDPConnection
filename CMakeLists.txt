@@ -10,7 +10,7 @@ set(UDPC_SOURCES
 add_compile_options(
     -Wall -Wextra -Wpedantic -Wno-missing-braces
     $<$<COMPILE_LANGUAGE:CXX>:-Weffc++>
-    $<$<CONFIG:DEBUG>:-O0>
+    $<$<CONFIG:DEBUG>:-Og>
 )
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
