@@ -434,3 +434,29 @@ TEST(UDPC, free_packet_ptr) {
     UDPC_free_PacketInfo_ptr(&pinfo);
     UDPC_free_PacketInfo_ptr(nullptr);
 }
+
+TEST(UDPC, enableDisableThreadedUpdate_StressTest) {
+    UDPC_ConnectionId id = UDPC_create_id_anyaddr(0);
+    UDPC_HContext ctx = UDPC_init(id, 0, 0);
+
+    std::array<std::thread, 100> thread_array;
+    for (int i = 0; i < 100; ++i) {
+        if (i % 2 == 0) {
+            thread_array[i] = std::thread([] (UDPC_HContext ctx) {
+                UDPC_enable_threaded_update(ctx);
+            }, ctx);
+        } else {
+            thread_array[i] = std::thread([] (UDPC_HContext ctx) {
+                UDPC_disable_threaded_update(ctx);
+            }, ctx);
+        }
+    }
+
+    thread_array[0].join();
+
+    UDPC_destroy(ctx);
+
+    for (int i = 1; i < 100; ++i) {
+        thread_array[i].join();
+    }
+}

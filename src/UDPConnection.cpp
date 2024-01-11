@@ -2326,7 +2326,9 @@ void UDPC_destroy(UDPC_HContext ctx) {
         // After lock has been dropped, wait in case there are enable/disable
         // threaded update functions waiting on the lock. Do this via a
         // atomic-int-based spin-lock.
-        while(UDPC_ctx->enableDisableFuncRunningCount.load() != 0) {}
+        while(UDPC_ctx->enableDisableFuncRunningCount.load() != 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
         WSACleanup();
