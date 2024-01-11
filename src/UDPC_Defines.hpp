@@ -225,7 +225,7 @@ public:
 
     char recvBuf[UDPC_PACKET_MAX_SIZE];
     /*
-     * 0 - UNUSED
+     * 0 - is destucting
      * 1 - is client
      * 2 - libsodium enabled
      */
@@ -277,6 +277,7 @@ public:
     std::uint32_t atostrBufIndex;
 
     std::mutex setThreadedUpdateMutex;
+    std::atomic_uint32_t enableDisableFuncRunningCount;
 
 }; // struct Context
 

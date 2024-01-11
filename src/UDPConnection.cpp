@@ -258,7 +258,8 @@ threadedSleepTime(std::chrono::milliseconds(UDPC_UPDATE_MS_DEFAULT)),
 keysSet(),
 atostrBufIndexMutex(),
 atostrBufIndex(0),
-setThreadedUpdateMutex()
+setThreadedUpdateMutex(),
+enableDisableFuncRunningCount(0)
 {
     std::memset(atostrBuf, 0, UDPC_ATOSTR_SIZE);
 
@@ -267,6 +268,8 @@ setThreadedUpdateMutex()
     } else {
         isAutoUpdating.store(false);
     }
+
+    flags.reset(0);
 
     rng_engine.seed(std::chrono::system_clock::now().time_since_epoch().count());
 
@@ -2212,9 +2215,12 @@ int UDPC_enable_threaded_update(UDPC_HContext ctx) {
         return 0;
     }
 
+    c->enableDisableFuncRunningCount.fetch_add(1);
+
     std::lock_guard<std::mutex> setThreadedLock(c->setThreadedUpdateMutex);
 
-    if(c->isAutoUpdating.load() || c->thread.joinable()) {
+    if(c->flags.test(0) || c->isAutoUpdating.load() || c->thread.joinable()) {
+        c->enableDisableFuncRunningCount.fetch_sub(1);
         return 0;
     }
 
@@ -2224,6 +2230,9 @@ int UDPC_enable_threaded_update(UDPC_HContext ctx) {
     c->thread = std::thread(UDPC::threadedUpdate, c);
 
     UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_INFO, "Started threaded update");
+
+    c->enableDisableFuncRunningCount.fetch_sub(1);
+
     return 1;
 }
 
@@ -2233,9 +2242,12 @@ int UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS) {
         return 0;
     }
 
+    c->enableDisableFuncRunningCount.fetch_add(1);
+
     std::lock_guard<std::mutex> setThreadedLock(c->setThreadedUpdateMutex);
 
-    if(c->isAutoUpdating.load() || c->thread.joinable()) {
+    if(c->flags.test(0) || c->isAutoUpdating.load() || c->thread.joinable()) {
+        c->enableDisableFuncRunningCount.fetch_sub(1);
         return 0;
     }
 
@@ -2251,6 +2263,9 @@ int UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS) {
     c->thread = std::thread(UDPC::threadedUpdate, c);
 
     UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_INFO, "Started threaded update");
+
+    c->enableDisableFuncRunningCount.fetch_sub(1);
+
     return 1;
 }
 
@@ -2260,9 +2275,12 @@ int UDPC_disable_threaded_update(UDPC_HContext ctx) {
         return 0;
     }
 
+    c->enableDisableFuncRunningCount.fetch_add(1);
+
     std::lock_guard<std::mutex> setThreadedLock(c->setThreadedUpdateMutex);
 
-    if(!c->isAutoUpdating.load() || !c->thread.joinable()) {
+    if(c->flags.test(0) || !c->isAutoUpdating.load() || !c->thread.joinable()) {
+        c->enableDisableFuncRunningCount.fetch_sub(1);
         return 0;
     }
 
@@ -2271,6 +2289,9 @@ int UDPC_disable_threaded_update(UDPC_HContext ctx) {
     c->isAutoUpdating.store(false);
 
     UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_INFO, "Stopped threaded update");
+
+    c->enableDisableFuncRunningCount.fetch_sub(1);
+
     return 1;
 }
 
@@ -2281,11 +2302,31 @@ int UDPC_is_valid_context(UDPC_HContext ctx) {
 void UDPC_destroy(UDPC_HContext ctx) {
     UDPC::Context *UDPC_ctx = UDPC::verifyContext(ctx);
     if(UDPC_ctx) {
-        // stop thread if threaded
-        if(UDPC_ctx->isAutoUpdating.load()) {
+        {
+            // Acquire lock so that this code does not run at the same time as
+            // enabling/disabling threaded-update.
+            std::lock_guard<std::mutex>
+                setThreadedLock(UDPC_ctx->setThreadedUpdateMutex);
+
+            // Stop thread if threaded.
+            // Set atomic bool to false always so that the thread will always
+            // stop at this point.
             UDPC_ctx->threadRunning.store(false);
-            UDPC_ctx->thread.join();
+            if(UDPC_ctx->isAutoUpdating.load() && UDPC_ctx->thread.joinable()) {
+                UDPC_ctx->thread.join();
+            }
+            UDPC_ctx->isAutoUpdating.store(false);
+
+            // Set destructing flag.
+            UDPC_ctx->flags.set(0);
+
+            // Drop lock at this point before destructing the context.
         }
+
+        // After lock has been dropped, wait in case there are enable/disable
+        // threaded update functions waiting on the lock. Do this via a
+        // atomic-int-based spin-lock.
+        while(UDPC_ctx->enableDisableFuncRunningCount.load() != 0) {}
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
         WSACleanup();
