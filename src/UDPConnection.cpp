@@ -257,7 +257,8 @@ peerPKWhitelistMutex(),
 threadedSleepTime(std::chrono::milliseconds(UDPC_UPDATE_MS_DEFAULT)),
 keysSet(),
 atostrBufIndexMutex(),
-atostrBufIndex(0)
+atostrBufIndex(0),
+setThreadedUpdateMutex()
 {
     std::memset(atostrBuf, 0, UDPC_ATOSTR_SIZE);
 
@@ -2207,7 +2208,13 @@ UDPC_HContext UDPC_init_threaded_update_ms(
 
 int UDPC_enable_threaded_update(UDPC_HContext ctx) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
-    if(!c || c->isAutoUpdating.load() || c->thread.joinable()) {
+    if (!c) {
+        return 0;
+    }
+
+    std::lock_guard<std::mutex> setThreadedLock(c->setThreadedUpdateMutex);
+
+    if(c->isAutoUpdating.load() || c->thread.joinable()) {
         return 0;
     }
 
@@ -2222,7 +2229,13 @@ int UDPC_enable_threaded_update(UDPC_HContext ctx) {
 
 int UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
-    if(!c || c->isAutoUpdating.load() || c->thread.joinable()) {
+    if (!c) {
+        return 0;
+    }
+
+    std::lock_guard<std::mutex> setThreadedLock(c->setThreadedUpdateMutex);
+
+    if(c->isAutoUpdating.load() || c->thread.joinable()) {
         return 0;
     }
 
@@ -2243,7 +2256,13 @@ int UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS) {
 
 int UDPC_disable_threaded_update(UDPC_HContext ctx) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
-    if(!c || !c->isAutoUpdating.load() || !c->thread.joinable()) {
+    if (!c) {
+        return 0;
+    }
+
+    std::lock_guard<std::mutex> setThreadedLock(c->setThreadedUpdateMutex);
+
+    if(!c->isAutoUpdating.load() || !c->thread.joinable()) {
         return 0;
     }
 

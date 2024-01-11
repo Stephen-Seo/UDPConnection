@@ -276,6 +276,8 @@ public:
     std::mutex atostrBufIndexMutex;
     std::uint32_t atostrBufIndex;
 
+    std::mutex setThreadedUpdateMutex;
+
 }; // struct Context
 
 Context *verifyContext(UDPC_HContext ctx);
