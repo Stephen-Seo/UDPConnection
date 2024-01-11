@@ -222,6 +222,7 @@ _contextIdentifier(UDPC_CONTEXT_IDENTIFIER),
 flags(),
 isAcceptNewConnections(true),
 isReceivingEvents(false),
+isAutoUpdating(false),
 protocolID(UDPC_DEFAULT_PROTOCOL_ID),
 #ifndef NDEBUG
 loggingType(UDPC_DEBUG),
@@ -261,9 +262,9 @@ atostrBufIndex(0)
     std::memset(atostrBuf, 0, UDPC_ATOSTR_SIZE);
 
     if(isThreaded) {
-        flags.set(0);
+        isAutoUpdating.store(true);
     } else {
-        flags.reset(0);
+        isAutoUpdating.store(false);
     }
 
     rng_engine.seed(std::chrono::system_clock::now().time_since_epoch().count());
@@ -2171,7 +2172,7 @@ UDPC_HContext UDPC_init_threaded_update(UDPC_ConnectionId listenId,
         return nullptr;
     }
 
-    ctx->flags.set(0);
+    ctx->isAutoUpdating.store(true);
     ctx->threadedSleepTime = std::chrono::milliseconds(UDPC_UPDATE_MS_DEFAULT);
     ctx->thread = std::thread(UDPC::threadedUpdate, ctx);
 
@@ -2189,7 +2190,7 @@ UDPC_HContext UDPC_init_threaded_update_ms(
         return nullptr;
     }
 
-    ctx->flags.set(0);
+    ctx->isAutoUpdating.store(true);
     if(updateMS < UDPC_UPDATE_MS_MIN) {
         ctx->threadedSleepTime = std::chrono::milliseconds(UDPC_UPDATE_MS_MIN);
     } else if(updateMS > UDPC_UPDATE_MS_MAX) {
@@ -2206,11 +2207,11 @@ UDPC_HContext UDPC_init_threaded_update_ms(
 
 int UDPC_enable_threaded_update(UDPC_HContext ctx) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
-    if(!c || c->flags.test(0) || c->thread.joinable()) {
+    if(!c || c->isAutoUpdating.load() || c->thread.joinable()) {
         return 0;
     }
 
-    c->flags.set(0);
+    c->isAutoUpdating.store(true);
     c->threadedSleepTime = std::chrono::milliseconds(UDPC_UPDATE_MS_DEFAULT);
     c->threadRunning.store(true);
     c->thread = std::thread(UDPC::threadedUpdate, c);
@@ -2221,11 +2222,11 @@ int UDPC_enable_threaded_update(UDPC_HContext ctx) {
 
 int UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
-    if(!c || c->flags.test(0) || c->thread.joinable()) {
+    if(!c || c->isAutoUpdating.load() || c->thread.joinable()) {
         return 0;
     }
 
-    c->flags.set(0);
+    c->isAutoUpdating.store(true);
     if(updateMS < UDPC_UPDATE_MS_MIN) {
         c->threadedSleepTime = std::chrono::milliseconds(UDPC_UPDATE_MS_MIN);
     } else if(updateMS > UDPC_UPDATE_MS_MAX) {
@@ -2242,13 +2243,13 @@ int UDPC_enable_threaded_update_ms(UDPC_HContext ctx, int updateMS) {
 
 int UDPC_disable_threaded_update(UDPC_HContext ctx) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
-    if(!c || !c->flags.test(0) || !c->thread.joinable()) {
+    if(!c || !c->isAutoUpdating.load() || !c->thread.joinable()) {
         return 0;
     }
 
     c->threadRunning.store(false);
     c->thread.join();
-    c->flags.reset(0);
+    c->isAutoUpdating.store(false);
 
     UDPC_CHECK_LOG(c, UDPC_LoggingType::UDPC_INFO, "Stopped threaded update");
     return 1;
@@ -2262,7 +2263,7 @@ void UDPC_destroy(UDPC_HContext ctx) {
     UDPC::Context *UDPC_ctx = UDPC::verifyContext(ctx);
     if(UDPC_ctx) {
         // stop thread if threaded
-        if(UDPC_ctx->flags.test(0)) {
+        if(UDPC_ctx->isAutoUpdating.load()) {
             UDPC_ctx->threadRunning.store(false);
             UDPC_ctx->thread.join();
         }
@@ -2277,7 +2278,7 @@ void UDPC_destroy(UDPC_HContext ctx) {
 
 void UDPC_update(UDPC_HContext ctx) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
-    if(!c || c->flags.test(0)) {
+    if(!c || c->isAutoUpdating.load()) {
         // invalid or is threaded, update should not be called
         return;
     }

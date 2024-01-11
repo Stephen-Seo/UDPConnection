@@ -225,13 +225,14 @@ public:
 
     char recvBuf[UDPC_PACKET_MAX_SIZE];
     /*
-     * 0 - is threaded
+     * 0 - UNUSED
      * 1 - is client
      * 2 - libsodium enabled
      */
     std::bitset<8> flags;
     std::atomic_bool isAcceptNewConnections;
     std::atomic_bool isReceivingEvents;
+    std::atomic_bool isAutoUpdating;
     std::atomic_uint32_t protocolID;
     std::atomic_uint_fast8_t loggingType;
     // See UDPC_AuthPolicy enum in UDPC.h for possible values
