@@ -67,6 +67,7 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
             src/test/UDPC_UnitTest.cpp
             src/test/TestTSLQueue.cpp
             src/test/TestUDPC.cpp
+            src/test/TestSharedSpinLock.cpp
         )
         add_executable(UnitTest ${UDPC_UnitTest_SOURCES})
         target_compile_features(UnitTest PUBLIC cxx_std_11)
