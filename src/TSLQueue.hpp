@@ -72,6 +72,10 @@ class TSLQueue {
         TSLQIter(const TSLQIter &) = delete;
         TSLQIter& operator=(const TSLQIter &) = delete;
 
+        // Allow move.
+        TSLQIter(TSLQIter &&) = default;
+        TSLQIter& operator=(TSLQIter &&) = default;
+
         std::unique_ptr<T> current();
         bool next();
         bool prev();
