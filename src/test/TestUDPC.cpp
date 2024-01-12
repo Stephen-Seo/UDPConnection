@@ -439,6 +439,8 @@ TEST(UDPC, enableDisableThreadedUpdate_StressTest) {
     UDPC_ConnectionId id = UDPC_create_id_anyaddr(0);
     UDPC_HContext ctx = UDPC_init(id, 0, 0);
 
+    UDPC_set_logging_type(ctx, UDPC_LoggingType::UDPC_WARNING);
+
     std::array<std::thread, 100> thread_array;
     for (int i = 0; i < 100; ++i) {
         if (i % 2 == 0) {
