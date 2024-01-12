@@ -1,0 +1,14 @@
+name: Run UnitTests
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  build-and-run-tests:
+    runs-on: archLinux
+    steps:
+      - run: git clone --depth=1 --no-single-branch https://git.seodisparate.com/stephenseo/UDPConnection.git UDPC
+      - run: cd UDPC && git checkout $GITHUB_REF_NAME
+      - run: cd UDPC && cmake -S . -B buildDebug -DCMAKE_BUILD_TYPE=Debug
+      - run: make -C UDPC/buildDebug && ./UDPC/buildDebug/UnitTest
