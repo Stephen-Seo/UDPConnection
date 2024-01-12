@@ -323,6 +323,12 @@ UDPC_EXPORT UDPC_ConnectionId UDPC_create_id_hostname(const char *hostname, uint
  *
  * \warning The received UDPC_HContext must be freed with a call to UDPC_destroy().
  *
+ * \note This function creates a context that does not use a separate thread to
+ * call update periodically. You must call \ref UDPC_update() periodically,
+ * enable threaded update with \ref UDPC_enable_threaded_update or \ref
+ * UDPC_enable_threaded_update_ms, or use \ref UDPC_init_threaded_update or
+ * \ref UDPC_init_threaded_update_ms instead of \ref UDPC_init .
+ *
  * \return A UDPC context
  */
 UDPC_EXPORT UDPC_HContext UDPC_init(UDPC_ConnectionId listenId, int isClient, int isUsingLibsodium);
