@@ -1451,6 +1451,7 @@ Variables</h2></td></tr>
 </dl>
 <p><a class="el" href="UDPC_8h.html#ac01480f803b063e2b44794420df0f671" title="Checks if the given UDPC_HContext is valid (successfully initialized)">UDPC_is_valid_context()</a> may be used to check if the context was successfully created.</p>
 <dl class="section warning"><dt>Warning</dt><dd>The received UDPC_HContext must be freed with a call to <a class="el" href="UDPC_8h.html#aad0e88866d4c5cb9c0676bc8d7df574e" title="Cleans up the UDPC_HContext.">UDPC_destroy()</a>.</dd></dl>
+<dl class="section note"><dt>Note</dt><dd>This function creates a context that does not use a separate thread to call update periodically. You must call <a class="el" href="UDPC_8h.html#a68fefba9edca7cd0a81d97ac27c70c0b">UDPC_update()</a> periodically, enable threaded update with <a class="el" href="UDPC_8h.html#a0fafce547e9185c29f42d06213b0ff4f">UDPC_enable_threaded_update</a> or <a class="el" href="UDPC_8h.html#a1a50763773d55aa7a2a9c7ad69575833">UDPC_enable_threaded_update_ms</a>, or use <a class="el" href="UDPC_8h.html#a614e2a058b89839d53fe9d348a058323">UDPC_init_threaded_update</a> or <a class="el" href="UDPC_8h.html#ab9a5258877ad3084f7d29954be525bd6">UDPC_init_threaded_update_ms</a> instead of <a class="el" href="UDPC_8h.html#a89dee65fcd5b70d25abbf6d4a3ee59f2">UDPC_init</a> .</dd></dl>
 <dl class="section return"><dt>Returns</dt><dd>A UDPC context </dd></dl>
 
 </div>
