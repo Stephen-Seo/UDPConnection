@@ -74,9 +74,9 @@ public:
     SharedSpinLock(const SharedSpinLock&) = delete;
     SharedSpinLock& operator=(const SharedSpinLock&) = delete;
 
-    // Disallow move.
-    SharedSpinLock(SharedSpinLock&&) = delete;
-    SharedSpinLock& operator=(SharedSpinLock&&) = delete;
+    // Enable move.
+    SharedSpinLock(SharedSpinLock&&) = default;
+    SharedSpinLock& operator=(SharedSpinLock&&) = default;
 
     LockObj<false> spin_read_lock();
     LockObj<false> try_spin_read_lock();
@@ -98,7 +98,7 @@ private:
     Weak selfWeakPtr;
 
     /// Used to lock the read/write member variables.
-    volatile std::atomic_bool spinLock;
+    std::atomic_bool spinLock;
 
     unsigned int read;
     bool write;
