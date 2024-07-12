@@ -73,8 +73,7 @@ and is also an example of using the library in a C program.
 
 NetworkTest only builds when CMAKE\_BUILD\_TYPE is Debug (default).
 
-UnitTest only builds in Debug mode and if GTest (a unit testing framework) is
-available.
+UnitTest only builds in Debug mode.
 
 # Links
 https://github.com/Stephen-Seo/UDPConnection  

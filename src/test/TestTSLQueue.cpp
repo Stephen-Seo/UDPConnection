@@ -1,276 +1,286 @@
-#include <gtest/gtest.h>
+#include "test_helpers.h"
+#include "test_headers.h"
 
 #include <future>
 #include <functional>
 
 #include "TSLQueue.hpp"
 
-TEST(TSLQueue, PushTopPopSize) {
-    TSLQueue<int> q;
-
-    EXPECT_FALSE(q.top());
-
-    for(int i = 0; i < 10; ++i) {
-        EXPECT_EQ(i, q.size());
-        q.push(i);
-    }
-
-    for(int i = 0; i < 10; ++i) {
-        auto v = q.top();
-        ASSERT_TRUE(v);
-        EXPECT_EQ(*v, i);
-        EXPECT_EQ(10 - i, q.size());
-        EXPECT_TRUE(q.pop());
-    }
-    EXPECT_EQ(q.size(), 0);
-
-    EXPECT_FALSE(q.pop());
-}
-
-TEST(TSLQueue, PushNB_TopNB_TopAndPop_Size) {
-    TSLQueue<int> q;
-
-    for(int i = 0; i < 10; ++i) {
-        EXPECT_EQ(q.size(), i);
-        EXPECT_TRUE(q.push_nb(i));
-    }
-
-    for(int i = 0; i < 10; ++i) {
-        auto v = q.top_nb();
-        ASSERT_TRUE(v);
-        EXPECT_EQ(*v, i);
-        EXPECT_EQ(q.size(), 10 - i);
-        v = q.top_and_pop();
-        ASSERT_TRUE(v);
-        EXPECT_EQ(*v, i);
-    }
-
+void TEST_TSLQueue() {
+    // PushTopPopSize
     {
-        auto v = q.top_nb();
-        ASSERT_FALSE(v);
+        TSLQueue<int> q;
+
+        CHECK_FALSE(q.top());
+
+        for(int i = 0; i < 10; ++i) {
+            CHECK_EQ(i, q.size());
+            q.push(i);
+        }
+
+        for(int i = 0; i < 10; ++i) {
+            auto v = q.top();
+            ASSERT_TRUE(v);
+            CHECK_EQ(*v, i);
+            CHECK_EQ(10 - i, q.size());
+            CHECK_TRUE(q.pop());
+        }
+        CHECK_EQ(q.size(), 0);
+
+        CHECK_FALSE(q.pop());
     }
+
+    // PushNB_TopNB_TopAndPop_Size
     {
-        auto v = q.top_and_pop();
-        ASSERT_FALSE(v);
-    }
-    EXPECT_EQ(q.size(), 0);
-}
+        TSLQueue<int> q;
 
-TEST(TSLQueue, Push_TopAndPopAndEmpty_Size) {
-    TSLQueue<int> q;
+        for(int i = 0; i < 10; ++i) {
+            CHECK_EQ(q.size(), i);
+            CHECK_TRUE(q.push_nb(i));
+        }
 
-    for(int i = 0; i < 10; ++i) {
-        EXPECT_EQ(q.size(), i);
-        q.push(i);
-    }
+        for(int i = 0; i < 10; ++i) {
+            auto v = q.top_nb();
+            ASSERT_TRUE(v);
+            CHECK_EQ(*v, i);
+            CHECK_EQ(q.size(), 10 - i);
+            v = q.top_and_pop();
+            ASSERT_TRUE(v);
+            CHECK_EQ(*v, i);
+        }
 
-    bool isEmpty;
-    for(int i = 0; i < 10; ++i) {
-        EXPECT_EQ(q.size(), 10 - i);
-        auto v = q.top_and_pop_and_empty(&isEmpty);
-        ASSERT_TRUE(v);
-        EXPECT_EQ(*v, i);
-        EXPECT_EQ(i == 9, isEmpty);
-    }
-    EXPECT_EQ(q.size(), 0);
-}
-
-TEST(TSLQueue, PushClearEmptySize) {
-    TSLQueue<int> q;
-
-    for(int i = 0; i < 10; ++i) {
-        EXPECT_EQ(q.size(), i);
-        q.push(i);
-    }
-    EXPECT_EQ(q.size(), 10);
-
-    EXPECT_FALSE(q.empty());
-    q.clear();
-    EXPECT_TRUE(q.empty());
-    EXPECT_EQ(q.size(), 0);
-}
-
-TEST(TSLQueue, Concurrent) {
-    TSLQueue<int> q;
-
-    const auto add_fn = [] (TSLQueue<int> *q, int i) -> void {
-        q->push(i);
-    };
-
-    std::future<void> futures[100];
-    for(int i = 0; i < 100; ++i) {
-        futures[i] = std::async(std::launch::async, add_fn, &q, i);
-    }
-    for(int i = 0; i < 100; ++i) {
-        futures[i].wait();
+        {
+            auto v = q.top_nb();
+            ASSERT_FALSE(v);
+        }
+        {
+            auto v = q.top_and_pop();
+            ASSERT_FALSE(v);
+        }
+        CHECK_EQ(q.size(), 0);
     }
 
-    EXPECT_FALSE(q.empty());
-    for(int i = 0; i < 100; ++i) {
-        EXPECT_EQ(q.size(), 100 - i);
-        auto v = q.top_and_pop();
-        ASSERT_TRUE(v);
-        EXPECT_GE(*v, 0);
-        EXPECT_LE(*v, 100);
-        EXPECT_EQ(i == 99, q.empty());
-    }
-    EXPECT_EQ(q.size(), 0);
-}
-
-TEST(TSLQueue, Iterator) {
-    TSLQueue<int> q;
-
-    for(int i = 0; i < 10; ++i) {
-        q.push(i);
-    }
-    EXPECT_EQ(q.size(), 10);
-
+    // Push_TopAndPopAndEmpty_Size
     {
-        // iteration
-        auto iter = q.begin();
+        TSLQueue<int> q;
+
+        for(int i = 0; i < 10; ++i) {
+            CHECK_EQ(q.size(), i);
+            q.push(i);
+        }
+
+        bool isEmpty;
+        for(int i = 0; i < 10; ++i) {
+            CHECK_EQ(q.size(), 10 - i);
+            auto v = q.top_and_pop_and_empty(&isEmpty);
+            ASSERT_TRUE(v);
+            CHECK_EQ(*v, i);
+            CHECK_EQ(i == 9, isEmpty);
+        }
+        CHECK_EQ(q.size(), 0);
+    }
+
+    // PushClearEmptySize
+    {
+        TSLQueue<int> q;
+
+        for(int i = 0; i < 10; ++i) {
+            CHECK_EQ(q.size(), i);
+            q.push(i);
+        }
+        CHECK_EQ(q.size(), 10);
+
+        CHECK_FALSE(q.empty());
+        q.clear();
+        CHECK_TRUE(q.empty());
+        CHECK_EQ(q.size(), 0);
+    }
+
+    // Concurrent
+    {
+        TSLQueue<int> q;
+
+        const auto add_fn = [] (TSLQueue<int> *q, int i) -> void {
+            q->push(i);
+        };
+
+        std::future<void> futures[100];
+        for(int i = 0; i < 100; ++i) {
+            futures[i] = std::async(std::launch::async, add_fn, &q, i);
+        }
+        for(int i = 0; i < 100; ++i) {
+            futures[i].wait();
+        }
+
+        CHECK_FALSE(q.empty());
+        for(int i = 0; i < 100; ++i) {
+            CHECK_EQ(q.size(), 100 - i);
+            auto v = q.top_and_pop();
+            ASSERT_TRUE(v);
+            CHECK_GE(*v, 0);
+            CHECK_LE(*v, 100);
+            CHECK_EQ(i == 99, q.empty());
+        }
+        CHECK_EQ(q.size(), 0);
+    }
+
+    // Iterator
+    {
+        TSLQueue<int> q;
+
+        for(int i = 0; i < 10; ++i) {
+            q.push(i);
+        }
+        CHECK_EQ(q.size(), 10);
+
+        {
+            // iteration
+            auto iter = q.begin();
+            int i = 0;
+            auto op = iter.current();
+            while(op) {
+                CHECK_EQ(*op, i++);
+                if(i < 10) {
+                    CHECK_TRUE(iter.next());
+                } else {
+                    CHECK_FALSE(iter.next());
+                }
+                op = iter.current();
+            }
+
+            // test that lock is held by iterator
+            CHECK_FALSE(q.push_nb(10));
+            op = q.top_nb();
+            // Getting top and iterator both hold read locks so this should be true.
+            CHECK_TRUE(op);
+
+            // backwards iteration
+            CHECK_TRUE(iter.prev());
+            op = iter.current();
+            while(op) {
+                CHECK_EQ(*op, --i);
+                if(i > 0) {
+                    CHECK_TRUE(iter.prev());
+                } else {
+                    CHECK_FALSE(iter.prev());
+                }
+                op = iter.current();
+            }
+        }
+
+        {
+            // iter remove
+            auto iter = q.begin();
+            CHECK_TRUE(iter.next());
+            CHECK_TRUE(iter.next());
+            CHECK_TRUE(iter.next());
+            CHECK_TRUE(iter.remove());
+
+            auto op = iter.current();
+            CHECK_TRUE(op);
+            CHECK_EQ(*op, 4);
+
+            CHECK_TRUE(iter.prev());
+            op = iter.current();
+            CHECK_TRUE(op);
+            CHECK_EQ(*op, 2);
+
+            // second iterator
+            auto iter2 = q.begin();
+
+            // Still should be able to get top.
+            CHECK_TRUE(iter2.current());
+
+            // Shouldn't be able to remove if 2 iterators exist.
+            CHECK_FALSE(iter2.try_remove());
+
+            // This will never return since the first iterator has a "read" lock.
+            //CHECK_FALSE(iter2.remove());
+
+            // Still should be able to get top.
+            CHECK_TRUE(iter2.current());
+        }
+        CHECK_EQ(q.size(), 9);
+
+        // check that "3" was removed from queue
         int i = 0;
-        auto op = iter.current();
-        while(op) {
-            EXPECT_EQ(*op, i++);
-            if(i < 10) {
-                EXPECT_TRUE(iter.next());
-            } else {
-                EXPECT_FALSE(iter.next());
+        std::unique_ptr<int> op;
+        while(!q.empty()) {
+            op = q.top();
+            CHECK_TRUE(op);
+            CHECK_EQ(i++, *op);
+            if(i == 3) {
+                ++i;
             }
-            op = iter.current();
+            CHECK_TRUE(q.pop());
         }
 
-        // test that lock is held by iterator
-        EXPECT_FALSE(q.push_nb(10));
-        op = q.top_nb();
-        // Getting top and iterator both hold read locks so this should be true.
-        EXPECT_TRUE(op);
+        // remove from start
+        q.push(0);
+        q.push(1);
+        q.push(2);
+        q.push(3);
+        CHECK_EQ(q.size(), 4);
+        {
+            auto iter = q.begin();
+            CHECK_TRUE(iter.remove());
+        }
+        CHECK_EQ(q.size(), 3);
+        i = 1;
+        while(!q.empty()) {
+            op = q.top();
+            CHECK_TRUE(op);
+            CHECK_EQ(i++, *op);
+            CHECK_TRUE(q.pop());
+        }
 
-        // backwards iteration
-        EXPECT_TRUE(iter.prev());
-        op = iter.current();
-        while(op) {
-            EXPECT_EQ(*op, --i);
-            if(i > 0) {
-                EXPECT_TRUE(iter.prev());
-            } else {
-                EXPECT_FALSE(iter.prev());
+        // remove from end
+        q.push(0);
+        q.push(1);
+        q.push(2);
+        q.push(3);
+        CHECK_EQ(q.size(), 4);
+        {
+            auto iter = q.begin();
+            while(true) {
+                CHECK_TRUE(iter.next());
+                op = iter.current();
+                CHECK_TRUE(op);
+                if(*op == 3) {
+                    CHECK_FALSE(iter.remove());
+                    break;
+                }
             }
-            op = iter.current();
         }
-    }
-
-    {
-        // iter remove
-        auto iter = q.begin();
-        EXPECT_TRUE(iter.next());
-        EXPECT_TRUE(iter.next());
-        EXPECT_TRUE(iter.next());
-        EXPECT_TRUE(iter.remove());
-
-        auto op = iter.current();
-        EXPECT_TRUE(op);
-        EXPECT_EQ(*op, 4);
-
-        EXPECT_TRUE(iter.prev());
-        op = iter.current();
-        EXPECT_TRUE(op);
-        EXPECT_EQ(*op, 2);
-
-        // second iterator
-        auto iter2 = q.begin();
-
-        // Still should be able to get top.
-        EXPECT_TRUE(iter2.current());
-
-        // Shouldn't be able to remove if 2 iterators exist.
-        EXPECT_FALSE(iter2.try_remove());
-
-        // This will never return since the first iterator has a "read" lock.
-        //EXPECT_FALSE(iter2.remove());
-
-        // Still should be able to get top.
-        EXPECT_TRUE(iter2.current());
-    }
-    EXPECT_EQ(q.size(), 9);
-
-    // check that "3" was removed from queue
-    int i = 0;
-    std::unique_ptr<int> op;
-    while(!q.empty()) {
-        op = q.top();
-        EXPECT_TRUE(op);
-        EXPECT_EQ(i++, *op);
-        if(i == 3) {
-            ++i;
-        }
-        EXPECT_TRUE(q.pop());
-    }
-
-    // remove from start
-    q.push(0);
-    q.push(1);
-    q.push(2);
-    q.push(3);
-    EXPECT_EQ(q.size(), 4);
-    {
-        auto iter = q.begin();
-        EXPECT_TRUE(iter.remove());
-    }
-    EXPECT_EQ(q.size(), 3);
-    i = 1;
-    while(!q.empty()) {
-        op = q.top();
-        EXPECT_TRUE(op);
-        EXPECT_EQ(i++, *op);
-        EXPECT_TRUE(q.pop());
-    }
-
-    // remove from end
-    q.push(0);
-    q.push(1);
-    q.push(2);
-    q.push(3);
-    EXPECT_EQ(q.size(), 4);
-    {
-        auto iter = q.begin();
-        while(true) {
-            EXPECT_TRUE(iter.next());
-            op = iter.current();
-            EXPECT_TRUE(op);
-            if(*op == 3) {
-                EXPECT_FALSE(iter.remove());
-                break;
+        CHECK_EQ(q.size(), 3);
+        i = 0;
+        while(!q.empty()) {
+            op = q.top();
+            CHECK_TRUE(op);
+            CHECK_EQ(i++, *op);
+            CHECK_TRUE(q.pop());
+            if(i == 3) {
+                CHECK_TRUE(q.empty());
             }
         }
     }
-    EXPECT_EQ(q.size(), 3);
-    i = 0;
-    while(!q.empty()) {
-        op = q.top();
-        EXPECT_TRUE(op);
-        EXPECT_EQ(i++, *op);
-        EXPECT_TRUE(q.pop());
-        if(i == 3) {
-            EXPECT_TRUE(q.empty());
-        }
+
+    // TempToNew
+    {
+        TSLQueue<int> q;
+
+        q.push(1234);
+        q.push(5678);
+
+        auto getValue = [] (TSLQueue<int> *q) -> int {
+            auto uptr = q->top_and_pop();
+            return *uptr;
+        };
+        int value;
+
+        value = getValue(&q);
+        CHECK_EQ(1234, value);
+        value = getValue(&q);
+        CHECK_EQ(5678, value);
     }
-}
-
-TEST(TSLQueue, TempToNew) {
-    TSLQueue<int> q;
-
-    q.push(1234);
-    q.push(5678);
-
-    auto getValue = [] (TSLQueue<int> *q) -> int {
-        auto uptr = q->top_and_pop();
-        return *uptr;
-    };
-    int value;
-
-    value = getValue(&q);
-    EXPECT_EQ(1234, value);
-    value = getValue(&q);
-    EXPECT_EQ(5678, value);
 }

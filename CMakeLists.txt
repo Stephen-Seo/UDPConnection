@@ -59,21 +59,18 @@ else()
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
-
-    find_package(GTest QUIET)
-    if(GTEST_FOUND)
-        set(UDPC_UnitTest_SOURCES
-            src/CXX11_shared_spin_lock.cpp
-            src/test/UDPC_UnitTest.cpp
-            src/test/TestTSLQueue.cpp
-            src/test/TestUDPC.cpp
-            src/test/TestSharedSpinLock.cpp
-        )
-        add_executable(UnitTest ${UDPC_UnitTest_SOURCES})
-        target_compile_features(UnitTest PUBLIC cxx_std_11)
-        target_link_libraries(UnitTest PUBLIC UDPC ${GTEST_BOTH_LIBRARIES})
-        target_include_directories(UnitTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-    endif()
+    set(UDPC_UnitTest_SOURCES
+        src/CXX11_shared_spin_lock.cpp
+        src/test/UDPC_UnitTest.cpp
+        src/test/TestTSLQueue.cpp
+        src/test/TestUDPC.cpp
+        src/test/TestSharedSpinLock.cpp
+    )
+    add_executable(UnitTest ${UDPC_UnitTest_SOURCES})
+    target_compile_features(UnitTest PUBLIC cxx_std_11)
+    target_link_libraries(UnitTest PUBLIC UDPC)
+    target_include_directories(UnitTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_compile_options(UnitTest PRIVATE "-Wno-sign-compare")
 
     set(UDPC_NetworkTest_SOURCES
         src/test/UDPC_NetworkTest.c)

@@ -1,18 +1,18 @@
-#include <gtest/gtest.h>
-
 #include "CXX11_shared_spin_lock.hpp"
+#include "test_helpers.h"
+#include "test_headers.h"
 
-TEST(CXX11_shared_spin_lock, simple) {
+void TEST_CXX11_shared_spin_lock() {
     UDPC::SharedSpinLock::Ptr spinLockPtr = UDPC::SharedSpinLock::newInstance();
 
     auto readLock = spinLockPtr->spin_read_lock();
-    EXPECT_TRUE(readLock.isValid());
-    EXPECT_TRUE(spinLockPtr->spin_read_lock().isValid());
-    EXPECT_FALSE(spinLockPtr->try_spin_write_lock().isValid());
+    CHECK_TRUE(readLock.isValid());
+    CHECK_TRUE(spinLockPtr->spin_read_lock().isValid());
+    CHECK_FALSE(spinLockPtr->try_spin_write_lock().isValid());
 
     auto writeLock = spinLockPtr->trade_read_for_write_lock(readLock);
-    EXPECT_TRUE(writeLock.isValid());
-    EXPECT_FALSE(readLock.isValid());
-    EXPECT_FALSE(spinLockPtr->try_spin_read_lock().isValid());
-    EXPECT_FALSE(spinLockPtr->try_spin_write_lock().isValid());
+    CHECK_TRUE(writeLock.isValid());
+    CHECK_FALSE(readLock.isValid());
+    CHECK_FALSE(spinLockPtr->try_spin_read_lock().isValid());
+    CHECK_FALSE(spinLockPtr->try_spin_write_lock().isValid());
 }
