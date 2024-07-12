@@ -9,10 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install dependencies
-        run: sudo /usr/bin/env DEBIAN_FRONTEND=noninteractive apt-get install cmake git libsodium-dev
+        run: sudo /usr/bin/env DEBIAN_FRONTEND=noninteractive apt-get install cmake git python3
       - name: Get sources
         run: git clone --depth=1 --no-single-branch https://github.com/Stephen-Seo/UDPConnection.git UDPC && cd UDPC && git checkout $GITHUB_REF_NAME
-      - name: Build sources
-        run: cd UDPC && cmake -S . -B buildDebug -DCMAKE_BUILD_TYPE=Debug && make -C buildDebug
+      - name: Get Conan
+        run: python -m venv venv_conan && source venv_conan/bin/activate && pip install conan
+      - name: Set up conan
+        run: source venv_conan/bin/activate && conan profile detect --force
+      - name: Build with conan
+        run: source venv_conan/bin/activate && conan build UDPC -of buildConan --settings=build_type=Debug --build=missing
       - name: Run tests
-        run: ./UDPC/buildDebug/UnitTest
+        run: find buildConan -name UnitTest -execdir './{}' ';'
