@@ -84,3 +84,10 @@ https://git.seodisparate.com/stephenseo/UDPConnection
 # Other Notes
 
 Inspired by [a series of blog posts about networking for games.](https://gafferongames.com/categories/game-networking/)
+
+## Conan
+
+conan packages of this library are [available here](https://git.seodisparate.com/stephenseo/-/packages/conan/udpc/versions).
+
+The `conan` branch contains the necessary changes to publish this library as a
+conan package. Expect the `conan` branch to rebase on `master` in the future.
