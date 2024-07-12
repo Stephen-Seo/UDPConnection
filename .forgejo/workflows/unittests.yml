@@ -6,9 +6,23 @@ on:
 
 jobs:
   build-and-run-tests:
-    runs-on: any_archLinux
+    runs-on: docker_arch
     steps:
+      - run: pacman-key --init && pacman-key --populate
+        name: Init pacman keyring
+      - run: pacman --noconfirm --needed -Sy archlinux-keyring
+        name: Update pacman keyring
+      - run: pacman --noconfirm --needed -Su git cmake libsodium python
+        name: Update and get dependencies
+      - run: python -m venv conan_venv && source conan_venv/bin/activate && pip install conan
+        name: Get conan
+      - run: source conan_venv/bin/activate && conan profile detect --force
+        name: Set up conan profile
       - run: git clone --depth=1 --no-single-branch https://git.seodisparate.com/stephenseo/UDPConnection.git UDPC
+        name: Get repository
       - run: cd UDPC && git checkout $GITHUB_REF_NAME
-      - run: cd UDPC && cmake -S . -B buildDebug -DCMAKE_BUILD_TYPE=Debug
-      - run: make -C UDPC/buildDebug && ./UDPC/buildDebug/UnitTest
+        name: Checkout git repository
+      - run: source conan_venv/bin/activate && conan build UDPC -of buildConan --settings=build_type=Debug --build=missing
+        name: Build with conan
+      - run: find buildConan -name UnitTest -execdir './{}' ';'
+        name: Test
