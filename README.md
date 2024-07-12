@@ -1,5 +1,7 @@
 # UDPConnection
 
+[C++ conan package](https://git.seodisparate.com/stephenseo/-/packages/conan/udpc/versions)
+
 Provides a network connection over UDP, with verification of packet support via
 libsodium (optional). Implemented in C++ (up to C++11 standard), but is
 available via a C api, which should facilitate creating bindings for other
