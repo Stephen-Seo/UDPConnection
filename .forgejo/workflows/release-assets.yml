@@ -23,7 +23,8 @@ jobs:
           -d "{
           \"name\": \"UDPC version ${GITHUB_REF_NAME}\",
           \"tag_name\": \"${GITHUB_REF_NAME}\",
-          \"body\": \"Warning: Static libs require linking with C++ linker (and libsodium)!
+          \"body\": \"Warning: Static libs require linking with C++ linker or linking with stdc++ (`-lstdc++`)!
+          Warning: Will need to link with libsodium!
 
               SHA256SUMS\"
           }" >&/dev/null
@@ -34,6 +35,8 @@ jobs:
     env:
       SHARED_LIB_ASSET_NAME: "udpc_${{ github.ref_name }}_shared.tar.zst"
       STATIC_LIB_ASSET_NAME: "udpc_${{ github.ref_name }}_static.tar.zst"
+      SHARED_NOLIBSODIUM_LIB_ASSET_NAME: "udpc_${{ github.ref_name }}_no_libsodium_shared.tar.zst"
+      STATIC_NOLIBSODIUM_LIB_ASSET_NAME: "udpc_${{ github.ref_name }}_no_libsodium_static.tar.zst"
     steps:
       - name: Update and upgrade with apt
         run: apt-get --yes update && apt-get --yes upgrade
@@ -51,6 +54,10 @@ jobs:
               touch shared_lib_exists
             elif [[ "$asset" == "$STATIC_LIB_ASSET_NAME" ]]; then
               touch static_lib_exists
+            elif [[ "$asset" == "$SHARED_NOLIBSODIUM_LIB_ASSET_NAME" ]]; then
+              touch shared_nolibsodium_lib_exists
+            elif [[ "$asset" == "$STATIC_NOLIBSODIUM_LIB_ASSET_NAME" ]]; then
+              touch static_nolibsodium_lib_exists
             fi
           done
       - name: Build shared if asset does not exist
@@ -130,4 +137,82 @@ jobs:
             -H "Authorization: token ${GITHUB_TOKEN}" \
             -H 'Content-Type: multipart/form-data' \
             -F "attachment=@staticOut/${STATIC_LIB_ASSET_NAME};type=application/zstd" >&/dev/null
+          fi
+      - name: Build shared-no-libsodium if asset does not exist
+        run: |
+          if ! [[ -e shared_nolibsodium_lib_exists ]]; then
+            if ! [[ -d udpc_cloned ]]; then
+              git clone --depth=1 --no-single-branch https://git.seodisparate.com/stephenseo/UDPConnection.git udpc_cloned
+            fi
+            pushd udpc_cloned >&/dev/null && git restore . && git checkout "${GITHUB_REF_NAME}" && popd >&/dev/null
+
+            cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=On -DCMAKE_INSTALL_PREFIX=/usr -DUDPC_DISABLE_LIBSODIUM=True -S udpc_cloned -B buildReleaseSharedNolibsodium
+            make -C buildReleaseSharedNolibsodium
+            make DESTDIR=$(pwd)/sharedNolibsodiumOut -C buildReleaseSharedNolibsodium install
+
+            pushd sharedNolibsodiumOut >&/dev/null
+
+            tar --sort=name -I'zstd --compress -T0 --ultra -20' -cf "$SHARED_NOLIBSODIUM_LIB_ASSET_NAME" usr
+
+            popd >&/dev/null
+
+            curl -X GET \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/tags/${GITHUB_REF_NAME}" \
+            -H 'accept: application/json' -o release_info_latest.json
+
+            curl --fail-with-body -X PATCH \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/$(jq .id < release_info_latest.json)" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"body\": \"$(jq .body < release_info_latest.json | sed -e 's/^"//' -e 's/"$//')
+              $(cd sharedNolibsodiumOut && sha256sum "$SHARED_NOLIBSODIUM_LIB_ASSET_NAME")\"
+            "} >&/dev/null
+
+            curl --fail-with-body -X POST \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/$(jq .id < release_info_latest.json)/assets" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: multipart/form-data' \
+            -F "attachment=@sharedNolibsodiumOut/${SHARED_NOLIBSODIUM_LIB_ASSET_NAME};type=application/zstd" >&/dev/null
+          fi
+      - name: Build static-no-libsodium if asset does not exist
+        run: |
+          if ! [[ -e static_nolibsodium_lib_exists ]]; then
+            if ! [[ -d udpc_cloned ]]; then
+              git clone --depth=1 --no-single-branch https://git.seodisparate.com/stephenseo/UDPConnection.git udpc_cloned
+            fi
+            pushd udpc_cloned >&/dev/null && git restore . && git checkout "${GITHUB_REF_NAME}" && popd >&/dev/null
+
+            cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=Off -DCMAKE_INSTALL_PREFIX=/usr -DUDPC_DISABLE_LIBSODIUM=True -S udpc_cloned -B buildReleaseStaticNolibsodium
+            make -C buildReleaseStaticNolibsodium
+            make DESTDIR=$(pwd)/staticNolibsodiumOut -C buildReleaseStaticNolibsodium install
+
+            pushd staticNolibsodiumOut >&/dev/null
+
+            tar --sort=name -I'zstd --compress -T0 --ultra -20' -cf "$STATIC_NOLIBSODIUM_LIB_ASSET_NAME" usr
+
+            popd >&/dev/null
+
+            curl -X GET \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/tags/${GITHUB_REF_NAME}" \
+            -H 'accept: application/json' -o release_info_latest.json
+
+            curl --fail-with-body -X PATCH \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/$(jq .id < release_info_latest.json)" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"body\": \"$(jq .body < release_info_latest.json | sed -e 's/^"//' -e 's/"$//')
+              $(cd staticNolibsodiumOut && sha256sum "$STATIC_NOLIBSODIUM_LIB_ASSET_NAME")\"
+            "} >&/dev/null
+
+            curl --fail-with-body -X POST \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/$(jq .id < release_info_latest.json)/assets" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: multipart/form-data' \
+            -F "attachment=@staticNolibsodiumOut/${STATIC_NOLIBSODIUM_LIB_ASSET_NAME};type=application/zstd" >&/dev/null
           fi
