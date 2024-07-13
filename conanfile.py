@@ -5,7 +5,7 @@ import os
 
 class udpcRecipe(ConanFile):
     name = "udpc"
-    version = "1.0"
+    version = "1.1"
     package_type = "library"
 
     # Optional metadata

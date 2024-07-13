@@ -1,5 +1,5 @@
 [requires]
-udpc/1.0
+udpc/1.1
 
 [generators]
 CMakeDeps
