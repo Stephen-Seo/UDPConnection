@@ -1,0 +1,133 @@
+name: Build for Releases
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  ensure-release-exists:
+    runs-on: any_archLinux
+    steps:
+      - name: Ensure that release exists
+        run: |
+          curl -X GET "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/tags/${GITHUB_REF_NAME}" \
+          -H "Authorization: token ${GITHUB_TOKEN}" \
+          -H 'accept: application/json' -o release_check_resp.json 2>/dev/null \
+          -w '%{http_code}\n' | sed 's/^\([0-9]\+\)/http_code=\1/' > check_release_http_code
+          test "$(cat check_release_http_code)" = "http_code=404" && \
+          curl --fail-with-body -X 'POST' \
+          "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases" \
+          -H 'accept: application/json' \
+          -H "Authorization: token ${GITHUB_TOKEN}" \
+          -H 'Content-Type: application/json' \
+          -d "{
+          \"name\": \"UDPC version ${GITHUB_REF_NAME}\",
+          \"tag_name\": \"${GITHUB_REF_NAME}\",
+          \"body\": \"Warning: Static libs require linking with C++ linker (and libsodium)!
+
+              SHA256SUMS\"
+          }" >&/dev/null
+
+  assets-release-x86_64:
+    needs: ensure-release-exists
+    runs-on: docker_debian_bookworm
+    env:
+      SHARED_LIB_ASSET_NAME: "udpc_${{ github.ref_name }}_shared.tar.zst"
+      STATIC_LIB_ASSET_NAME: "udpc_${{ github.ref_name }}_static.tar.zst"
+    steps:
+      - name: Update and upgrade with apt
+        run: apt-get --yes update && apt-get --yes upgrade
+      - name: Get necessary packages
+        run: apt-get --yes install gcc g++ jq curl cmake make zstd sed git libsodium-dev pkg-config
+      - name: Get release info
+        run: |
+          curl -X GET \
+          "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/tags/${GITHUB_REF_NAME}" \
+          -H 'accept: application/json' -o release_info.json
+      - name: Check if asset exists
+        run: |
+          for asset in $(jq '.assets[].name' < release_info.json | tr -d '"'); do
+            if [[ "$asset" == "$SHARED_LIB_ASSET_NAME" ]]; then
+              touch shared_lib_exists
+            elif [[ "$asset" == "$STATIC_LIB_ASSET_NAME" ]]; then
+              touch static_lib_exists
+            fi
+          done
+      - name: Build shared if asset does not exist
+        run: |
+          if ! [[ -e shared_lib_exists ]]; then
+            if ! [[ -d udpc_cloned ]]; then
+              git clone --depth=1 --no-single-branch https://git.seodisparate.com/stephenseo/UDPConnection.git udpc_cloned
+            fi
+            pushd udpc_cloned >&/dev/null && git restore . && git checkout "${GITHUB_REF_NAME}" && popd >&/dev/null
+
+            cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=On -DCMAKE_INSTALL_PREFIX=/usr -DUDPC_DISABLE_LIBSODIUM=False -S udpc_cloned -B buildReleaseShared
+            make -C buildReleaseShared
+            make DESTDIR=$(pwd)/sharedOut -C buildReleaseShared install
+
+            pushd sharedOut >&/dev/null
+
+            tar --sort=name -I'zstd --compress -T0 --ultra -20' -cf "$SHARED_LIB_ASSET_NAME" usr
+
+            popd >&/dev/null
+
+            curl -X GET \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/tags/${GITHUB_REF_NAME}" \
+            -H 'accept: application/json' -o release_info_latest.json
+
+            curl --fail-with-body -X PATCH \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/$(jq .id < release_info_latest.json)" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"body\": \"$(jq .body < release_info_latest.json | sed -e 's/^"//' -e 's/"$//')
+              $(cd sharedOut && sha256sum "$SHARED_LIB_ASSET_NAME")\"
+            "} >&/dev/null
+
+            curl --fail-with-body -X POST \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/$(jq .id < release_info_latest.json)/assets" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: multipart/form-data' \
+            -F "attachment=@sharedOut/${SHARED_LIB_ASSET_NAME};type=application/zstd" >&/dev/null
+          fi
+      - name: Build static if asset does not exist
+        run: |
+          if ! [[ -e static_lib_exists ]]; then
+            if ! [[ -d udpc_cloned ]]; then
+              git clone --depth=1 --no-single-branch https://git.seodisparate.com/stephenseo/UDPConnection.git udpc_cloned
+            fi
+            pushd udpc_cloned >&/dev/null && git restore . && git checkout "${GITHUB_REF_NAME}" && popd >&/dev/null
+
+            cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=Off -DCMAKE_INSTALL_PREFIX=/usr -DUDPC_DISABLE_LIBSODIUM=False -S udpc_cloned -B buildReleaseStatic
+            make -C buildReleaseStatic
+            make DESTDIR=$(pwd)/staticOut -C buildReleaseStatic install
+
+            pushd staticOut >&/dev/null
+
+            tar --sort=name -I'zstd --compress -T0 --ultra -20' -cf "$STATIC_LIB_ASSET_NAME" usr
+
+            popd >&/dev/null
+
+            curl -X GET \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/tags/${GITHUB_REF_NAME}" \
+            -H 'accept: application/json' -o release_info_latest.json
+
+            curl --fail-with-body -X PATCH \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/$(jq .id < release_info_latest.json)" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"body\": \"$(jq .body < release_info_latest.json | sed -e 's/^"//' -e 's/"$//')
+              $(cd staticOut && sha256sum "$STATIC_LIB_ASSET_NAME")\"
+            "} >&/dev/null
+
+            curl --fail-with-body -X POST \
+            "https://git.seodisparate.com/api/v1/repos/stephenseo/UDPConnection/releases/$(jq .id < release_info_latest.json)/assets" \
+            -H 'accept: application/json' \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: multipart/form-data' \
+            -F "attachment=@staticOut/${STATIC_LIB_ASSET_NAME};type=application/zstd" >&/dev/null
+          fi
