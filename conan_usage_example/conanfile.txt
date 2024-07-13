@@ -4,6 +4,3 @@ udpc/1.1
 [generators]
 CMakeDeps
 CMakeToolchain
-
-[options]
-udpc*:shared=True

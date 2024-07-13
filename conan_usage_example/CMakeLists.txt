@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.7)
-project(UDPC_NetworkTest C)
+project(UDPC_NetworkTest CXX)
 
 set(UDPC_NetworkTest_SOURCES
-    src/UDPC_NetworkTest.c
+    src/UDPC_NetworkTest.cpp
 )
 
 add_compile_options(
