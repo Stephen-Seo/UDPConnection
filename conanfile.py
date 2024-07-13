@@ -53,5 +53,5 @@ class udpcRecipe(ConanFile):
         cmake.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["UDPC"]
-        self.cpp_info.system_libs = ["stdc++"]
+        self.cpp_info.libs.append("UDPC")
+        self.cpp_info.system_libs.append("stdc++")

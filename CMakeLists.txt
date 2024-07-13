@@ -23,6 +23,12 @@ endif()
 
 add_library(UDPC ${UDPC_SOURCES})
 
+# Enforce linking with libstdc++ even with C targets.
+# Doesn't affect conan, so conanfile.py was also modified for this.
+set_target_properties(UDPC PROPERTIES
+    INTERFACE_LINK_LIBRARIES "stdc++"
+)
+
 set_target_properties(UDPC PROPERTIES VERSION ${UDPC_VERSION} SOVERSION ${UDPC_SOVERSION})
 
 target_compile_features(UDPC PUBLIC cxx_std_11)
@@ -42,11 +48,6 @@ find_package(libsodium REQUIRED)
 target_compile_definitions(UDPC PUBLIC UDPC_LIBSODIUM_ENABLED)
 target_link_libraries(UDPC PUBLIC libsodium::libsodium)
 
-# Enforce linking with libstdc++ even with C targets.
-# Doesn't affect conan, so conanfile.py was also modified for this.
-set_target_properties(UDPC PROPERTIES
-    INTERFACE_LINK_LIBRARIES "stdc++"
-)
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
     set(UDPC_UnitTest_SOURCES
