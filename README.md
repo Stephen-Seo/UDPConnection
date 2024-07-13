@@ -91,3 +91,6 @@ conan packages of this library are [available here](https://git.seodisparate.com
 
 The `conan` branch contains the necessary changes to publish this library as a
 conan package. Expect the `conan` branch to rebase on `master` in the future.
+
+An example project is [available here](https://git.seodisparate.com/stephenseo/UDPConnection/src/branch/conan/conan_usage_example)
+to use this project with conan.
