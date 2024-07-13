@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.7)
 project(UDPC)
 
-set(UDPC_VERSION 1.0)
+set(UDPC_VERSION 1.1)
+set(UDPC_SOVERSION 1)
 
 set(UDPC_SOURCES
     src/UDPConnection.cpp
@@ -22,7 +23,7 @@ endif()
 
 add_library(UDPC ${UDPC_SOURCES})
 
-set_target_properties(UDPC PROPERTIES VERSION ${UDPC_VERSION})
+set_target_properties(UDPC PROPERTIES VERSION ${UDPC_VERSION} SOVERSION ${UDPC_SOVERSION})
 
 target_compile_features(UDPC PUBLIC cxx_std_11)
 target_link_libraries(UDPC PUBLIC pthread)
