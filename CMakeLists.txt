@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.7)
 project(UDPC)
 
-set(UDPC_VERSION 1.1)
+set(UDPC_VERSION 1.2)
 set(UDPC_SOVERSION 1)
 
 set(UDPC_SOURCES
@@ -41,6 +41,12 @@ endif()
 find_package(libsodium REQUIRED)
 target_compile_definitions(UDPC PUBLIC UDPC_LIBSODIUM_ENABLED)
 target_link_libraries(UDPC PUBLIC libsodium::libsodium)
+
+# Enforce linking with libstdc++ even with C targets.
+# Doesn't affect conan, so conanfile.py was also modified for this.
+set_target_properties(UDPC PROPERTIES
+    INTERFACE_LINK_LIBRARIES "stdc++"
+)
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
     set(UDPC_UnitTest_SOURCES

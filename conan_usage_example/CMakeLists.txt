@@ -22,4 +22,4 @@ find_package(udpc CONFIG REQUIRED)
 add_executable(UDPC_NetworkTest
     ${UDPC_NetworkTest_SOURCES}
 )
-target_link_libraries(UDPC_NetworkTest udpc::udpc stdc++)
+target_link_libraries(UDPC_NetworkTest PUBLIC udpc::udpc)
