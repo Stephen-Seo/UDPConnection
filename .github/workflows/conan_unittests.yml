@@ -2,7 +2,7 @@ name: Run UnitTests
 on:
   push:
     branches:
-      - '*'
+      - 'conan'
 
 jobs:
   build-and-run-tests:
