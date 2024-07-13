@@ -1,0 +1,9 @@
+[requires]
+udpc/1.0
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[options]
+udpc*:shared=True
