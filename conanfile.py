@@ -54,4 +54,8 @@ class udpcRecipe(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs.append("UDPC")
-        self.cpp_info.system_libs.append("stdc++")
+        if self.settings.os == "Linux":
+            self.cpp_info.system_libs.append("stdc++")
+        elif self.settings.os == "Macos":
+            self.cpp_info.system_libs.append("libc++")
+        # TODO figure out linking static library for other OS.
