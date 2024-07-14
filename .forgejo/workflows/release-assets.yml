@@ -23,7 +23,7 @@ jobs:
           -d "{
           \"name\": \"UDPC version ${GITHUB_REF_NAME}\",
           \"tag_name\": \"${GITHUB_REF_NAME}\",
-          \"body\": \"Warning: Static libs require linking with C++ linker or linking with stdc++ (`-lstdc++`)!
+          \"body\": \"Warning: Static libs require linking with C++ linker or linking with stdc++ (\`-lstdc++\` on Linux, \`-llibc++\` on MacOS)!
           Warning: Will need to link with libsodium!
 
               SHA256SUMS\"
