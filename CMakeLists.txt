@@ -25,9 +25,15 @@ add_library(UDPC ${UDPC_SOURCES})
 
 # Enforce linking with libstdc++ even with C targets.
 # Doesn't affect conan, so conanfile.py was also modified for this.
+if(APPLE)
+set_target_properties(UDPC PROPERTIES
+    INTERFACE_LINK_LIBRARIES "libc++"
+)
+elseif(UNIX)
 set_target_properties(UDPC PROPERTIES
     INTERFACE_LINK_LIBRARIES "stdc++"
 )
+endif()
 
 set_target_properties(UDPC PROPERTIES VERSION ${UDPC_VERSION} SOVERSION ${UDPC_SOVERSION})
 
