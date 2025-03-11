@@ -1,6 +1,7 @@
 # UDPConnection
 
-[C++ conan package](https://git.seodisparate.com/stephenseo/-/packages/conan/udpc/versions)
+Conan package is currently unavailable. However, building this with CMake should
+be simple.
 
 Provides a network connection over UDP, with verification of packet support via
 libsodium (optional). Implemented in C++ (up to C++11 standard), but is
@@ -79,7 +80,6 @@ UnitTest only builds in Debug mode.
 
 # Links
 https://github.com/Stephen-Seo/UDPConnection  
-https://git.seodisparate.com/stephenseo/UDPConnection
 
 # Other Notes
 
@@ -87,10 +87,8 @@ Inspired by [a series of blog posts about networking for games.](https://gaffero
 
 ## Conan
 
-conan packages of this library are [available here](https://git.seodisparate.com/stephenseo/-/packages/conan/udpc/versions).
+There used to be a self-hosted conan repository for UDPConnection. It is
+currently unavailable.
 
 The `conan` branch contains the necessary changes to publish this library as a
 conan package. Expect the `conan` branch to merge `master` in the future.
-
-An example project is [available here](https://git.seodisparate.com/stephenseo/UDPConnection/src/branch/conan/conan_usage_example)
-to use this project with conan.
