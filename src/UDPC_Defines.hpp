@@ -25,12 +25,12 @@
 #include <deque>
 #include <unordered_map>
 #include <unordered_set>
-#include <queue>
 #include <random>
 #include <memory>
 #include <thread>
 #include <mutex>
 #include <iostream>
+#include <shared_mutex>
 
 #include "TSLQueue.hpp"
 #include "UDPC.h"
@@ -58,17 +58,17 @@
 
 namespace UDPC {
 
-static const auto ONE_SECOND = std::chrono::seconds(1);
-static const auto TEN_SECONDS = std::chrono::seconds(10);
-static const auto THIRTY_SECONDS = std::chrono::seconds(30);
+constexpr auto ONE_SECOND = std::chrono::seconds(1);
+constexpr auto TEN_SECONDS = std::chrono::seconds(10);
+constexpr auto THIRTY_SECONDS = std::chrono::seconds(30);
 
-static const auto INIT_PKT_INTERVAL_DT = std::chrono::seconds(5);
-static const auto HEARTBEAT_PKT_INTERVAL_DT = std::chrono::milliseconds(150);
-static const auto PACKET_TIMEOUT_TIME = ONE_SECOND;
-static const auto GOOD_RTT_LIMIT = std::chrono::milliseconds(250);
-static const auto CONNECTION_TIMEOUT = TEN_SECONDS;
-static const auto GOOD_MODE_SEND_RATE = std::chrono::microseconds(33333);
-static const auto BAD_MODE_SEND_RATE = std::chrono::milliseconds(100);
+constexpr auto INIT_PKT_INTERVAL_DT = std::chrono::seconds(5);
+constexpr auto HEARTBEAT_PKT_INTERVAL_DT = std::chrono::milliseconds(150);
+constexpr auto PACKET_TIMEOUT_TIME = ONE_SECOND;
+constexpr auto GOOD_RTT_LIMIT = std::chrono::milliseconds(250);
+constexpr auto CONNECTION_TIMEOUT = TEN_SECONDS;
+constexpr auto GOOD_MODE_SEND_RATE = std::chrono::microseconds(33333);
+constexpr auto BAD_MODE_SEND_RATE = std::chrono::milliseconds(100);
 
 // forward declaration
 struct Context;
@@ -266,7 +266,7 @@ public:
     std::thread thread;
     std::atomic_bool threadRunning;
     std::mutex conMapMutex;
-    std::mutex peerPKWhitelistMutex;
+    std::shared_mutex peerPKWhitelistMutex;
 
     std::chrono::milliseconds threadedSleepTime;
     unsigned char sk[crypto_sign_SECRETKEYBYTES];
@@ -278,6 +278,9 @@ public:
 
     std::mutex setThreadedUpdateMutex;
     std::atomic_uint32_t enableDisableFuncRunningCount;
+
+    std::chrono::milliseconds heartbeatDuration;
+    std::shared_mutex heartbeatMutex;
 
 }; // struct Context
 

@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.10)
 project(UDPC)
 
-set(UDPC_VERSION 1.2)
+set(UDPC_VERSION 1.3)
 set(UDPC_SOVERSION 1)
 
 set(UDPC_SOURCES
@@ -25,7 +25,7 @@ add_library(UDPC ${UDPC_SOURCES})
 
 set_target_properties(UDPC PROPERTIES VERSION ${UDPC_VERSION} SOVERSION ${UDPC_SOVERSION})
 
-target_compile_features(UDPC PUBLIC cxx_std_11)
+target_compile_features(UDPC PUBLIC cxx_std_17)
 target_link_libraries(UDPC PUBLIC pthread)
 if(WIN32)
     if(MINGW)
@@ -68,7 +68,7 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
         src/test/TestSharedSpinLock.cpp
     )
     add_executable(UnitTest ${UDPC_UnitTest_SOURCES})
-    target_compile_features(UnitTest PUBLIC cxx_std_11)
+    target_compile_features(UnitTest PUBLIC cxx_std_17)
     target_link_libraries(UnitTest PUBLIC UDPC)
     target_include_directories(UnitTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_compile_options(UnitTest PRIVATE "-Wno-sign-compare")

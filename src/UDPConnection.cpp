@@ -259,7 +259,9 @@ keysSet(),
 atostrBufIndexMutex(),
 atostrBufIndex(0),
 setThreadedUpdateMutex(),
-enableDisableFuncRunningCount(0)
+enableDisableFuncRunningCount(0),
+heartbeatDuration(UDPC::HEARTBEAT_PKT_INTERVAL_DT),
+heartbeatMutex()
 {
     std::memset(atostrBuf, 0, UDPC_ATOSTR_SIZE);
 
@@ -894,8 +896,11 @@ void UDPC::Context::update_impl() {
             if(iter->second.sendPkts.empty() && iter->second.priorityPkts.empty()) {
                 // nothing in queues, send heartbeat packet
                 auto sentDT = now - iter->second.sent;
-                if(sentDT < UDPC::HEARTBEAT_PKT_INTERVAL_DT) {
-                    continue;
+                {
+                    std::shared_lock<std::shared_mutex> lock(heartbeatMutex);
+                    if(sentDT < heartbeatDuration) {
+                        continue;
+                    }
                 }
 
                 unsigned int sendSize = 0;
@@ -1351,7 +1356,7 @@ void UDPC::Context::update_impl() {
                         recvBuf + UDPC_MIN_HEADER_SIZE + 4,
                         crypto_sign_PUBLICKEYBYTES);
                     {
-                        std::lock_guard<std::mutex>
+                        std::shared_lock<std::shared_mutex>
                             pkWhitelistLock(peerPKWhitelistMutex);
                         if(!peerPKWhitelist.empty()
                                 && peerPKWhitelist.find(
@@ -1484,7 +1489,7 @@ void UDPC::Context::update_impl() {
                         recvBuf + UDPC_MIN_HEADER_SIZE + 4,
                         crypto_sign_PUBLICKEYBYTES);
                     {
-                        std::lock_guard<std::mutex>
+                        std::shared_lock<std::shared_mutex>
                             pkWhitelistLock(peerPKWhitelistMutex);
                         if(!peerPKWhitelist.empty()
                                 && peerPKWhitelist.find(
@@ -2635,7 +2640,7 @@ int UDPC_add_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk) {
         return 0;
     }
 
-    std::lock_guard<std::mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
+    std::unique_lock<std::shared_mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
     auto result = c->peerPKWhitelist.insert(UDPC::PKContainer(pk));
     if(result.second) {
         return c->peerPKWhitelist.size();
@@ -2649,7 +2654,7 @@ int UDPC_has_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk) {
         return 0;
     }
 
-    std::lock_guard<std::mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
+    std::shared_lock<std::shared_mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
     if(c->peerPKWhitelist.find(UDPC::PKContainer(pk)) != c->peerPKWhitelist.end()) {
         return 1;
     }
@@ -2662,7 +2667,7 @@ int UDPC_remove_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk) {
         return 0;
     }
 
-    std::lock_guard<std::mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
+    std::unique_lock<std::shared_mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
     if(c->peerPKWhitelist.erase(UDPC::PKContainer(pk)) != 0) {
         return 1;
     }
@@ -2675,7 +2680,7 @@ int UDPC_clear_whitelist(UDPC_HContext ctx) {
         return 0;
     }
 
-    std::lock_guard<std::mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
+    std::unique_lock<std::shared_mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
     c->peerPKWhitelist.clear();
     return 1;
 }
@@ -2819,6 +2824,28 @@ void UDPC_atostr_unsafe_free_ptr(const char **addrBuf) {
         std::free((void*)*addrBuf);
         *addrBuf = nullptr;
     }
+}
+
+int UDPC_set_heartbeat_millis(UDPC_HContext ctx, unsigned int millis) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if (!c) {
+        return -1;
+    }
+
+    int ret = 0;
+
+    if (millis < 150) {
+        millis = 150;
+        ret = 1;
+    } else if (millis > 5000) {
+        millis = 5000;
+        ret = 2;
+    }
+
+    std::unique_lock<std::shared_mutex> lock(c->heartbeatMutex);
+    c->heartbeatDuration = std::chrono::milliseconds(millis);
+
+    return ret;
 }
 
 UDPC_IPV6_ADDR_TYPE UDPC_strtoa(const char *addrStr) {
