@@ -4,10 +4,8 @@
 #include <cassert>
 #include <chrono>
 #include <cstring>
-#include <optional>
 #include <vector>
 #include <functional>
-#include <type_traits>
 #include <string>
 #include <sstream>
 #include <ios>
