@@ -49,6 +49,7 @@ void usage() {
     puts("-sk <pubkey> <seckey> - start with pub/sec key pair");
     puts("-p <\"fallback\" or \"strict\"> - set auth policy");
     puts("--hostname <hostname> - dont run test, just lookup hostname");
+    puts("--heartbeat <interval> - set heartbeat interval in milliseconds");
 }
 
 void sleep_seconds(unsigned int seconds) {
@@ -107,6 +108,7 @@ int main(int argc, char **argv) {
     unsigned int whitelist_pk_files_index = 0;
     unsigned char whitelist_pks[WHITELIST_FILES_SIZE][crypto_sign_PUBLICKEYBYTES];
     int authPolicy = UDPC_AUTH_POLICY_FALLBACK;
+    unsigned long heartbeat_millis = 0;
 
     while(argc > 0) {
         if(strcmp(argv[0], "-c") == 0) {
@@ -195,6 +197,13 @@ int main(int argc, char **argv) {
             UDPC_destroy(ctx);
 
             return 0;
+        } else if (strcmp(argv[0], "--heartbeat") == 0 && argc > 1) {
+            --argc; ++argv;
+            heartbeat_millis = strtoul(argv[0], NULL, 10);
+            if (heartbeat_millis > 0xFFFFFFFF) {
+                // Clamp to unsigned int maximum value, assuming 4 bytes.
+                heartbeat_millis = 0xFFFFFFFF;
+            }
         } else {
             printf("ERROR: invalid argument \"%s\"\n", argv[0]);
             usage();
@@ -317,6 +326,13 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
+    }
+
+    int ret = UDPC_set_heartbeat_millis(context, heartbeat_millis);
+    if (ret == 1) {
+        puts("WARNING: Clamped heartbeat interval to minimum 150!");
+    } else if (ret == 2) {
+        puts("WARNING: Clamped heartbeat interval to maxiumum 5000!");
     }
 
     UDPC_enable_threaded_update(context);
