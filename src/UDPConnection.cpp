@@ -4,10 +4,8 @@
 #include <cassert>
 #include <chrono>
 #include <cstring>
-#include <optional>
 #include <vector>
 #include <functional>
-#include <type_traits>
 #include <string>
 #include <sstream>
 #include <ios>
@@ -1692,7 +1690,22 @@ void UDPC::Context::update_impl() {
                             && "Every entry in sentPkts must have a "
                             "corresponding entry in sentInfoMap");
                     auto duration = now - sentInfoIter->second->sentTime;
-                    if(duration > UDPC::PACKET_TIMEOUT_TIME) {
+                    std::chrono::milliseconds double_heartbeat_duration;
+
+                    // Account for possible heartbeat duration longer than 1
+                    // second.
+                    {
+                        std::shared_lock<std::shared_mutex> lock(heartbeatMutex);
+                        double_heartbeat_duration = heartbeatDuration * 2;
+                    }
+
+                    // Pick the longer of PACKET_TIMEOUT_TIME and
+                    // double_heartbeat_duration. Timeout if longer than the
+                    // greater of the two.
+                    if((UDPC::PACKET_TIMEOUT_TIME >= double_heartbeat_duration
+                            && duration > UDPC::PACKET_TIMEOUT_TIME)
+                        || (UDPC::PACKET_TIMEOUT_TIME < double_heartbeat_duration
+                            && duration > double_heartbeat_duration)) {
                         bool pktSigned =
                             sentIter->data[UDPC_MIN_HEADER_SIZE] == 1;
                         if((pktSigned
