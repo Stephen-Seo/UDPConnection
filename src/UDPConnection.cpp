@@ -2847,11 +2847,11 @@ int UDPC_set_heartbeat_millis(UDPC_HContext ctx, unsigned int millis) {
 
     int ret = 0;
 
-    if (millis < 150) {
-        millis = 150;
+    if (millis < UDPC::HEARTBEAT_PKT_INT_MIN_MILLIS) {
+        millis = UDPC::HEARTBEAT_PKT_INT_MIN_MILLIS;
         ret = 1;
-    } else if (millis > 5000) {
-        millis = 5000;
+    } else if (millis > UDPC::HEARTBEAT_PKT_INT_MAX_MILLIS) {
+        millis = UDPC::HEARTBEAT_PKT_INT_MAX_MILLIS;
         ret = 2;
     }
 

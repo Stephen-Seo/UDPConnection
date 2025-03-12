@@ -63,7 +63,9 @@ constexpr auto TEN_SECONDS = std::chrono::seconds(10);
 constexpr auto THIRTY_SECONDS = std::chrono::seconds(30);
 
 constexpr auto INIT_PKT_INTERVAL_DT = std::chrono::seconds(5);
-constexpr auto HEARTBEAT_PKT_INTERVAL_DT = std::chrono::milliseconds(150);
+constexpr unsigned int HEARTBEAT_PKT_INT_MIN_MILLIS = 150;
+constexpr unsigned int HEARTBEAT_PKT_INT_MAX_MILLIS = 5000;
+constexpr auto HEARTBEAT_PKT_INTERVAL_DT = std::chrono::milliseconds(HEARTBEAT_PKT_INT_MIN_MILLIS);
 constexpr auto PACKET_TIMEOUT_TIME = ONE_SECOND;
 constexpr auto GOOD_RTT_LIMIT = std::chrono::milliseconds(250);
 constexpr auto CONNECTION_TIMEOUT = TEN_SECONDS;
