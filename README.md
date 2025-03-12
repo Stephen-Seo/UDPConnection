@@ -29,6 +29,7 @@ is built when Debug builds are enabled (the default) with CMake.
     -sk <pubkey> <seckey> - start with pub/sec key pair
     -p <"fallback" or "strict"> - set auth policy
     --hostname <hostname> - dont run test, just lookup hostname
+    --heartbeat <interval> - set heartbeat interval in milliseconds
 
 A typical test can be done with the following parameters:
 
