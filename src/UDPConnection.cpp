@@ -1351,7 +1351,7 @@ void UDPC::Context::update_impl() {
                         recvBuf + UDPC_MIN_HEADER_SIZE + 4,
                         crypto_sign_PUBLICKEYBYTES);
                     {
-                        std::lock_guard<std::mutex>
+                        std::shared_lock<std::shared_mutex>
                             pkWhitelistLock(peerPKWhitelistMutex);
                         if(!peerPKWhitelist.empty()
                                 && peerPKWhitelist.find(
@@ -1484,7 +1484,7 @@ void UDPC::Context::update_impl() {
                         recvBuf + UDPC_MIN_HEADER_SIZE + 4,
                         crypto_sign_PUBLICKEYBYTES);
                     {
-                        std::lock_guard<std::mutex>
+                        std::shared_lock<std::shared_mutex>
                             pkWhitelistLock(peerPKWhitelistMutex);
                         if(!peerPKWhitelist.empty()
                                 && peerPKWhitelist.find(
@@ -2635,7 +2635,7 @@ int UDPC_add_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk) {
         return 0;
     }
 
-    std::lock_guard<std::mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
+    std::unique_lock<std::shared_mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
     auto result = c->peerPKWhitelist.insert(UDPC::PKContainer(pk));
     if(result.second) {
         return c->peerPKWhitelist.size();
@@ -2649,7 +2649,7 @@ int UDPC_has_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk) {
         return 0;
     }
 
-    std::lock_guard<std::mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
+    std::shared_lock<std::shared_mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
     if(c->peerPKWhitelist.find(UDPC::PKContainer(pk)) != c->peerPKWhitelist.end()) {
         return 1;
     }
@@ -2662,7 +2662,7 @@ int UDPC_remove_whitelist_pk(UDPC_HContext ctx, const unsigned char *pk) {
         return 0;
     }
 
-    std::lock_guard<std::mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
+    std::unique_lock<std::shared_mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
     if(c->peerPKWhitelist.erase(UDPC::PKContainer(pk)) != 0) {
         return 1;
     }
@@ -2675,7 +2675,7 @@ int UDPC_clear_whitelist(UDPC_HContext ctx) {
         return 0;
     }
 
-    std::lock_guard<std::mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
+    std::unique_lock<std::shared_mutex> pkWhitelistLock(c->peerPKWhitelistMutex);
     c->peerPKWhitelist.clear();
     return 1;
 }

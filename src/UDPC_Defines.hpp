@@ -25,12 +25,12 @@
 #include <deque>
 #include <unordered_map>
 #include <unordered_set>
-#include <queue>
 #include <random>
 #include <memory>
 #include <thread>
 #include <mutex>
 #include <iostream>
+#include <shared_mutex>
 
 #include "TSLQueue.hpp"
 #include "UDPC.h"
@@ -266,7 +266,7 @@ public:
     std::thread thread;
     std::atomic_bool threadRunning;
     std::mutex conMapMutex;
-    std::mutex peerPKWhitelistMutex;
+    std::shared_mutex peerPKWhitelistMutex;
 
     std::chrono::milliseconds threadedSleepTime;
     unsigned char sk[crypto_sign_SECRETKEYBYTES];
