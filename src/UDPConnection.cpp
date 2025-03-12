@@ -259,7 +259,9 @@ keysSet(),
 atostrBufIndexMutex(),
 atostrBufIndex(0),
 setThreadedUpdateMutex(),
-enableDisableFuncRunningCount(0)
+enableDisableFuncRunningCount(0),
+heartbeatDuration(UDPC::HEARTBEAT_PKT_INTERVAL_DT),
+heartbeatMutex()
 {
     std::memset(atostrBuf, 0, UDPC_ATOSTR_SIZE);
 
@@ -894,8 +896,11 @@ void UDPC::Context::update_impl() {
             if(iter->second.sendPkts.empty() && iter->second.priorityPkts.empty()) {
                 // nothing in queues, send heartbeat packet
                 auto sentDT = now - iter->second.sent;
-                if(sentDT < UDPC::HEARTBEAT_PKT_INTERVAL_DT) {
-                    continue;
+                {
+                    std::shared_lock<std::shared_mutex> lock(heartbeatMutex);
+                    if(sentDT < heartbeatDuration) {
+                        continue;
+                    }
                 }
 
                 unsigned int sendSize = 0;
@@ -2819,6 +2824,28 @@ void UDPC_atostr_unsafe_free_ptr(const char **addrBuf) {
         std::free((void*)*addrBuf);
         *addrBuf = nullptr;
     }
+}
+
+int UDPC_set_heartbeat_millis(UDPC_HContext ctx, unsigned int millis) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if (!c) {
+        return -1;
+    }
+
+    int ret = 0;
+
+    if (millis < 150) {
+        millis = 150;
+        ret = 1;
+    } else if (millis > 5000) {
+        millis = 5000;
+        ret = 2;
+    }
+
+    std::unique_lock<std::shared_mutex> lock(c->heartbeatMutex);
+    c->heartbeatDuration = std::chrono::milliseconds(millis);
+
+    return ret;
 }
 
 UDPC_IPV6_ADDR_TYPE UDPC_strtoa(const char *addrStr) {
