@@ -12,6 +12,16 @@
  *
  * Note that all functions are thread-safe unless mentioned otherwise in the
  * function's documentation.
+ *
+ * UDPC maintains a binary state for each connection. This state is either
+ * "good mode" or "bad mode". All connections start in "bad mode". When in "bad
+ * mode", the fastest packet sending rate is 1 packet per 0.1 seconds, or 10
+ * packets per second. When in "good mode", the fastest packet sending rate is
+ * 1 packet per 33.333 milliseconds, or 30 packets a second. Queued packets are
+ * sent immediately at the current mode's fastest-interval rate. If there are no
+ * queued packets, then "heartbeat" packets are sent at a rate of 1 packet per
+ * 0.15 seconds, or roughly 6 packets a second. This "heartbeat interval" can be
+ * adjusted with the \ref UDPC_set_heartbeat_millis() function.
  */
 
 #ifndef UDPC_CONNECTION_H
@@ -927,7 +937,8 @@ UDPC_EXPORT void UDPC_atostr_unsafe_free_ptr(const char **addrBuf);
  *
  * This is useful for cases where low-latency is not required. Also note that
  * increasing the heartbeat interval may prevent UDPC from entering "good mode"
- * for any connection.
+ * for any connection. (See <a href="#details">details</a> for info on "good
+ * mode" and "bad mode".)
  *
  * \return 0 on success, 1 if clamped to minimum, 2 if clamped to maximum, -1
  * if the given context is invalid.
