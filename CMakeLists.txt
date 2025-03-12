@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(UDPC)
 
-set(UDPC_VERSION 1.3)
+set(UDPC_VERSION 1.4)
 set(UDPC_SOVERSION 1)
 
 set(UDPC_SOURCES
