@@ -307,7 +307,7 @@ UDPC_EXPORT void&#160;</td><td class="memItemRight" valign="bottom"><b>UDPC_atos
 <tr class="memdesc:a2e47fb8779abe3a9db72a08bf494dc75"><td class="mdescLeft">&#160;</td><td class="mdescRight">Free an addr string created with <a class="el" href="#a939b6c407297f6cf913f2983869f051f" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe()</a> and zeroes the pointer.  <br /></td></tr>
 <tr class="separator:a2e47fb8779abe3a9db72a08bf494dc75"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aeb40d2c285eec0c53dd77e9d2cfeb5a2" id="r_aeb40d2c285eec0c53dd77e9d2cfeb5a2"><td class="memItemLeft" align="right" valign="top">UDPC_EXPORT int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aeb40d2c285eec0c53dd77e9d2cfeb5a2">UDPC_set_heartbeat_millis</a> (UDPC_HContext ctx, unsigned int millis)</td></tr>
-<tr class="memdesc:aeb40d2c285eec0c53dd77e9d2cfeb5a2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sets the amount of time between heartbeat packets.  <br /></td></tr>
+<tr class="memdesc:aeb40d2c285eec0c53dd77e9d2cfeb5a2"><td class="mdescLeft">&#160;</td><td class="mdescRight">REVERTED FUNCTION, SEE DETAILS.  <br /></td></tr>
 <tr class="separator:aeb40d2c285eec0c53dd77e9d2cfeb5a2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2ae8e7d87f785dd3b3353a00005c3dc6" id="r_a2ae8e7d87f785dd3b3353a00005c3dc6"><td class="memItemLeft" align="right" valign="top"><a id="a2ae8e7d87f785dd3b3353a00005c3dc6" name="a2ae8e7d87f785dd3b3353a00005c3dc6"></a>
 UDPC_EXPORT UDPC_IPV6_ADDR_TYPE&#160;</td><td class="memItemRight" valign="bottom"><b>UDPC_strtoa</b> (const char *addrStr)</td></tr>
@@ -1800,12 +1800,9 @@ mode", the fastest packet sending rate is 1 packet per 0.1 seconds, or 10 packet
       </table>
 </div><div class="memdoc">
 
-<p>Sets the amount of time between heartbeat packets. </p>
-<p>By default, UDPC sends a heartbeat packet every 150 milliseconds. This function can be used to increase the heartbeat interval time. Valid values are between 150 to 5000 milliseconds. Any value outside of this range will be clamped to within this range.</p>
-<p>This function affects all connections associated with the given UDPC Context.</p>
-<p>This is useful for cases where low-latency is not required. Also note that increasing the heartbeat interval may prevent UDPC from entering "good mode" for any connection. (See <a href="#details">details</a> for info on "good
-mode" and "bad mode".)</p>
-<dl class="section return"><dt>Returns</dt><dd>0 on success, 1 if clamped to minimum, 2 if clamped to maximum, -1 if the given context is invalid. </dd></dl>
+<p>REVERTED FUNCTION, SEE DETAILS. </p>
+<p>This function and its provided functionality was deemed premature for production use. This function will therefore be a no-op until the feature is implemented and ready.</p>
+<dl class="section return"><dt>Returns</dt><dd>-1 always, indicating that this function does not yet work as intended. </dd></dl>
 
 </div>
 </div>
