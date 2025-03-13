@@ -2846,6 +2846,18 @@ void UDPC_atostr_unsafe_free_ptr(const char **addrBuf) {
     }
 }
 
+uint32_t UDPC_get_heartbeat_millis(UDPC_HContext ctx) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if (!c) {
+        return 0;
+    }
+
+    std::shared_lock<std::shared_mutex> lock(c->heartbeatMutex);
+    // The milliseconds are clamped to a maximum for heartbeat, so it should
+    // fit in a 32-bit unsigned integer.
+    return c->heartbeatDuration.count();
+}
+
 int UDPC_set_heartbeat_millis(UDPC_HContext ctx, unsigned int millis) {
     UDPC::Context *c = UDPC::verifyContext(ctx);
     if (!c) {
@@ -2876,6 +2888,16 @@ int UDPC_set_heartbeat_millis(UDPC_HContext ctx, unsigned int millis) {
     }
 
     return ret;
+}
+
+uint64_t UDPC_get_con_timeout_millis(UDPC_HContext ctx) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if (!c) {
+        return 0;
+    }
+
+    std::shared_lock<std::shared_mutex> lock(c->conTimeoutMutex);
+    return c->conTimeoutDuration.count();
 }
 
 int UDPC_set_con_timeout_millis(UDPC_HContext ctx, unsigned int millis) {

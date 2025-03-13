@@ -475,4 +475,34 @@ void TEST_UDPC() {
             thread_array[i].join();
         }
     }
+
+    // Test get/set heartbeat millis
+    {
+        UDPC_ConnectionId id = UDPC_create_id_anyaddr(0);
+        UDPC_HContext ctx = UDPC_init(id, 0, 0);
+
+        CHECK_TRUE(UDPC_get_heartbeat_millis(ctx) == UDPC::HEARTBEAT_PKT_INT_MIN_MILLIS);
+        CHECK_TRUE(UDPC_set_heartbeat_millis(ctx, 1) == 1);
+        CHECK_TRUE(UDPC_get_heartbeat_millis(ctx) == UDPC::HEARTBEAT_PKT_INT_MIN_MILLIS);
+        CHECK_TRUE(UDPC_set_heartbeat_millis(ctx, 10000) == 2);
+        CHECK_TRUE(UDPC_get_heartbeat_millis(ctx) == UDPC::HEARTBEAT_PKT_INT_MAX_MILLIS);
+        CHECK_TRUE(UDPC_set_heartbeat_millis(ctx, 2000) == 0);
+        CHECK_TRUE(UDPC_get_heartbeat_millis(ctx) == 2000);
+
+        UDPC_destroy(ctx);
+    }
+
+    // Test get/set connection timeout millis
+    {
+        UDPC_ConnectionId id = UDPC_create_id_anyaddr(0);
+        UDPC_HContext ctx = UDPC_init(id, 0, 0);
+
+        CHECK_TRUE(UDPC_get_con_timeout_millis(ctx) == UDPC_CON_TIMEOUT_DEFAULT);
+        CHECK_TRUE(UDPC_set_con_timeout_millis(ctx, 1) == -2);
+        CHECK_TRUE(UDPC_get_con_timeout_millis(ctx) == UDPC_CON_TIMEOUT_DEFAULT);
+        CHECK_TRUE(UDPC_set_con_timeout_millis(ctx, 7000) == 0);
+        CHECK_TRUE(UDPC_get_con_timeout_millis(ctx) == 7000);
+
+        UDPC_destroy(ctx);
+    }
 }

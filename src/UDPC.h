@@ -930,6 +930,14 @@ UDPC_EXPORT void UDPC_atostr_unsafe_free(const char *addrBuf);
 UDPC_EXPORT void UDPC_atostr_unsafe_free_ptr(const char **addrBuf);
 
 /*!
+ * \brief Gets the currently set amount of time between heartbeat packets in
+ * milliseconds.
+ *
+ * \return 0 if context is invalid, otherwise the interval time in milliseconds.
+ */
+UDPC_EXPORT uint32_t UDPC_get_heartbeat_millis(UDPC_HContext ctx);
+
+/*!
  * \brief Sets the amount of time between heartbeat packets.
  *
  * By default, UDPC sends a heartbeat packet every 150 milliseconds.
@@ -953,6 +961,13 @@ UDPC_EXPORT void UDPC_atostr_unsafe_free_ptr(const char **addrBuf);
  * if the given context is invalid.
  */
 UDPC_EXPORT int UDPC_set_heartbeat_millis(UDPC_HContext ctx, unsigned int millis);
+
+/*!
+ * \brief Gets the currently set connection timeout time in milliseconds.
+ *
+ * \return 0 if context is invalid, otherwise the timeout time in milliseconds.
+ */
+UDPC_EXPORT uint64_t UDPC_get_con_timeout_millis(UDPC_HContext ctx);
 
 /*!
  * \brief Sets the connection timeout time.
