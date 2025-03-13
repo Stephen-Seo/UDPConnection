@@ -33,7 +33,7 @@ static void handleSIGINT(int signal) {
 #define SEND_IDS_SIZE 64
 #define WHITELIST_FILES_SIZE 64
 
-void usage() {
+void usage(void) {
     puts("[-c | -s] - client or server (default server)");
     puts("-ll <addr> - listen addr");
     puts("-lp <port> - listen port");
@@ -50,6 +50,7 @@ void usage() {
     puts("-p <\"fallback\" or \"strict\"> - set auth policy");
     puts("--hostname <hostname> - dont run test, just lookup hostname");
     puts("--heartbeat <interval> - set heartbeat interval in milliseconds");
+    puts("--con-timeout <millis> - set connection timeout time in milliseconds");
 }
 
 void sleep_seconds(unsigned int seconds) {
@@ -109,6 +110,7 @@ int main(int argc, char **argv) {
     unsigned char whitelist_pks[WHITELIST_FILES_SIZE][crypto_sign_PUBLICKEYBYTES];
     int authPolicy = UDPC_AUTH_POLICY_FALLBACK;
     unsigned long heartbeat_millis = 0;
+    unsigned long con_timeout_millis = 10000;
 
     while(argc > 0) {
         if(strcmp(argv[0], "-c") == 0) {
@@ -203,6 +205,14 @@ int main(int argc, char **argv) {
             if (heartbeat_millis > 0xFFFFFFFF) {
                 // Clamp to unsigned int maximum value, assuming 4 bytes.
                 heartbeat_millis = 0xFFFFFFFF;
+            }
+        } else if (strcmp(argv[0], "--con-timeout") == 0 && argc > 1) {
+            --argc; ++argv;
+            con_timeout_millis = strtoul(argv[0], NULL, 10);
+            if (con_timeout_millis == 0) {
+                printf("ERROR: Failed to parse connection timeout milliseconds!\n");
+                usage();
+                return 1;
             }
         } else {
             printf("ERROR: invalid argument \"%s\"\n", argv[0]);
@@ -323,6 +333,7 @@ int main(int argc, char **argv) {
         for(unsigned int i = 0; i < whitelist_pk_files_index; ++i) {
             if((unsigned int)UDPC_add_whitelist_pk(context, whitelist_pks[i]) != i + 1) {
                 puts("Failed to add pubkey to whitelist");
+                UDPC_destroy(context);
                 return 1;
             }
         }
@@ -333,6 +344,14 @@ int main(int argc, char **argv) {
         puts("WARNING: Clamped heartbeat interval to minimum 150!");
     } else if (ret == 2) {
         puts("WARNING: Clamped heartbeat interval to maxiumum 5000!");
+    }
+
+    ret = UDPC_set_con_timeout_millis(context, con_timeout_millis);
+    if (ret < 0) {
+        printf("ERROR: Failed to set connection timeout time to %lu millis (too low)!\n",
+               con_timeout_millis);
+        UDPC_destroy(context);
+        return 1;
     }
 
     UDPC_enable_threaded_update(context);

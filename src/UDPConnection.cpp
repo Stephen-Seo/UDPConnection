@@ -259,7 +259,9 @@ atostrBufIndex(0),
 setThreadedUpdateMutex(),
 enableDisableFuncRunningCount(0),
 heartbeatDuration(UDPC::HEARTBEAT_PKT_INTERVAL_DT),
-heartbeatMutex()
+heartbeatMutex(),
+conTimeoutDuration(UDPC_CON_TIMEOUT_DEFAULT),
+conTimeoutMutex()
 {
     std::memset(atostrBuf, 0, UDPC_ATOSTR_SIZE);
 
@@ -447,7 +449,12 @@ void UDPC::Context::update_impl() {
         std::lock_guard<std::mutex> conMapLock(conMapMutex);
         for(auto iter = conMap.begin(); iter != conMap.end(); ++iter) {
             temp_dt_fs = now - iter->second.received;
-            if(temp_dt_fs >= UDPC::CONNECTION_TIMEOUT) {
+            std::chrono::milliseconds conTimeoutTime;
+            {
+                std::shared_lock<std::shared_mutex> lock(conTimeoutMutex);
+                conTimeoutTime = conTimeoutDuration;
+            }
+            if(temp_dt_fs >= conTimeoutTime) {
                 removed.push_back(iter->first);
                 UDPC_CHECK_LOG(this,
                     UDPC_LoggingType::UDPC_VERBOSE,
@@ -2855,10 +2862,46 @@ int UDPC_set_heartbeat_millis(UDPC_HContext ctx, unsigned int millis) {
         ret = 2;
     }
 
-    std::unique_lock<std::shared_mutex> lock(c->heartbeatMutex);
-    c->heartbeatDuration = std::chrono::milliseconds(millis);
+    const std::chrono::milliseconds chrono_millis(millis);
+    {
+        std::unique_lock<std::shared_mutex> lock(c->heartbeatMutex);
+        c->heartbeatDuration = chrono_millis;
+    }
+
+    {
+        std::unique_lock<std::shared_mutex> lock(c->conTimeoutMutex);
+        if (c->conTimeoutDuration < chrono_millis) {
+            c->conTimeoutDuration = chrono_millis * 3;
+        }
+    }
 
     return ret;
+}
+
+int UDPC_set_con_timeout_millis(UDPC_HContext ctx, unsigned int millis) {
+    UDPC::Context *c = UDPC::verifyContext(ctx);
+    if (!c) {
+        return -1;
+    }
+
+    const std::chrono::milliseconds mseconds(millis);
+
+    std::chrono::milliseconds heartbeatTime;
+    {
+        std::shared_lock<std::shared_mutex> heartbeatLock(c->heartbeatMutex);
+        heartbeatTime = c->heartbeatDuration;
+    }
+
+    if (mseconds < heartbeatTime) {
+        return -2;
+    }
+
+    {
+        std::unique_lock<std::shared_mutex> conTimeoutLock(c->conTimeoutMutex);
+        c->conTimeoutDuration = mseconds;
+    }
+
+    return 0;
 }
 
 UDPC_IPV6_ADDR_TYPE UDPC_strtoa(const char *addrStr) {

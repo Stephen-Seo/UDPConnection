@@ -273,6 +273,10 @@ typedef struct UDPC_EXPORT UDPC_Event {
     } v;
 } UDPC_Event;
 
+/// The connection timeout time default in milliseconds.
+/// Use this for UDPC_set_con_timeout_millis().
+#define UDPC_CON_TIMEOUT_DEFAULT 10000
+
 /*!
  * \brief Creates an UDPC_ConnectionId with the given addr and port
  *
@@ -940,10 +944,36 @@ UDPC_EXPORT void UDPC_atostr_unsafe_free_ptr(const char **addrBuf);
  * for any connection. (See <a href="#details">details</a> for info on "good
  * mode" and "bad mode".)
  *
+ * \warning The connection timeout time is adjusted if it is less than the new
+ * value for the heartbeat interval time. The new connection timeout time is
+ * calculated as 3 times the heartbeat interval time. It may be necessary to
+ * set the connection timeout time with UDPC_set_con_timeout_millis().
+ *
  * \return 0 on success, 1 if clamped to minimum, 2 if clamped to maximum, -1
  * if the given context is invalid.
  */
 UDPC_EXPORT int UDPC_set_heartbeat_millis(UDPC_HContext ctx, unsigned int millis);
+
+/*!
+ * \brief Sets the connection timeout time.
+ *
+ * By default, UDPC times out a connection if a packet hasn't been received for
+ * 10 seconds, or 10,000 milliseconds (the default value).
+ *
+ * This function sets the connection timeout time. It is an error to set this
+ * value to be less than the currently set heartbeat interval time, which can
+ * be set with UDPC_set_heartbeat_millis().
+ *
+ * Pass \ref UDPC_CON_TIMEOUT_DEFAULT to set the timeout to the default.
+ *
+ * \warning This function does no sanity checking other than ensuring the
+ * timeout is not set to less than the heartbeat time. A sane maximum would be
+ * the default timeout time, which is 10 seconds, or 10,000 milliseconds.
+ *
+ * \return 0 on success, -1 the given context is invalid, -2 if the given value
+ * is invalid (less than the currently set heartbeat interval time).
+ */
+UDPC_EXPORT int UDPC_set_con_timeout_millis(UDPC_HContext ctx, unsigned int millis);
 
 // =============================================================================
 // Helpers

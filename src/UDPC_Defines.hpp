@@ -284,6 +284,8 @@ public:
     std::chrono::milliseconds heartbeatDuration;
     std::shared_mutex heartbeatMutex;
 
+    std::chrono::milliseconds conTimeoutDuration;
+    std::shared_mutex conTimeoutMutex;
 }; // struct Context
 
 Context *verifyContext(UDPC_HContext ctx);
