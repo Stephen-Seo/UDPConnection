@@ -257,9 +257,7 @@ keysSet(),
 atostrBufIndexMutex(),
 atostrBufIndex(0),
 setThreadedUpdateMutex(),
-enableDisableFuncRunningCount(0),
-heartbeatDuration(UDPC::HEARTBEAT_PKT_INTERVAL_DT),
-heartbeatMutex()
+enableDisableFuncRunningCount(0)
 {
     std::memset(atostrBuf, 0, UDPC_ATOSTR_SIZE);
 
@@ -894,13 +892,9 @@ void UDPC::Context::update_impl() {
             if(iter->second.sendPkts.empty() && iter->second.priorityPkts.empty()) {
                 // nothing in queues, send heartbeat packet
                 auto sentDT = now - iter->second.sent;
-                {
-                    std::shared_lock<std::shared_mutex> lock(heartbeatMutex);
-                    if(sentDT < heartbeatDuration) {
-                        continue;
-                    }
+                if (sentDT < UDPC::HEARTBEAT_PKT_INTERVAL_DT) {
+                    continue;
                 }
-
                 unsigned int sendSize = 0;
                 std::unique_ptr<char[]> buf;
                 if(flags.test(2) && iter->second.flags.test(6)) {
@@ -1690,22 +1684,7 @@ void UDPC::Context::update_impl() {
                             && "Every entry in sentPkts must have a "
                             "corresponding entry in sentInfoMap");
                     auto duration = now - sentInfoIter->second->sentTime;
-                    std::chrono::milliseconds double_heartbeat_duration;
-
-                    // Account for possible heartbeat duration longer than 1
-                    // second.
-                    {
-                        std::shared_lock<std::shared_mutex> lock(heartbeatMutex);
-                        double_heartbeat_duration = heartbeatDuration * 2;
-                    }
-
-                    // Pick the longer of PACKET_TIMEOUT_TIME and
-                    // double_heartbeat_duration. Timeout if longer than the
-                    // greater of the two.
-                    if((UDPC::PACKET_TIMEOUT_TIME >= double_heartbeat_duration
-                            && duration > UDPC::PACKET_TIMEOUT_TIME)
-                        || (UDPC::PACKET_TIMEOUT_TIME < double_heartbeat_duration
-                            && duration > double_heartbeat_duration)) {
+                    if(duration > UDPC::PACKET_TIMEOUT_TIME) {
                         bool pktSigned =
                             sentIter->data[UDPC_MIN_HEADER_SIZE] == 1;
                         if((pktSigned
@@ -2837,11 +2816,6 @@ void UDPC_atostr_unsafe_free_ptr(const char **addrBuf) {
         std::free((void*)*addrBuf);
         *addrBuf = nullptr;
     }
-}
-
-int UDPC_set_heartbeat_millis(UDPC_HContext ctx, unsigned int millis) {
-    // No-op for now, see docs for details.
-    return -1;
 }
 
 UDPC_IPV6_ADDR_TYPE UDPC_strtoa(const char *addrStr) {

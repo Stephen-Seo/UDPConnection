@@ -279,9 +279,6 @@ public:
     std::mutex setThreadedUpdateMutex;
     std::atomic_uint32_t enableDisableFuncRunningCount;
 
-    std::chrono::milliseconds heartbeatDuration;
-    std::shared_mutex heartbeatMutex;
-
 }; // struct Context
 
 Context *verifyContext(UDPC_HContext ctx);

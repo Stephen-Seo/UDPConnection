@@ -925,18 +925,6 @@ UDPC_EXPORT void UDPC_atostr_unsafe_free(const char *addrBuf);
  */
 UDPC_EXPORT void UDPC_atostr_unsafe_free_ptr(const char **addrBuf);
 
-/*!
- * \brief REVERTED FUNCTION, SEE DETAILS.
- *
- * This function and its provided functionality was deemed premature for
- * production use. This function will therefore be a no-op until the feature
- * is implemented and ready.
- *
- * \return -1 always, indicating that this function does not yet work as
- * intended.
- */
-UDPC_EXPORT int UDPC_set_heartbeat_millis(UDPC_HContext ctx, unsigned int millis);
-
 // =============================================================================
 // Helpers
 
