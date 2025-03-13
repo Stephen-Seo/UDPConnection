@@ -391,7 +391,7 @@ Variables</h2></td></tr>
 <div class="textblock"><p>Public API for UDPConnection. </p>
 <p>Note that all functions are thread-safe unless mentioned otherwise in the function's documentation.</p>
 <p>UDPC maintains a binary state for each connection. This state is either "good mode" or "bad mode". All connections start in "bad mode". When in "bad
-mode", the fastest packet sending rate is 1 packet per 0.1 seconds, or 10 packets per second. When in "good mode", the fastest packet sending rate is 1 packet per 33.333 milliseconds, or 30 packets a second. Queued packets are sent immediately at the current mode's fastest-interval rate. If there are no queued packets, then "heartbeat" packets are sent at a rate of 1 packet per 0.15 seconds, or roughly 6 packets a second. This "heartbeat interval" can be adjusted with the UDPC_set_heartbeat_millis() function. </p>
+mode", the fastest packet sending rate is 1 packet per 0.1 seconds, or 10 packets per second. When in "good mode", the fastest packet sending rate is 1 packet per 33.333 milliseconds, or 30 packets a second. Queued packets are sent immediately at the current mode's fastest-interval rate. If there are no queued packets, then "heartbeat" packets are sent at a rate of 1 packet per 0.15 seconds, or roughly 6 packets a second. </p>
 </div><h2 class="groupheader">Typedef Documentation</h2>
 <a id="a228cd7ddf56a4e76e216bc3b80e8bd4a" name="a228cd7ddf56a4e76e216bc3b80e8bd4a"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a228cd7ddf56a4e76e216bc3b80e8bd4a">&#9670;&#160;</a></span>UDPC_AuthPolicy</h2>
@@ -607,7 +607,7 @@ mode", the fastest packet sending rate is 1 packet per 0.1 seconds, or 10 packet
 <div class="line"><a class="code hl_function" href="#a2e47fb8779abe3a9db72a08bf494dc75">UDPC_atostr_unsafe_free_ptr</a>(&amp;addrString);</div>
 <div class="ttc" id="aUDPC_8h_html_a1549eee3edacbc23ca144eec72d274bb"><div class="ttname"><a href="#a1549eee3edacbc23ca144eec72d274bb">UDPC_atostr_unsafe_cid</a></div><div class="ttdeci">UDPC_EXPORT const char * UDPC_atostr_unsafe_cid(UDPC_ConnectionId cid)</div><div class="ttdoc">Similar to UPDC_atostr(), but the returned ptr must be free'd.</div></div>
 <div class="ttc" id="aUDPC_8h_html_a2e47fb8779abe3a9db72a08bf494dc75"><div class="ttname"><a href="#a2e47fb8779abe3a9db72a08bf494dc75">UDPC_atostr_unsafe_free_ptr</a></div><div class="ttdeci">UDPC_EXPORT void UDPC_atostr_unsafe_free_ptr(const char **addrBuf)</div><div class="ttdoc">Free an addr string created with UDPC_atostr_unsafe() and zeroes the pointer.</div></div>
-<div class="ttc" id="astructUDPC__ConnectionId_html"><div class="ttname"><a href="structUDPC__ConnectionId.html">UDPC_ConnectionId</a></div><div class="ttdoc">Data identifying a peer via addr, port, and scope_id.</div><div class="ttdef"><b>Definition</b> UDPC.h:169</div></div>
+<div class="ttc" id="astructUDPC__ConnectionId_html"><div class="ttname"><a href="structUDPC__ConnectionId.html">UDPC_ConnectionId</a></div><div class="ttdoc">Data identifying a peer via addr, port, and scope_id.</div><div class="ttdef"><b>Definition</b> UDPC.h:168</div></div>
 </div><!-- fragment --> 
 </div>
 </div>
@@ -981,7 +981,7 @@ mode", the fastest packet sending rate is 1 packet per 0.1 seconds, or 10 packet
 <div class="line"><a class="code hl_function" href="#ad77c746ea0401664e11bfd76c56e94f5">UDPC_free_PacketInfo_ptr</a>(&amp;pinfo); <span class="comment">// This is safe, no double free.</span></div>
 <div class="ttc" id="aUDPC_8h_html_ad77c746ea0401664e11bfd76c56e94f5"><div class="ttname"><a href="#ad77c746ea0401664e11bfd76c56e94f5">UDPC_free_PacketInfo_ptr</a></div><div class="ttdeci">UDPC_EXPORT void UDPC_free_PacketInfo_ptr(UDPC_PacketInfo *pInfoPtr)</div><div class="ttdoc">Frees a UDPC_PacketInfo.</div></div>
 <div class="ttc" id="aUDPC_8h_html_affa8655a4e7e3475be441060e92213b3"><div class="ttname"><a href="#affa8655a4e7e3475be441060e92213b3">UDPC_get_received</a></div><div class="ttdeci">UDPC_EXPORT UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining)</div><div class="ttdoc">Get a received packet from a given UDPC context.</div></div>
-<div class="ttc" id="astructUDPC__PacketInfo_html"><div class="ttname"><a href="structUDPC__PacketInfo.html">UDPC_PacketInfo</a></div><div class="ttdoc">Data representing a received/sent packet.</div><div class="ttdef"><b>Definition</b> UDPC.h:184</div></div>
+<div class="ttc" id="astructUDPC__PacketInfo_html"><div class="ttname"><a href="structUDPC__PacketInfo.html">UDPC_PacketInfo</a></div><div class="ttdoc">Data representing a received/sent packet.</div><div class="ttdef"><b>Definition</b> UDPC.h:183</div></div>
 </div><!-- fragment --> 
 </div>
 </div>
