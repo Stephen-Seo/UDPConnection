@@ -361,11 +361,12 @@ void UDPC::Context::update_impl() {
                     event.conId.port,
 #ifdef UDPC_LIBSODIUM_ENABLED
                     flags.test(2) && event.v.enableLibSodium != 0,
-                    sk, pk);
+                    sk, pk
 #else
                     false,
-                    sk, pk);
+                    sk, pk
 #endif
+                    );
                 if(newCon.flags.test(5)) {
                     UDPC_CHECK_LOG(this,
                         UDPC_LoggingType::UDPC_ERROR,
@@ -1759,6 +1760,8 @@ void UDPC::Context::update_impl() {
         }
 
         // calculate sequence and ack
+        // TODO: Request tracked packets dropped off the current ack to be sent
+        // again.
         bool isOutOfOrder = false;
         uint32_t diff = 0;
         if(seqID > iter->second.rseq) {
