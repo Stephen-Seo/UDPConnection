@@ -20,8 +20,7 @@
  * 1 packet per 33.333 milliseconds, or 30 packets a second. Queued packets are
  * sent immediately at the current mode's fastest-interval rate. If there are no
  * queued packets, then "heartbeat" packets are sent at a rate of 1 packet per
- * 0.15 seconds, or roughly 6 packets a second. This "heartbeat interval" can be
- * adjusted with the \ref UDPC_set_heartbeat_millis() function.
+ * 0.15 seconds, or roughly 6 packets a second.
  */
 
 #ifndef UDPC_CONNECTION_H
