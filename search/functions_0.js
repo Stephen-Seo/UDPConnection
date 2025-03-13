@@ -46,13 +46,12 @@ var searchData=
   ['udpc_5fremove_5fwhitelist_5fpk_43',['UDPC_remove_whitelist_pk',['../UDPC_8h.html#abc2d3284e5c45d6cd888154e813a1383',1,'UDPC.h']]],
   ['udpc_5fset_5faccept_5fnew_5fconnections_44',['UDPC_set_accept_new_connections',['../UDPC_8h.html#a32e217a02b2e8ba05568aabfaecbcdcb',1,'UDPC.h']]],
   ['udpc_5fset_5fauth_5fpolicy_45',['UDPC_set_auth_policy',['../UDPC_8h.html#a8d0dbbd258e17844a2f9a0e277789581',1,'UDPC.h']]],
-  ['udpc_5fset_5fheartbeat_5fmillis_46',['UDPC_set_heartbeat_millis',['../UDPC_8h.html#aeb40d2c285eec0c53dd77e9d2cfeb5a2',1,'UDPC.h']]],
-  ['udpc_5fset_5flibsodium_5fkey_5feasy_47',['UDPC_set_libsodium_key_easy',['../UDPC_8h.html#ad7eb0c77561f84a63dad29388d099fbe',1,'UDPC.h']]],
-  ['udpc_5fset_5flibsodium_5fkeys_48',['UDPC_set_libsodium_keys',['../UDPC_8h.html#abd0a7d5c0a17cf3351dbe5abf5f70df1',1,'UDPC.h']]],
-  ['udpc_5fset_5flogging_5ftype_49',['UDPC_set_logging_type',['../UDPC_8h.html#a6c90dc723e67a07bf65c1fc97e526305',1,'UDPC.h']]],
-  ['udpc_5fset_5fprotocol_5fid_50',['UDPC_set_protocol_id',['../UDPC_8h.html#a0720bec1922660c983b1b3d9f6a5de3a',1,'UDPC.h']]],
-  ['udpc_5fset_5freceiving_5fevents_51',['UDPC_set_receiving_events',['../UDPC_8h.html#a380c91ee395cff22189c7988c3381787',1,'UDPC.h']]],
-  ['udpc_5fstrtoa_52',['UDPC_strtoa',['../UDPC_8h.html#a2ae8e7d87f785dd3b3353a00005c3dc6',1,'UDPC.h']]],
-  ['udpc_5funset_5flibsodium_5fkeys_53',['UDPC_unset_libsodium_keys',['../UDPC_8h.html#a62a5131b90653ccbfc86ad5db4031ba9',1,'UDPC.h']]],
-  ['udpc_5fupdate_54',['UDPC_update',['../UDPC_8h.html#a68fefba9edca7cd0a81d97ac27c70c0b',1,'UDPC.h']]]
+  ['udpc_5fset_5flibsodium_5fkey_5feasy_46',['UDPC_set_libsodium_key_easy',['../UDPC_8h.html#ad7eb0c77561f84a63dad29388d099fbe',1,'UDPC.h']]],
+  ['udpc_5fset_5flibsodium_5fkeys_47',['UDPC_set_libsodium_keys',['../UDPC_8h.html#abd0a7d5c0a17cf3351dbe5abf5f70df1',1,'UDPC.h']]],
+  ['udpc_5fset_5flogging_5ftype_48',['UDPC_set_logging_type',['../UDPC_8h.html#a6c90dc723e67a07bf65c1fc97e526305',1,'UDPC.h']]],
+  ['udpc_5fset_5fprotocol_5fid_49',['UDPC_set_protocol_id',['../UDPC_8h.html#a0720bec1922660c983b1b3d9f6a5de3a',1,'UDPC.h']]],
+  ['udpc_5fset_5freceiving_5fevents_50',['UDPC_set_receiving_events',['../UDPC_8h.html#a380c91ee395cff22189c7988c3381787',1,'UDPC.h']]],
+  ['udpc_5fstrtoa_51',['UDPC_strtoa',['../UDPC_8h.html#a2ae8e7d87f785dd3b3353a00005c3dc6',1,'UDPC.h']]],
+  ['udpc_5funset_5flibsodium_5fkeys_52',['UDPC_unset_libsodium_keys',['../UDPC_8h.html#a62a5131b90653ccbfc86ad5db4031ba9',1,'UDPC.h']]],
+  ['udpc_5fupdate_53',['UDPC_update',['../UDPC_8h.html#a68fefba9edca7cd0a81d97ac27c70c0b',1,'UDPC.h']]]
 ];

@@ -306,9 +306,6 @@ UDPC_EXPORT void&#160;</td><td class="memItemRight" valign="bottom"><b>UDPC_atos
 <tr class="memitem:a2e47fb8779abe3a9db72a08bf494dc75" id="r_a2e47fb8779abe3a9db72a08bf494dc75"><td class="memItemLeft" align="right" valign="top">UDPC_EXPORT void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a2e47fb8779abe3a9db72a08bf494dc75">UDPC_atostr_unsafe_free_ptr</a> (const char **addrBuf)</td></tr>
 <tr class="memdesc:a2e47fb8779abe3a9db72a08bf494dc75"><td class="mdescLeft">&#160;</td><td class="mdescRight">Free an addr string created with <a class="el" href="#a939b6c407297f6cf913f2983869f051f" title="Similar to UPDC_atostr(), but the returned ptr must be free&#39;d.">UDPC_atostr_unsafe()</a> and zeroes the pointer.  <br /></td></tr>
 <tr class="separator:a2e47fb8779abe3a9db72a08bf494dc75"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aeb40d2c285eec0c53dd77e9d2cfeb5a2" id="r_aeb40d2c285eec0c53dd77e9d2cfeb5a2"><td class="memItemLeft" align="right" valign="top">UDPC_EXPORT int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aeb40d2c285eec0c53dd77e9d2cfeb5a2">UDPC_set_heartbeat_millis</a> (UDPC_HContext ctx, unsigned int millis)</td></tr>
-<tr class="memdesc:aeb40d2c285eec0c53dd77e9d2cfeb5a2"><td class="mdescLeft">&#160;</td><td class="mdescRight">REVERTED FUNCTION, SEE DETAILS.  <br /></td></tr>
-<tr class="separator:aeb40d2c285eec0c53dd77e9d2cfeb5a2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2ae8e7d87f785dd3b3353a00005c3dc6" id="r_a2ae8e7d87f785dd3b3353a00005c3dc6"><td class="memItemLeft" align="right" valign="top"><a id="a2ae8e7d87f785dd3b3353a00005c3dc6" name="a2ae8e7d87f785dd3b3353a00005c3dc6"></a>
 UDPC_EXPORT UDPC_IPV6_ADDR_TYPE&#160;</td><td class="memItemRight" valign="bottom"><b>UDPC_strtoa</b> (const char *addrStr)</td></tr>
 <tr class="memdesc:a2ae8e7d87f785dd3b3353a00005c3dc6"><td class="mdescLeft">&#160;</td><td class="mdescRight">addrStr must be a valid ipv6 address or a valid ipv4 address <br /></td></tr>
@@ -394,7 +391,7 @@ Variables</h2></td></tr>
 <div class="textblock"><p>Public API for UDPConnection. </p>
 <p>Note that all functions are thread-safe unless mentioned otherwise in the function's documentation.</p>
 <p>UDPC maintains a binary state for each connection. This state is either "good mode" or "bad mode". All connections start in "bad mode". When in "bad
-mode", the fastest packet sending rate is 1 packet per 0.1 seconds, or 10 packets per second. When in "good mode", the fastest packet sending rate is 1 packet per 33.333 milliseconds, or 30 packets a second. Queued packets are sent immediately at the current mode's fastest-interval rate. If there are no queued packets, then "heartbeat" packets are sent at a rate of 1 packet per 0.15 seconds, or roughly 6 packets a second. This "heartbeat interval" can be adjusted with the <a class="el" href="#aeb40d2c285eec0c53dd77e9d2cfeb5a2">UDPC_set_heartbeat_millis()</a> function. </p>
+mode", the fastest packet sending rate is 1 packet per 0.1 seconds, or 10 packets per second. When in "good mode", the fastest packet sending rate is 1 packet per 33.333 milliseconds, or 30 packets a second. Queued packets are sent immediately at the current mode's fastest-interval rate. If there are no queued packets, then "heartbeat" packets are sent at a rate of 1 packet per 0.15 seconds, or roughly 6 packets a second. This "heartbeat interval" can be adjusted with the UDPC_set_heartbeat_millis() function. </p>
 </div><h2 class="groupheader">Typedef Documentation</h2>
 <a id="a228cd7ddf56a4e76e216bc3b80e8bd4a" name="a228cd7ddf56a4e76e216bc3b80e8bd4a"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a228cd7ddf56a4e76e216bc3b80e8bd4a">&#9670;&#160;</a></span>UDPC_AuthPolicy</h2>
@@ -1778,31 +1775,6 @@ mode", the fastest packet sending rate is 1 packet per 0.1 seconds, or 10 packet
 <p>If libsodium is enabled and the auth policy is "strict", then peers attempting to connect will be denied if they do not have public key verification enabled. Otherwise if the auth policy is "fallback", then peers will not be denied a connection regardless of whether or not they use public key verification of packets.</p>
 <p>Note that public key verification will not occur if it is not enabled during the call to <a class="el" href="#a89dee65fcd5b70d25abbf6d4a3ee59f2" title="Creates an UDPC_HContext that holds state for connections.">UDPC_init()</a>.</p>
 <dl class="section return"><dt>Returns</dt><dd>The previous auth policy (see <a class="el" href="#a228cd7ddf56a4e76e216bc3b80e8bd4a">UDPC_AuthPolicy</a>), or zero on fail </dd></dl>
-
-</div>
-</div>
-<a id="aeb40d2c285eec0c53dd77e9d2cfeb5a2" name="aeb40d2c285eec0c53dd77e9d2cfeb5a2"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aeb40d2c285eec0c53dd77e9d2cfeb5a2">&#9670;&#160;</a></span>UDPC_set_heartbeat_millis()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">UDPC_EXPORT int UDPC_set_heartbeat_millis </td>
-          <td>(</td>
-          <td class="paramtype">UDPC_HContext</td>          <td class="paramname"><span class="paramname"><em>ctx</em></span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">unsigned int</td>          <td class="paramname"><span class="paramname"><em>millis</em></span>&#160;)</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>REVERTED FUNCTION, SEE DETAILS. </p>
-<p>This function and its provided functionality was deemed premature for production use. This function will therefore be a no-op until the feature is implemented and ready.</p>
-<dl class="section return"><dt>Returns</dt><dd>-1 always, indicating that this function does not yet work as intended. </dd></dl>
 
 </div>
 </div>
