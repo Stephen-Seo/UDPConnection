@@ -926,22 +926,14 @@ UDPC_EXPORT void UDPC_atostr_unsafe_free(const char *addrBuf);
 UDPC_EXPORT void UDPC_atostr_unsafe_free_ptr(const char **addrBuf);
 
 /*!
- * \brief Sets the amount of time between heartbeat packets.
+ * \brief REVERTED FUNCTION, SEE DETAILS.
  *
- * By default, UDPC sends a heartbeat packet every 150 milliseconds.
- * This function can be used to increase the heartbeat interval time.
- * Valid values are between 150 to 5000 milliseconds. Any value outside of this
- * range will be clamped to within this range.
+ * This function and its provided functionality was deemed premature for
+ * production use. This function will therefore be a no-op until the feature
+ * is implemented and ready.
  *
- * This function affects all connections associated with the given UDPC Context.
- *
- * This is useful for cases where low-latency is not required. Also note that
- * increasing the heartbeat interval may prevent UDPC from entering "good mode"
- * for any connection. (See <a href="#details">details</a> for info on "good
- * mode" and "bad mode".)
- *
- * \return 0 on success, 1 if clamped to minimum, 2 if clamped to maximum, -1
- * if the given context is invalid.
+ * \return -1 always, indicating that this function does not yet work as
+ * intended.
  */
 UDPC_EXPORT int UDPC_set_heartbeat_millis(UDPC_HContext ctx, unsigned int millis);
 
