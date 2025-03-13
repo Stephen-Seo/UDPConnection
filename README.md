@@ -85,6 +85,13 @@ https://github.com/Stephen-Seo/UDPConnection
 
 Inspired by [a series of blog posts about networking for games.](https://gafferongames.com/categories/game-networking/)
 
+## C++11 vs. C++17
+
+Version 1.2 of UDPConnection supports up to C++11 standard, but future versions
+target the C++17 standard. If this is a problem for your use case, then you can
+safely use version 1.2 of UDPConnection for now. If there are major changes or
+fixes since, it will be noted here.
+
 ## Conan
 
 There used to be a self-hosted conan repository for UDPConnection. It is
