@@ -502,6 +502,12 @@ void TEST_UDPC() {
         CHECK_TRUE(UDPC_get_con_timeout_millis(ctx) == UDPC_CON_TIMEOUT_DEFAULT);
         CHECK_TRUE(UDPC_set_con_timeout_millis(ctx, 7000) == 0);
         CHECK_TRUE(UDPC_get_con_timeout_millis(ctx) == 7000);
+        CHECK_TRUE(UDPC_set_heartbeat_millis(ctx, 3000) == 0);
+        CHECK_TRUE(UDPC_get_heartbeat_millis(ctx) == 3000);
+        CHECK_TRUE(UDPC_set_con_timeout_millis(ctx, 2000) == -2);
+        CHECK_TRUE(UDPC_get_con_timeout_millis(ctx) == 7000);
+        CHECK_TRUE(UDPC_set_con_timeout_millis(ctx, 5500) == 0);
+        CHECK_TRUE(UDPC_get_con_timeout_millis(ctx) == 5500);
 
         UDPC_destroy(ctx);
     }
