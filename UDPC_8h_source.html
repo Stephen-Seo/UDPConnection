@@ -369,31 +369,35 @@ $(function(){ initResizable(false); });
 <div class="line"><a id="l00913" name="l00913"></a><span class="lineno">  913</span> </div>
 <div class="line"><a id="l00925" name="l00925"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a2e47fb8779abe3a9db72a08bf494dc75">  925</a></span>UDPC_EXPORT <span class="keywordtype">void</span> <a class="code hl_function" href="UDPC_8h.html#a2e47fb8779abe3a9db72a08bf494dc75">UDPC_atostr_unsafe_free_ptr</a>(<span class="keyword">const</span> <span class="keywordtype">char</span> **addrBuf);</div>
 <div class="line"><a id="l00926" name="l00926"></a><span class="lineno">  926</span> </div>
-<div class="line"><a id="l00927" name="l00927"></a><span class="lineno">  927</span><span class="comment">// =============================================================================</span></div>
-<div class="line"><a id="l00928" name="l00928"></a><span class="lineno">  928</span><span class="comment">// Helpers</span></div>
-<div class="line"><a id="l00929" name="l00929"></a><span class="lineno">  929</span> </div>
-<div class="line"><a id="l00931" name="l00931"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a2ae8e7d87f785dd3b3353a00005c3dc6">  931</a></span>UDPC_EXPORT UDPC_IPV6_ADDR_TYPE <a class="code hl_function" href="UDPC_8h.html#a2ae8e7d87f785dd3b3353a00005c3dc6">UDPC_strtoa</a>(<span class="keyword">const</span> <span class="keywordtype">char</span> *addrStr);</div>
-<div class="line"><a id="l00932" name="l00932"></a><span class="lineno">  932</span> </div>
-<div class="line"><a id="l00933" name="l00933"></a><span class="lineno">  933</span>UDPC_EXPORT UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(<span class="keyword">const</span> <span class="keywordtype">char</span> *addrStr, uint32_t *linkId_out);</div>
-<div class="line"><a id="l00934" name="l00934"></a><span class="lineno">  934</span> </div>
-<div class="line"><a id="l00935" name="l00935"></a><span class="lineno">  935</span>UDPC_EXPORT UDPC_IPV6_ADDR_TYPE UDPC_a4toa6(uint32_t a4_be);</div>
+<div class="line"><a id="l00927" name="l00927"></a><span class="lineno">  927</span><span class="comment">// There used to be a `UDPC_set_heartbeat_millis(...)` function here, but it</span></div>
+<div class="line"><a id="l00928" name="l00928"></a><span class="lineno">  928</span><span class="comment">// was determined that it would be better not to implement it. Details here:</span></div>
+<div class="line"><a id="l00929" name="l00929"></a><span class="lineno">  929</span><span class="comment">// https://github.com/Stephen-Seo/UDPConnection/issues/2</span></div>
+<div class="line"><a id="l00930" name="l00930"></a><span class="lineno">  930</span> </div>
+<div class="line"><a id="l00931" name="l00931"></a><span class="lineno">  931</span><span class="comment">// =============================================================================</span></div>
+<div class="line"><a id="l00932" name="l00932"></a><span class="lineno">  932</span><span class="comment">// Helpers</span></div>
+<div class="line"><a id="l00933" name="l00933"></a><span class="lineno">  933</span> </div>
+<div class="line"><a id="l00935" name="l00935"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a2ae8e7d87f785dd3b3353a00005c3dc6">  935</a></span>UDPC_EXPORT UDPC_IPV6_ADDR_TYPE <a class="code hl_function" href="UDPC_8h.html#a2ae8e7d87f785dd3b3353a00005c3dc6">UDPC_strtoa</a>(<span class="keyword">const</span> <span class="keywordtype">char</span> *addrStr);</div>
 <div class="line"><a id="l00936" name="l00936"></a><span class="lineno">  936</span> </div>
-<div class="line"><a id="l00937" name="l00937"></a><span class="lineno">  937</span>UDPC_EXPORT <span class="keywordtype">int</span> UDPC_is_big_endian();</div>
+<div class="line"><a id="l00937" name="l00937"></a><span class="lineno">  937</span>UDPC_EXPORT UDPC_IPV6_ADDR_TYPE UDPC_strtoa_link(<span class="keyword">const</span> <span class="keywordtype">char</span> *addrStr, uint32_t *linkId_out);</div>
 <div class="line"><a id="l00938" name="l00938"></a><span class="lineno">  938</span> </div>
-<div class="line"><a id="l00979" name="l00979"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a09093c7edd8ed04407c84a94e0d02587">  979</a></span>UDPC_EXPORT uint16_t <a class="code hl_function" href="UDPC_8h.html#a09093c7edd8ed04407c84a94e0d02587">UDPC_no16i</a>(uint16_t i);</div>
-<div class="line"><a id="l00980" name="l00980"></a><span class="lineno">  980</span> </div>
-<div class="line"><a id="l01021" name="l01021"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a3e62beb3d497732f5e1d79e19878198c"> 1021</a></span>UDPC_EXPORT uint32_t <a class="code hl_function" href="UDPC_8h.html#a3e62beb3d497732f5e1d79e19878198c">UDPC_no32i</a>(uint32_t i);</div>
-<div class="line"><a id="l01022" name="l01022"></a><span class="lineno"> 1022</span> </div>
-<div class="line"><a id="l01063" name="l01063"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a0d6d9407ed6743a23283d8711652d757"> 1063</a></span>UDPC_EXPORT uint64_t <a class="code hl_function" href="UDPC_8h.html#a0d6d9407ed6743a23283d8711652d757">UDPC_no64i</a>(uint64_t i);</div>
-<div class="line"><a id="l01064" name="l01064"></a><span class="lineno"> 1064</span> </div>
-<div class="line"><a id="l01096" name="l01096"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a61f1ec575cd8a1020bf4d53a72497ab6"> 1096</a></span>UDPC_EXPORT <span class="keywordtype">float</span> <a class="code hl_function" href="UDPC_8h.html#a61f1ec575cd8a1020bf4d53a72497ab6">UDPC_no32f</a>(<span class="keywordtype">float</span> f);</div>
-<div class="line"><a id="l01097" name="l01097"></a><span class="lineno"> 1097</span> </div>
-<div class="line"><a id="l01129" name="l01129"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a93a1a33c4d5dcd4f3e829ce4b15df11c"> 1129</a></span>UDPC_EXPORT <span class="keywordtype">double</span> <a class="code hl_function" href="UDPC_8h.html#a93a1a33c4d5dcd4f3e829ce4b15df11c">UDPC_no64f</a>(<span class="keywordtype">double</span> f);</div>
-<div class="line"><a id="l01130" name="l01130"></a><span class="lineno"> 1130</span> </div>
-<div class="line"><a id="l01131" name="l01131"></a><span class="lineno"> 1131</span><span class="preprocessor">#ifdef __cplusplus</span></div>
-<div class="line"><a id="l01132" name="l01132"></a><span class="lineno"> 1132</span>}</div>
-<div class="line"><a id="l01133" name="l01133"></a><span class="lineno"> 1133</span><span class="preprocessor">#endif</span></div>
-<div class="line"><a id="l01134" name="l01134"></a><span class="lineno"> 1134</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00939" name="l00939"></a><span class="lineno">  939</span>UDPC_EXPORT UDPC_IPV6_ADDR_TYPE UDPC_a4toa6(uint32_t a4_be);</div>
+<div class="line"><a id="l00940" name="l00940"></a><span class="lineno">  940</span> </div>
+<div class="line"><a id="l00941" name="l00941"></a><span class="lineno">  941</span>UDPC_EXPORT <span class="keywordtype">int</span> UDPC_is_big_endian();</div>
+<div class="line"><a id="l00942" name="l00942"></a><span class="lineno">  942</span> </div>
+<div class="line"><a id="l00983" name="l00983"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a09093c7edd8ed04407c84a94e0d02587">  983</a></span>UDPC_EXPORT uint16_t <a class="code hl_function" href="UDPC_8h.html#a09093c7edd8ed04407c84a94e0d02587">UDPC_no16i</a>(uint16_t i);</div>
+<div class="line"><a id="l00984" name="l00984"></a><span class="lineno">  984</span> </div>
+<div class="line"><a id="l01025" name="l01025"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a3e62beb3d497732f5e1d79e19878198c"> 1025</a></span>UDPC_EXPORT uint32_t <a class="code hl_function" href="UDPC_8h.html#a3e62beb3d497732f5e1d79e19878198c">UDPC_no32i</a>(uint32_t i);</div>
+<div class="line"><a id="l01026" name="l01026"></a><span class="lineno"> 1026</span> </div>
+<div class="line"><a id="l01067" name="l01067"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a0d6d9407ed6743a23283d8711652d757"> 1067</a></span>UDPC_EXPORT uint64_t <a class="code hl_function" href="UDPC_8h.html#a0d6d9407ed6743a23283d8711652d757">UDPC_no64i</a>(uint64_t i);</div>
+<div class="line"><a id="l01068" name="l01068"></a><span class="lineno"> 1068</span> </div>
+<div class="line"><a id="l01100" name="l01100"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a61f1ec575cd8a1020bf4d53a72497ab6"> 1100</a></span>UDPC_EXPORT <span class="keywordtype">float</span> <a class="code hl_function" href="UDPC_8h.html#a61f1ec575cd8a1020bf4d53a72497ab6">UDPC_no32f</a>(<span class="keywordtype">float</span> f);</div>
+<div class="line"><a id="l01101" name="l01101"></a><span class="lineno"> 1101</span> </div>
+<div class="line"><a id="l01133" name="l01133"></a><span class="lineno"><a class="line" href="UDPC_8h.html#a93a1a33c4d5dcd4f3e829ce4b15df11c"> 1133</a></span>UDPC_EXPORT <span class="keywordtype">double</span> <a class="code hl_function" href="UDPC_8h.html#a93a1a33c4d5dcd4f3e829ce4b15df11c">UDPC_no64f</a>(<span class="keywordtype">double</span> f);</div>
+<div class="line"><a id="l01134" name="l01134"></a><span class="lineno"> 1134</span> </div>
+<div class="line"><a id="l01135" name="l01135"></a><span class="lineno"> 1135</span><span class="preprocessor">#ifdef __cplusplus</span></div>
+<div class="line"><a id="l01136" name="l01136"></a><span class="lineno"> 1136</span>}</div>
+<div class="line"><a id="l01137" name="l01137"></a><span class="lineno"> 1137</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l01138" name="l01138"></a><span class="lineno"> 1138</span><span class="preprocessor">#endif</span></div>
 <div class="ttc" id="aUDPC_8h_html_a0720bec1922660c983b1b3d9f6a5de3a"><div class="ttname"><a href="UDPC_8h.html#a0720bec1922660c983b1b3d9f6a5de3a">UDPC_set_protocol_id</a></div><div class="ttdeci">UDPC_EXPORT uint32_t UDPC_set_protocol_id(UDPC_HContext ctx, uint32_t id)</div><div class="ttdoc">Sets the protocol id of the UDPC context.</div></div>
 <div class="ttc" id="aUDPC_8h_html_a09093c7edd8ed04407c84a94e0d02587"><div class="ttname"><a href="UDPC_8h.html#a09093c7edd8ed04407c84a94e0d02587">UDPC_no16i</a></div><div class="ttdeci">UDPC_EXPORT uint16_t UDPC_no16i(uint16_t i)</div><div class="ttdoc">Converts a 16-bit int into/from network byte order (big endian).</div></div>
 <div class="ttc" id="aUDPC_8h_html_a0d6d9407ed6743a23283d8711652d757"><div class="ttname"><a href="UDPC_8h.html#a0d6d9407ed6743a23283d8711652d757">UDPC_no64i</a></div><div class="ttdeci">UDPC_EXPORT uint64_t UDPC_no64i(uint64_t i)</div><div class="ttdoc">Converts a 64-bit int into/from network byte order (big endian).</div></div>
