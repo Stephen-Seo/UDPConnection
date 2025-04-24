@@ -99,3 +99,35 @@ currently unavailable.
 
 The `conan` branch contains the necessary changes to publish this library as a
 conan package. Expect the `conan` branch to merge `master` in the future.
+
+## Removal of Setting Heartbeat Interval Function
+
+https://github.com/Stephen-Seo/UDPConnection/issues/2
+
+(The following text is a reproduction of the text in the linked issue in case
+the link goes down.)
+
+    The original intent of the reverted function UDPC_set_heartbeat_millis(...)
+    was to allow UDPC to accommodate the use case of where packets are sent much
+    less frequently than the "good-mode"/"bad-mode" rates (30pkts-per-second and
+    10pkts-per-second). However, increasing the heartbeat packet rate and also
+    increasing the timed-out-packet time causes issues with the current
+    implementation.
+    
+    The default packet-time-out time is 1 second. Every packet includes a 32-bit
+    ack that keeps track of the peer's packet's received status. This means that
+    at the fastest rate of 30 packets a second, these 32 flags can still track
+    if a packet has timed out, and a peer will resend a timed out packet
+    accordingly.
+    
+    The previously introduced functionality of increasing the
+    heartbeat-interval-time (and packet-timeout-time based on the
+    heartbeat-interval-time) breaks this setup in the case where a burst of
+    fastest-rate packets are sent followed by only heartbeat packets, causing
+    possible loss of tracked packets and preventing them from being re-sent (or
+    being re-sent too aggressively).
+    
+    As mentioned in 79f43a4 , some changes are required to support high-latency
+    use cases. One possible use is to impose a separate time-out rate and
+    send-rate for high-latency use cases. But it would be more ideal for UDPC to
+    do the heavy lifting and handle both situations seamlessly.
