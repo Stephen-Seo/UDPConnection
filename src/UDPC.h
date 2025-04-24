@@ -924,6 +924,10 @@ UDPC_EXPORT void UDPC_atostr_unsafe_free(const char *addrBuf);
  */
 UDPC_EXPORT void UDPC_atostr_unsafe_free_ptr(const char **addrBuf);
 
+// There used to be a `UDPC_set_heartbeat_millis(...)` function here, but it
+// was determined that it would be better not to implement it. Details here:
+// https://github.com/Stephen-Seo/UDPConnection/issues/2
+
 // =============================================================================
 // Helpers
 
