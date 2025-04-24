@@ -131,3 +131,6 @@ the link goes down.)
     use cases. One possible use is to impose a separate time-out rate and
     send-rate for high-latency use cases. But it would be more ideal for UDPC to
     do the heavy lifting and handle both situations seamlessly.
+
+Long story short, for high-latency, just use TCP/Websockets etc. For
+low-latency, you may use this library, but the connection must be decent.
