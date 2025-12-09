@@ -46,8 +46,8 @@ public:
     LockObj& operator=(const LockObj&) = delete;
 
     // Allow move.
-    LockObj(LockObj&&) = default;
-    LockObj& operator=(LockObj&&) = default;
+    LockObj(LockObj&&);
+    LockObj& operator=(LockObj&&);
 
     bool isValid() const;
 
@@ -88,9 +88,6 @@ public:
 
     LockObj<false> trade_write_for_read_lock(LockObj<true>&);
     LockObj<false> try_trade_write_for_read_lock(LockObj<true>&);
-
-    LockObj<true> trade_read_for_write_lock(LockObj<false>&);
-    LockObj<true> try_trade_read_for_write_lock(LockObj<false>&);
 
 private:
     SharedSpinLock();
@@ -139,6 +136,26 @@ LockObj<IsWriteObj>::~LockObj() {
             strongPtrLock->read_unlock(std::move(badge));
         }
     }
+}
+
+template <bool IsWriteObj>
+LockObj<IsWriteObj>::LockObj(LockObj<IsWriteObj> &&other) {
+    this->weakPtrLock = std::move(other.weakPtrLock);
+    this->isLocked = std::move(other.isLocked);
+    this->badge = std::move(other.badge);
+}
+
+template <bool IsWriteObj>
+LockObj<IsWriteObj> &LockObj<IsWriteObj>::operator=(LockObj<IsWriteObj> &&other) {
+    this->~LockObj();
+
+    this->weakPtrLock = std::move(other.weakPtrLock);
+    this->isLocked = std::move(other.isLocked);
+    this->badge = std::move(other.badge);
+
+    other.isLocked = false;
+
+    return *this;
 }
 
 template <bool IsWriteObj>

@@ -389,9 +389,12 @@ bool TSLQueue<T>::TSLQIter::remove() {
             return false;
         }
 
-        writeLock = std::unique_ptr<UDPC::LockObj<true>>(new UDPC::LockObj<true>{});
-        *writeLock = sharedSpinLockStrong->trade_read_for_write_lock(*readLock);
+        // Drop the read lock.
         readLock.reset(nullptr);
+
+        writeLock = std::unique_ptr<UDPC::LockObj<true>>(new UDPC::LockObj<true>{});
+        // Get the write lock.
+        *writeLock = sharedSpinLockStrong->spin_write_lock();
 
         return remove_impl();
     } else {
@@ -407,8 +410,12 @@ bool TSLQueue<T>::TSLQIter::try_remove() {
             return false;
         }
 
+        // Drop the read lock.
+        readLock.reset(nullptr);
+
         writeLock = std::unique_ptr<UDPC::LockObj<true>>(new UDPC::LockObj<true>{});
-        *writeLock = sharedSpinLockStrong->try_trade_read_for_write_lock(*readLock);
+        // Get the write lock.
+        *writeLock = sharedSpinLockStrong->try_spin_write_lock();
         if (writeLock->isValid()) {
             readLock.reset(nullptr);
             return remove_impl();
