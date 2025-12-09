@@ -143,6 +143,8 @@ LockObj<IsWriteObj>::LockObj(LockObj<IsWriteObj> &&other) {
     this->weakPtrLock = std::move(other.weakPtrLock);
     this->isLocked = std::move(other.isLocked);
     this->badge = std::move(other.badge);
+
+    other.isLocked = false;
 }
 
 template <bool IsWriteObj>
