@@ -2,14 +2,13 @@
 #define UDPC_THREADSAFE_LINKEDLIST_QUEUE_HPP
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <chrono>
 #include <optional>
 #include <cassert>
-#include <list>
-#include <type_traits>
 
 #include "CXX11_shared_spin_lock.hpp"
 
@@ -140,9 +139,9 @@ class TSLQueue {
 
   public:
     /// Only 1 read-write Iter can exist.
-    TSLQIter begin();
+    std::optional<TSLQIter> begin(uint64_t timeout_sec);
     /// There can be many read-only Iterators.
-    TSLQIter begin_readonly();
+    std::optional<TSLQIter> begin_readonly(uint64_t timeout_sec);
 
   private:
     UDPC::SharedSpinLock::Ptr sharedSpinLock;
@@ -612,19 +611,29 @@ bool TSLQueue<T>::TSLQIter::remove_impl() {
 }
 
 template <typename T>
-typename TSLQueue<T>::TSLQIter TSLQueue<T>::begin() {
+std::optional<typename TSLQueue<T>::TSLQIter> TSLQueue<T>::begin(uint64_t timeout_sec) {
+    const auto duration = std::chrono::seconds(timeout_sec);
+    const auto start_time = std::chrono::steady_clock::now();
     auto mlock = std::lock_guard<std::mutex>(this->iterCreateMutex);
     while (this->iterCount->load() != 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        if (std::chrono::steady_clock::now() - start_time > duration) {
+            return std::nullopt;
+        }
     }
     return TSLQIter(sharedSpinLock, head->next, &msize, iterCount, writeIterExists);
 }
 
 template <typename T>
-typename TSLQueue<T>::TSLQIter TSLQueue<T>::begin_readonly() {
+std::optional<typename TSLQueue<T>::TSLQIter> TSLQueue<T>::begin_readonly(uint64_t timeout_sec) {
+    const auto duration = std::chrono::seconds(timeout_sec);
+    const auto start_time = std::chrono::steady_clock::now();
     auto mlock = std::lock_guard<std::mutex>(this->iterCreateMutex);
     while (this->writeIterExists->load()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        if (std::chrono::steady_clock::now() - start_time > duration) {
+            return std::nullopt;
+        }
     }
     return TSLQIter(sharedSpinLock, head->next, &msize, iterCount, {});
 }

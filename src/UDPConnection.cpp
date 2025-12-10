@@ -282,15 +282,19 @@ UDPC::Context::~Context() {
            ++iter) {
         std::free(iter->data);
     }
-    {
-        auto iter = cSendPkts.begin();
-        auto current = iter.current();
+    do {
+        auto iter = cSendPkts.begin(1);
+        if (!iter.has_value()) {
+            continue;
+        }
+        auto current = iter->current();
         while(current) {
             std::free(current->data);
-            if(!iter.next()) { break; }
-            current = iter.current();
+            if(!iter->next()) { break; }
+            current = iter->current();
         }
-    }
+        break;
+    } while (true);
 }
 
 bool UDPC::Context::willLog(UDPC_LoggingType type) {
@@ -559,12 +563,16 @@ void UDPC::Context::update_impl() {
     }
 
     // move queued in cSendPkts to existing connection's sendPkts
+    do
     {
-        auto sendIter = cSendPkts.begin();
+        auto sendIter = cSendPkts.begin(1);
+        if (!sendIter.has_value()) {
+            break;
+        }
         std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher> dropped;
         std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher> notQueued;
         while(true) {
-            auto next = sendIter.current();
+            auto next = sendIter->current();
             if(next) {
                 std::lock_guard<std::mutex> conMapLock(conMapMutex);
                 auto iter = conMap.find(next->receiver);
@@ -580,14 +588,14 @@ void UDPC::Context::update_impl() {
                                 next->receiver.port,
                                 ", connection's queue reached max size");
                         }
-                        if(sendIter.next()) {
+                        if(sendIter->next()) {
                             continue;
                         } else {
                             break;
                         }
                     }
                     iter->second.sendPkts.push_back(*next);
-                    if(sendIter.remove()) {
+                    if(sendIter->remove()) {
                         continue;
                     } else {
                         break;
@@ -603,7 +611,7 @@ void UDPC::Context::update_impl() {
                             " due to connection not existing");
                         dropped.insert(next->receiver);
                     }
-                    if(sendIter.remove()) {
+                    if(sendIter->remove()) {
                         continue;
                     } else {
                         break;
@@ -613,7 +621,8 @@ void UDPC::Context::update_impl() {
                 break;
             }
         }
-    }
+        break;
+    } while (true);
 
     // update send (only if triggerSend flag is set)
     {

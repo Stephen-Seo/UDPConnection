@@ -2,7 +2,6 @@
 #include "test_headers.h"
 
 #include <future>
-#include <functional>
 
 #include "TSLQueue.hpp"
 
@@ -135,7 +134,8 @@ void TEST_TSLQueue() {
 
         {
             // iteration
-            auto iter = q.begin();
+            auto iter_opt = q.begin_readonly(1);
+            auto iter = std::move(iter_opt.value());
             int i = 0;
             auto op = iter.current();
             while(op) {
@@ -171,7 +171,8 @@ void TEST_TSLQueue() {
         {
             // iter remove
             {
-                auto iter = q.begin();
+                auto iter_opt = q.begin(1);
+                auto iter = std::move(iter_opt.value());
                 CHECK_TRUE(iter.next());
                 CHECK_TRUE(iter.next());
                 CHECK_TRUE(iter.next());
@@ -189,16 +190,17 @@ void TEST_TSLQueue() {
             // Drop first iterator, there can only be 1 rw iterator.
 
             // second iterator, read-only.
-            auto iter2 = q.begin_readonly();
+            auto iter2 = q.begin_readonly(1);
+            CHECK_TRUE(iter2.has_value());
 
             // Still should be able to get top.
-            CHECK_TRUE(iter2.current());
+            CHECK_TRUE(iter2.has_value() && iter2->current());
 
             // third iterator, read-only.
-            auto iter3 = q.begin_readonly();
+            auto iter3 = q.begin_readonly(1);
 
             // Still should be able to get top.
-            CHECK_TRUE(iter3.current());
+            CHECK_TRUE(iter3.has_value() && iter3->current());
         }
         CHECK_EQ(q.size(), 9);
 
@@ -222,8 +224,8 @@ void TEST_TSLQueue() {
         q.push(3);
         CHECK_EQ(q.size(), 4);
         {
-            auto iter = q.begin();
-            CHECK_TRUE(iter.remove());
+            auto iter = q.begin(1);
+            CHECK_TRUE(iter.has_value() && iter->remove());
         }
         CHECK_EQ(q.size(), 3);
         i = 1;
@@ -241,14 +243,17 @@ void TEST_TSLQueue() {
         q.push(3);
         CHECK_EQ(q.size(), 4);
         {
-            auto iter = q.begin();
-            while(true) {
-                CHECK_TRUE(iter.next());
-                op = iter.current();
-                CHECK_TRUE(op);
-                if(*op == 3) {
-                    CHECK_FALSE(iter.remove());
-                    break;
+            auto iter = q.begin(1);
+            CHECK_TRUE(iter.has_value());
+            if (iter.has_value()) {
+                while(true) {
+                    CHECK_TRUE(iter->next());
+                    op = iter->current();
+                    CHECK_TRUE(op);
+                    if(*op == 3) {
+                        CHECK_FALSE(iter->remove());
+                        break;
+                    }
                 }
             }
         }
