@@ -139,9 +139,9 @@ class TSLQueue {
 
   public:
     /// Only 1 read-write Iter can exist.
-    std::optional<TSLQIter> begin(uint64_t timeout_sec);
+    std::optional<TSLQIter> begin(uint64_t timeout_millis);
     /// There can be many read-only Iterators.
-    std::optional<TSLQIter> begin_readonly(uint64_t timeout_sec);
+    std::optional<TSLQIter> begin_readonly(uint64_t timeout_millis);
 
   private:
     UDPC::SharedSpinLock::Ptr sharedSpinLock;
@@ -611,8 +611,8 @@ bool TSLQueue<T>::TSLQIter::remove_impl() {
 }
 
 template <typename T>
-std::optional<typename TSLQueue<T>::TSLQIter> TSLQueue<T>::begin(uint64_t timeout_sec) {
-    const auto duration = std::chrono::seconds(timeout_sec);
+std::optional<typename TSLQueue<T>::TSLQIter> TSLQueue<T>::begin(uint64_t timeout_millis) {
+    const auto duration = std::chrono::milliseconds(timeout_millis);
     const auto start_time = std::chrono::steady_clock::now();
     auto mlock = std::lock_guard<std::mutex>(this->iterCreateMutex);
     while (this->iterCount->load() != 0) {
@@ -625,8 +625,8 @@ std::optional<typename TSLQueue<T>::TSLQIter> TSLQueue<T>::begin(uint64_t timeou
 }
 
 template <typename T>
-std::optional<typename TSLQueue<T>::TSLQIter> TSLQueue<T>::begin_readonly(uint64_t timeout_sec) {
-    const auto duration = std::chrono::seconds(timeout_sec);
+std::optional<typename TSLQueue<T>::TSLQIter> TSLQueue<T>::begin_readonly(uint64_t timeout_millis) {
+    const auto duration = std::chrono::milliseconds(timeout_millis);
     const auto start_time = std::chrono::steady_clock::now();
     auto mlock = std::lock_guard<std::mutex>(this->iterCreateMutex);
     while (this->writeIterExists->load()) {

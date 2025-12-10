@@ -171,7 +171,7 @@ void TEST_TSLQueue() {
         {
             // iter remove
             {
-                auto iter_opt = q.begin(1);
+                auto iter_opt = q.begin(300);
                 auto iter = std::move(iter_opt.value());
                 CHECK_TRUE(iter.next());
                 CHECK_TRUE(iter.next());
@@ -224,7 +224,7 @@ void TEST_TSLQueue() {
         q.push(3);
         CHECK_EQ(q.size(), 4);
         {
-            auto iter = q.begin(1);
+            auto iter = q.begin(300);
             CHECK_TRUE(iter.has_value() && iter->remove());
         }
         CHECK_EQ(q.size(), 3);
@@ -243,7 +243,7 @@ void TEST_TSLQueue() {
         q.push(3);
         CHECK_EQ(q.size(), 4);
         {
-            auto iter = q.begin(1);
+            auto iter = q.begin(300);
             CHECK_TRUE(iter.has_value());
             if (iter.has_value()) {
                 while(true) {
@@ -271,7 +271,7 @@ void TEST_TSLQueue() {
 
         // Iterator timeout
         {
-            auto write_iter = q.begin(1);
+            auto write_iter = q.begin(300);
             CHECK_TRUE(write_iter.has_value());
             auto read_iter = q.begin_readonly(1);
             CHECK_FALSE(read_iter.has_value());
@@ -279,7 +279,7 @@ void TEST_TSLQueue() {
         {
             auto read_iter = q.begin_readonly(1);
             CHECK_TRUE(read_iter.has_value());
-            auto write_iter = q.begin(1);
+            auto write_iter = q.begin(300);
             CHECK_FALSE(write_iter.has_value());
             auto read_iter2 = q.begin_readonly(1);
             CHECK_TRUE(read_iter2.has_value());

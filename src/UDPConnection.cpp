@@ -283,7 +283,7 @@ UDPC::Context::~Context() {
         std::free(iter->data);
     }
     do {
-        auto iter = cSendPkts.begin(1);
+        auto iter = cSendPkts.begin(300);
         if (!iter.has_value()) {
             continue;
         }
@@ -565,7 +565,7 @@ void UDPC::Context::update_impl() {
     // move queued in cSendPkts to existing connection's sendPkts
     do
     {
-        auto sendIter = cSendPkts.begin(1);
+        auto sendIter = cSendPkts.begin(300);
         if (!sendIter.has_value()) {
             break;
         }
