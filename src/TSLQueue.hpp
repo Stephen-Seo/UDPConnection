@@ -1,6 +1,7 @@
 #ifndef UDPC_THREADSAFE_LINKEDLIST_QUEUE_HPP
 #define UDPC_THREADSAFE_LINKEDLIST_QUEUE_HPP
 
+#include <atomic>
 #include <memory>
 #include <thread>
 #include <chrono>
@@ -61,11 +62,29 @@ class TSLQueue {
         bool isNormal() const;
     };
 
+    class IterCount {
+    public:
+        IterCount(std::shared_ptr<std::atomic_ullong> count);
+        ~IterCount();
+
+        // Disallow copy.
+        IterCount(const IterCount &) = delete;
+        IterCount& operator=(const IterCount &) = delete;
+
+        // Allow move.
+        IterCount(IterCount &&);
+        IterCount& operator=(IterCount &&);
+    private:
+        std::shared_ptr<std::atomic_ullong> count;
+
+    };
+
     class TSLQIter {
     public:
         TSLQIter(UDPC::SharedSpinLock::Weak sharedSpinLockWeak,
                  std::weak_ptr<TSLQNode> currentNode,
-                 unsigned long *msize);
+                 unsigned long *msize,
+                 std::shared_ptr<std::atomic_ullong> count);
         ~TSLQIter();
 
         // Disallow copy.
@@ -84,6 +103,7 @@ class TSLQueue {
 
     private:
         UDPC::SharedSpinLock::Weak sharedSpinLockWeak;
+        IterCount iterCount;
         std::unique_ptr<UDPC::LockObj<false>> readLock;
         std::unique_ptr<UDPC::LockObj<true>> writeLock;
         std::weak_ptr<TSLQNode> currentNode;
@@ -98,6 +118,7 @@ class TSLQueue {
 
   private:
     UDPC::SharedSpinLock::Ptr sharedSpinLock;
+    std::shared_ptr<std::atomic_ullong> iterCount;
     std::shared_ptr<TSLQNode> head;
     std::shared_ptr<TSLQNode> tail;
     unsigned long msize;
@@ -106,6 +127,7 @@ class TSLQueue {
 template <typename T>
 TSLQueue<T>::TSLQueue() :
     sharedSpinLock(UDPC::SharedSpinLock::newInstance()),
+    iterCount(std::shared_ptr<std::atomic_ullong>(new std::atomic_ullong(0))),
     head(std::shared_ptr<TSLQNode>(new TSLQNode())),
     tail(std::shared_ptr<TSLQNode>(new TSLQNode())),
     msize(0)
@@ -123,10 +145,14 @@ TSLQueue<T>::~TSLQueue() {
 template <typename T>
 TSLQueue<T>::TSLQueue(TSLQueue &&other) :
     sharedSpinLock(UDPC::SharedSpinLock::newInstance()),
+    iterCount(other.iterCount),
     head(std::shared_ptr<TSLQNode>(new TSLQNode())),
     tail(std::shared_ptr<TSLQNode>(new TSLQNode())),
     msize(0)
 {
+    while (iterCount->load() != 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     auto selfWriteLock = sharedSpinLock->spin_write_lock();
     auto otherWriteLock = other.sharedSpinLock->spin_write_lock();
     head = std::move(other.head);
@@ -136,15 +162,22 @@ TSLQueue<T>::TSLQueue(TSLQueue &&other) :
 
 template <typename T>
 TSLQueue<T> & TSLQueue<T>::operator=(TSLQueue &&other) {
+    while (iterCount->load() != 0 && other.iterCount->load() != 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     auto selfWriteLock = sharedSpinLock->spin_write_lock();
     auto otherWriteLock = other.sharedSpinLock->spin_write_lock();
     head = std::move(other.head);
     tail = std::move(other.tail);
     msize = std::move(other.msize);
+    iterCount = std::move(other.iterCount);
 }
 
 template <typename T>
 void TSLQueue<T>::push(const T &data) {
+    while (iterCount->load() != 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     auto writeLock = sharedSpinLock->spin_write_lock();
     auto newNode = std::shared_ptr<TSLQNode>(new TSLQNode());
     newNode->data = std::unique_ptr<T>(new T(data));
@@ -161,6 +194,9 @@ void TSLQueue<T>::push(const T &data) {
 
 template <typename T>
 bool TSLQueue<T>::push_nb(const T &data) {
+    if (iterCount->load() != 0) {
+        return false;
+    }
     auto writeLock = sharedSpinLock->try_spin_write_lock();
     if(writeLock.isValid()) {
         auto newNode = std::shared_ptr<TSLQNode>(new TSLQNode());
@@ -209,6 +245,9 @@ std::unique_ptr<T> TSLQueue<T>::top_nb() {
 
 template <typename T>
 bool TSLQueue<T>::pop() {
+    while (iterCount->load() != 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     auto writeLock = sharedSpinLock->spin_write_lock();
     if(head->next == tail) {
         return false;
@@ -226,6 +265,9 @@ bool TSLQueue<T>::pop() {
 template <typename T>
 std::unique_ptr<T> TSLQueue<T>::top_and_pop() {
     std::unique_ptr<T> result;
+    while (iterCount->load() != 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     auto writeLock = sharedSpinLock->spin_write_lock();
     if(head->next != tail) {
         assert(head->next->data);
@@ -244,6 +286,9 @@ std::unique_ptr<T> TSLQueue<T>::top_and_pop() {
 template <typename T>
 std::unique_ptr<T> TSLQueue<T>::top_and_pop_and_empty(bool *isEmpty) {
     std::unique_ptr<T> result;
+    while (iterCount->load() != 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     auto writeLock = sharedSpinLock->spin_write_lock();
     if(head->next == tail) {
         if(isEmpty) {
@@ -270,6 +315,9 @@ std::unique_ptr<T> TSLQueue<T>::top_and_pop_and_empty(bool *isEmpty) {
 template <typename T>
 std::unique_ptr<T> TSLQueue<T>::top_and_pop_and_rsize(unsigned long *rsize) {
     std::unique_ptr<T> result;
+    while (iterCount->load() != 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     auto writeLock = sharedSpinLock->spin_write_lock();
     if(head->next == tail) {
         if(rsize) {
@@ -295,6 +343,9 @@ std::unique_ptr<T> TSLQueue<T>::top_and_pop_and_rsize(unsigned long *rsize) {
 
 template <typename T>
 void TSLQueue<T>::clear() {
+    while (iterCount->load() != 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     auto writeLock = sharedSpinLock->spin_write_lock();
 
     head->next = tail;
@@ -328,10 +379,37 @@ bool TSLQueue<T>::TSLQNode::isNormal() const {
 }
 
 template <typename T>
+TSLQueue<T>::IterCount::IterCount(std::shared_ptr<std::atomic_ullong> count) : count(count) {
+    this->count->fetch_add(1);
+}
+
+template <typename T>
+TSLQueue<T>::IterCount::~IterCount() {
+    if (this->count) {
+        this->count->fetch_sub(1);
+    }
+}
+
+template <typename T>
+TSLQueue<T>::IterCount::IterCount(IterCount &&other) : count(other.count) {
+    other.count.reset();
+}
+
+template <typename T>
+typename TSLQueue<T>::IterCount &TSLQueue<T>::IterCount::operator=(IterCount &&other) {
+    ~IterCount();
+
+    this->count = other.count;
+    other.count.reset();
+}
+
+template <typename T>
 TSLQueue<T>::TSLQIter::TSLQIter(UDPC::SharedSpinLock::Weak lockWeak,
                                 std::weak_ptr<TSLQNode> currentNode,
-                                unsigned long *msize) :
+                                unsigned long *msize,
+                                std::shared_ptr<std::atomic_ullong> count) :
 sharedSpinLockWeak(lockWeak),
+iterCount(count),
 readLock(std::unique_ptr<UDPC::LockObj<false>>(new UDPC::LockObj<false>{})),
 writeLock(),
 currentNode(currentNode),
@@ -465,7 +543,7 @@ bool TSLQueue<T>::TSLQIter::remove_impl() {
 
 template <typename T>
 typename TSLQueue<T>::TSLQIter TSLQueue<T>::begin() {
-    return TSLQIter(sharedSpinLock, head->next, &msize);
+    return TSLQIter(sharedSpinLock, head->next, &msize, iterCount);
 }
 
 #endif
