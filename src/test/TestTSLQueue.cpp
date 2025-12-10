@@ -170,35 +170,35 @@ void TEST_TSLQueue() {
 
         {
             // iter remove
-            auto iter = q.begin();
-            CHECK_TRUE(iter.next());
-            CHECK_TRUE(iter.next());
-            CHECK_TRUE(iter.next());
-            CHECK_TRUE(iter.remove());
+            {
+                auto iter = q.begin();
+                CHECK_TRUE(iter.next());
+                CHECK_TRUE(iter.next());
+                CHECK_TRUE(iter.next());
+                CHECK_TRUE(iter.remove());
 
-            auto op = iter.current();
-            CHECK_TRUE(op);
-            CHECK_EQ(*op, 4);
+                auto op = iter.current();
+                CHECK_TRUE(op);
+                CHECK_EQ(*op, 4);
 
-            CHECK_TRUE(iter.prev());
-            op = iter.current();
-            CHECK_TRUE(op);
-            CHECK_EQ(*op, 2);
+                CHECK_TRUE(iter.prev());
+                op = iter.current();
+                CHECK_TRUE(op);
+                CHECK_EQ(*op, 2);
+            }
+            // Drop first iterator, there can only be 1 rw iterator.
 
-            // second iterator
-            auto iter2 = q.begin();
-
-            // Still should be able to get top.
-            CHECK_TRUE(iter2.current());
-
-            // Shouldn't be able to remove if 2 iterators exist.
-            CHECK_FALSE(iter2.try_remove());
-
-            // This will never return since the first iterator has a "read" lock.
-            //CHECK_FALSE(iter2.remove());
+            // second iterator, read-only.
+            auto iter2 = q.begin_readonly();
 
             // Still should be able to get top.
             CHECK_TRUE(iter2.current());
+
+            // third iterator, read-only.
+            auto iter3 = q.begin_readonly();
+
+            // Still should be able to get top.
+            CHECK_TRUE(iter3.current());
         }
         CHECK_EQ(q.size(), 9);
 

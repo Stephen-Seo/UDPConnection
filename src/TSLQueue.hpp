@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <chrono>
 #include <optional>
@@ -74,8 +75,29 @@ class TSLQueue {
         // Allow move.
         IterCount(IterCount &&);
         IterCount& operator=(IterCount &&);
+
     private:
         std::shared_ptr<std::atomic_ullong> count;
+
+    };
+
+    class WriteIterExists {
+    public:
+        WriteIterExists(std::shared_ptr<std::atomic_bool> exists);
+        ~WriteIterExists();
+
+        // Disallow copy.
+        WriteIterExists(const WriteIterExists &) = delete;
+        WriteIterExists& operator=(const WriteIterExists &) = delete;
+
+        // Allow move.
+        WriteIterExists(WriteIterExists &&);
+        WriteIterExists& operator=(WriteIterExists &&);
+
+        bool isReadWrite() const;
+
+    private:
+        std::shared_ptr<std::atomic_bool> exists;
 
     };
 
@@ -84,7 +106,8 @@ class TSLQueue {
         TSLQIter(UDPC::SharedSpinLock::Weak sharedSpinLockWeak,
                  std::weak_ptr<TSLQNode> currentNode,
                  unsigned long *msize,
-                 std::shared_ptr<std::atomic_ullong> count);
+                 std::shared_ptr<std::atomic_ullong> count,
+                 std::shared_ptr<std::atomic_bool> writeExists);
         ~TSLQIter();
 
         // Disallow copy.
@@ -104,21 +127,28 @@ class TSLQueue {
     private:
         UDPC::SharedSpinLock::Weak sharedSpinLockWeak;
         IterCount iterCount;
+        WriteIterExists writeExists;
         std::unique_ptr<UDPC::LockObj<false>> readLock;
         std::unique_ptr<UDPC::LockObj<true>> writeLock;
         std::weak_ptr<TSLQNode> currentNode;
         unsigned long *const msize;
+        bool readOnly;
 
         bool remove_impl();
 
     };
 
   public:
+    /// Only 1 read-write Iter can exist.
     TSLQIter begin();
+    /// There can be many read-only Iterators.
+    TSLQIter begin_readonly();
 
   private:
     UDPC::SharedSpinLock::Ptr sharedSpinLock;
     std::shared_ptr<std::atomic_ullong> iterCount;
+    std::shared_ptr<std::atomic_bool> writeIterExists;
+    std::mutex iterCreateMutex;
     std::shared_ptr<TSLQNode> head;
     std::shared_ptr<TSLQNode> tail;
     unsigned long msize;
@@ -128,6 +158,8 @@ template <typename T>
 TSLQueue<T>::TSLQueue() :
     sharedSpinLock(UDPC::SharedSpinLock::newInstance()),
     iterCount(std::shared_ptr<std::atomic_ullong>(new std::atomic_ullong(0))),
+    writeIterExists(std::shared_ptr<std::atomic_bool>(new std::atomic_bool(false))),
+    iterCreateMutex(),
     head(std::shared_ptr<TSLQNode>(new TSLQNode())),
     tail(std::shared_ptr<TSLQNode>(new TSLQNode())),
     msize(0)
@@ -380,7 +412,9 @@ bool TSLQueue<T>::TSLQNode::isNormal() const {
 
 template <typename T>
 TSLQueue<T>::IterCount::IterCount(std::shared_ptr<std::atomic_ullong> count) : count(count) {
-    this->count->fetch_add(1);
+    if (this->count) {
+        this->count->fetch_add(1);
+    }
 }
 
 template <typename T>
@@ -399,23 +433,59 @@ template <typename T>
 typename TSLQueue<T>::IterCount &TSLQueue<T>::IterCount::operator=(IterCount &&other) {
     ~IterCount();
 
-    this->count = other.count;
+    this->count = std::move(other.count);
     other.count.reset();
+}
+
+template <typename T>
+TSLQueue<T>::WriteIterExists::WriteIterExists(std::shared_ptr<std::atomic_bool> exists) : exists(exists) {
+    if (this->exists) {
+        this->exists->store(true);
+    }
+}
+
+template <typename T>
+TSLQueue<T>::WriteIterExists::~WriteIterExists() {
+    if (this->exists) {
+        this->exists->store(false);
+    }
+}
+
+template <typename T>
+TSLQueue<T>::WriteIterExists::WriteIterExists(WriteIterExists &&other) : exists(other.exists) {
+    other.exists.reset();
+}
+
+template <typename T>
+typename TSLQueue<T>::WriteIterExists &TSLQueue<T>::WriteIterExists::operator=(WriteIterExists &&other) {
+    ~WriteIterExists();
+
+    this->exists = std::move(other.exists);
+    other.exists.reset();
+}
+
+template <typename T>
+bool TSLQueue<T>::WriteIterExists::isReadWrite() const {
+    return static_cast<bool>(this->exists);
 }
 
 template <typename T>
 TSLQueue<T>::TSLQIter::TSLQIter(UDPC::SharedSpinLock::Weak lockWeak,
                                 std::weak_ptr<TSLQNode> currentNode,
                                 unsigned long *msize,
-                                std::shared_ptr<std::atomic_ullong> count) :
+                                std::shared_ptr<std::atomic_ullong> count,
+                                std::shared_ptr<std::atomic_bool> writeExists) :
 sharedSpinLockWeak(lockWeak),
 iterCount(count),
+writeExists(writeExists),
 readLock(std::unique_ptr<UDPC::LockObj<false>>(new UDPC::LockObj<false>{})),
 writeLock(),
 currentNode(currentNode),
-msize(msize)
+msize(msize),
+readOnly(true)
 {
     *readLock = lockWeak.lock()->spin_read_lock();
+    this->readOnly = !this->writeExists.isReadWrite();
 }
 
 template <typename T>
@@ -461,7 +531,7 @@ bool TSLQueue<T>::TSLQIter::prev() {
 
 template <typename T>
 bool TSLQueue<T>::TSLQIter::remove() {
-    if (readLock && !writeLock && readLock->isValid()) {
+    if (!readOnly && readLock && !writeLock && readLock->isValid()) {
         auto sharedSpinLockStrong = sharedSpinLockWeak.lock();
         if (!sharedSpinLockStrong) {
             return false;
@@ -482,7 +552,7 @@ bool TSLQueue<T>::TSLQIter::remove() {
 
 template <typename T>
 bool TSLQueue<T>::TSLQIter::try_remove() {
-    if (readLock && !writeLock && readLock->isValid()) {
+    if (!readOnly && readLock && !writeLock && readLock->isValid()) {
         auto sharedSpinLockStrong = sharedSpinLockWeak.lock();
         if (!sharedSpinLockStrong) {
             return false;
@@ -543,7 +613,20 @@ bool TSLQueue<T>::TSLQIter::remove_impl() {
 
 template <typename T>
 typename TSLQueue<T>::TSLQIter TSLQueue<T>::begin() {
-    return TSLQIter(sharedSpinLock, head->next, &msize, iterCount);
+    auto mlock = std::lock_guard<std::mutex>(this->iterCreateMutex);
+    while (this->iterCount->load() != 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return TSLQIter(sharedSpinLock, head->next, &msize, iterCount, writeIterExists);
+}
+
+template <typename T>
+typename TSLQueue<T>::TSLQIter TSLQueue<T>::begin_readonly() {
+    auto mlock = std::lock_guard<std::mutex>(this->iterCreateMutex);
+    while (this->writeIterExists->load()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return TSLQIter(sharedSpinLock, head->next, &msize, iterCount, {});
 }
 
 #endif
