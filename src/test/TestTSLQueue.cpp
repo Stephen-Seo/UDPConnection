@@ -134,7 +134,7 @@ void TEST_TSLQueue() {
 
         {
             // iteration
-            auto iter_opt = q.begin_readonly(1);
+            auto iter_opt = q.begin_readonly(300);
             auto iter = std::move(iter_opt.value());
             int i = 0;
             auto op = iter.current();
@@ -190,14 +190,14 @@ void TEST_TSLQueue() {
             // Drop first iterator, there can only be 1 rw iterator.
 
             // second iterator, read-only.
-            auto iter2 = q.begin_readonly(1);
+            auto iter2 = q.begin_readonly(300);
             CHECK_TRUE(iter2.has_value());
 
             // Still should be able to get top.
             CHECK_TRUE(iter2.has_value() && iter2->current());
 
             // third iterator, read-only.
-            auto iter3 = q.begin_readonly(1);
+            auto iter3 = q.begin_readonly(300);
 
             // Still should be able to get top.
             CHECK_TRUE(iter3.has_value() && iter3->current());
@@ -273,15 +273,17 @@ void TEST_TSLQueue() {
         {
             auto write_iter = q.begin(300);
             CHECK_TRUE(write_iter.has_value());
-            auto read_iter = q.begin_readonly(1);
+            auto read_iter = q.begin_readonly(300);
             CHECK_FALSE(read_iter.has_value());
+            auto write_iter2 = q.begin(300);
+            CHECK_FALSE(write_iter2.has_value());
         }
         {
-            auto read_iter = q.begin_readonly(1);
+            auto read_iter = q.begin_readonly(300);
             CHECK_TRUE(read_iter.has_value());
             auto write_iter = q.begin(300);
             CHECK_FALSE(write_iter.has_value());
-            auto read_iter2 = q.begin_readonly(1);
+            auto read_iter2 = q.begin_readonly(300);
             CHECK_TRUE(read_iter2.has_value());
         }
     }
