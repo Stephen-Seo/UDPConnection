@@ -268,6 +268,22 @@ void TEST_TSLQueue() {
                 CHECK_TRUE(q.empty());
             }
         }
+
+        // Iterator timeout
+        {
+            auto write_iter = q.begin(1);
+            CHECK_TRUE(write_iter.has_value());
+            auto read_iter = q.begin_readonly(1);
+            CHECK_FALSE(read_iter.has_value());
+        }
+        {
+            auto read_iter = q.begin_readonly(1);
+            CHECK_TRUE(read_iter.has_value());
+            auto write_iter = q.begin(1);
+            CHECK_FALSE(write_iter.has_value());
+            auto read_iter2 = q.begin_readonly(1);
+            CHECK_TRUE(read_iter2.has_value());
+        }
     }
 
     // TempToNew
