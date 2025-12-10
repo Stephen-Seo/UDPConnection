@@ -417,10 +417,11 @@ bool TSLQueue<T>::TSLQIter::try_remove() {
         // Get the write lock.
         *writeLock = sharedSpinLockStrong->try_spin_write_lock();
         if (writeLock->isValid()) {
-            readLock.reset(nullptr);
             return remove_impl();
         } else {
-            writeLock.reset(nullptr);
+            // Get a read lock back.
+            readLock = std::unique_ptr<UDPC::LockObj<false>>(new UDPC::LockObj<false>{});
+            *readLock = sharedSpinLockStrong->spin_read_lock();
             return false;
         }
     } else {
