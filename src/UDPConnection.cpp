@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <iomanip>
+#include <list>
 
 #if UDPC_PLATFORM == UDPC_PLATFORM_WINDOWS
 #include <netioapi.h>
@@ -282,19 +283,6 @@ UDPC::Context::~Context() {
            ++iter) {
         std::free(iter->data);
     }
-    do {
-        auto iter = cSendPkts.begin(300);
-        if (!iter.has_value()) {
-            continue;
-        }
-        auto current = iter->current();
-        while(current) {
-            std::free(current->data);
-            if(!iter->next()) { break; }
-            current = iter->current();
-        }
-        break;
-    } while (true);
 }
 
 bool UDPC::Context::willLog(UDPC_LoggingType type) {
@@ -563,17 +551,17 @@ void UDPC::Context::update_impl() {
     }
 
     // move queued in cSendPkts to existing connection's sendPkts
-    do
     {
-        auto sendIter = cSendPkts.begin(300);
-        if (!sendIter.has_value()) {
-            break;
-        }
         std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher> dropped;
         std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher> notQueued;
-        while(true) {
-            auto next = sendIter->current();
-            if(next) {
+        std::list<PktInfoWrapper> requeue;
+        // Take the current queue, leaving an empty queue in its place.
+        TSLQueue<PktInfoWrapper> queue(std::move(cSendPkts));
+        bool isEmpty = false;
+        while (!isEmpty) {
+            auto next_wrapper = queue.top_and_pop_and_empty(&isEmpty);
+            UDPC_PacketInfo *next = &next_wrapper->pinfo;
+            if (!isEmpty && next) {
                 std::lock_guard<std::mutex> conMapLock(conMapMutex);
                 auto iter = conMap.find(next->receiver);
                 if(iter != conMap.end()) {
@@ -588,18 +576,11 @@ void UDPC::Context::update_impl() {
                                 next->receiver.port,
                                 ", connection's queue reached max size");
                         }
-                        if(sendIter->next()) {
-                            continue;
-                        } else {
-                            break;
-                        }
+                        requeue.push_back(*next_wrapper);
+                        continue;
                     }
                     iter->second.sendPkts.push_back(*next);
-                    if(sendIter->remove()) {
-                        continue;
-                    } else {
-                        break;
-                    }
+                    next_wrapper->pinfo.data = nullptr;
                 } else {
                     if(dropped.find(next->receiver) == dropped.end()) {
                         UDPC_CHECK_LOG(this,
@@ -611,18 +592,15 @@ void UDPC::Context::update_impl() {
                             " due to connection not existing");
                         dropped.insert(next->receiver);
                     }
-                    if(sendIter->remove()) {
-                        continue;
-                    } else {
-                        break;
-                    }
                 }
-            } else {
-                break;
             }
         }
-        break;
-    } while (true);
+
+        // Re-queue packets that were not added due to size limits.
+        for (auto req_iter = requeue.rbegin(); req_iter != requeue.rend(); ++req_iter) {
+            cSendPkts.push_front(*req_iter);
+        }
+    }
 
     // update send (only if triggerSend flag is set)
     {
@@ -1846,6 +1824,51 @@ void UDPC::Context::update_impl() {
     } while (true);
 }
 
+UDPC::PktInfoWrapper::PktInfoWrapper() : pinfo() {
+    pinfo.data = nullptr;
+}
+
+UDPC::PktInfoWrapper::PktInfoWrapper(UDPC_PacketInfo pinfo) : pinfo(pinfo) {
+}
+
+UDPC::PktInfoWrapper::~PktInfoWrapper() {
+    if (pinfo.data) {
+        std::free(pinfo.data);
+    }
+}
+
+UDPC::PktInfoWrapper::PktInfoWrapper(const PktInfoWrapper &other) : pinfo(other.pinfo) {
+    if (pinfo.dataSize > 0) {
+        pinfo.data = static_cast<char*>(std::malloc(pinfo.dataSize));
+        std::memcpy(pinfo.data, other.pinfo.data, pinfo.dataSize);
+    } else {
+        pinfo.data = nullptr;
+    }
+}
+
+UDPC::PktInfoWrapper& UDPC::PktInfoWrapper::operator=(const PktInfoWrapper &other) {
+    pinfo = other.pinfo;
+    if (pinfo.dataSize > 0) {
+        pinfo.data = static_cast<char*>(std::malloc(pinfo.dataSize));
+        std::memcpy(pinfo.data, other.pinfo.data, pinfo.dataSize);
+    } else {
+        pinfo.data = nullptr;
+    }
+
+    return *this;
+}
+
+UDPC::PktInfoWrapper::PktInfoWrapper(PktInfoWrapper &&other) : pinfo(std::move(other.pinfo)) {
+    other.pinfo.data = nullptr;
+}
+
+UDPC::PktInfoWrapper& UDPC::PktInfoWrapper::operator=(PktInfoWrapper &&other) {
+    pinfo = std::move(other.pinfo);
+    other.pinfo.data = nullptr;
+
+    return *this;
+}
+
 UDPC::Context *UDPC::verifyContext(UDPC_HContext ctx) {
     if(ctx == nullptr) {
         return nullptr;
@@ -2395,7 +2418,7 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
     sendInfo.receiver.port = destinationId.port;
     sendInfo.flags = (isChecked != 0 ? 0x0 : 0x4);
 
-    c->cSendPkts.push(sendInfo);
+    c->cSendPkts.push_back(sendInfo);
 }
 
 unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx) {

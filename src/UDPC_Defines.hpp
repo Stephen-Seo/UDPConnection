@@ -72,6 +72,7 @@ constexpr auto BAD_MODE_SEND_RATE = std::chrono::milliseconds(100);
 
 // forward declaration
 struct Context;
+struct PktInfoWrapper;
 
 struct SentPktInfo {
     typedef std::shared_ptr<SentPktInfo> Ptr;
@@ -253,7 +254,7 @@ public:
     std::unordered_set<PKContainer, PKContainer> peerPKWhitelist;
     std::deque<UDPC_PacketInfo> receivedPkts;
     std::mutex receivedPktsMutex;
-    TSLQueue<UDPC_PacketInfo> cSendPkts;
+    TSLQueue<PktInfoWrapper> cSendPkts;
     // handled internally
     std::deque<UDPC_Event> internalEvents;
     std::mutex internalEventsMutex;
@@ -280,6 +281,21 @@ public:
     std::atomic_uint32_t enableDisableFuncRunningCount;
 
 }; // struct Context
+
+struct PktInfoWrapper {
+    PktInfoWrapper();
+    PktInfoWrapper(UDPC_PacketInfo);
+    ~PktInfoWrapper();
+
+    // Allow copy
+    PktInfoWrapper(const PktInfoWrapper&);
+    PktInfoWrapper &operator=(const PktInfoWrapper&);
+    // Allow move
+    PktInfoWrapper(PktInfoWrapper&&);
+    PktInfoWrapper &operator=(PktInfoWrapper&&);
+
+    UDPC_PacketInfo pinfo;
+};
 
 Context *verifyContext(UDPC_HContext ctx);
 
