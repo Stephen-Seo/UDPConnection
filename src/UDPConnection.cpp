@@ -244,6 +244,7 @@ peerPKWhitelist(),
 receivedPkts(),
 receivedPktsMutex(),
 cSendPkts(),
+cSendPktsFirst(true),
 internalEvents(),
 internalEventsMutex(),
 externalEvents(),
@@ -556,12 +557,19 @@ void UDPC::Context::update_impl() {
         std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher> notQueued;
         std::list<PktInfoWrapper> requeue;
         // Take the current queue, leaving an empty queue in its place.
-        TSLQueue<PktInfoWrapper> queue(std::move(cSendPkts));
+        TSLQueue<PktInfoWrapper> *queue = nullptr;
+        if (cSendPktsFirst.load()) {
+            cSendPktsFirst.store(false);
+            queue = &cSendPkts[0];
+        } else {
+            cSendPktsFirst.store(true);
+            queue = &cSendPkts[1];
+        }
         bool isEmpty = false;
         while (!isEmpty) {
-            auto next_wrapper = queue.top_and_pop_and_empty(&isEmpty);
+            auto next_wrapper = queue->top_and_pop_and_empty(&isEmpty);
             UDPC_PacketInfo *next = &next_wrapper->pinfo;
-            if (!isEmpty && next) {
+            if (next_wrapper) {
                 std::lock_guard<std::mutex> conMapLock(conMapMutex);
                 auto iter = conMap.find(next->receiver);
                 if(iter != conMap.end()) {
@@ -597,8 +605,14 @@ void UDPC::Context::update_impl() {
         }
 
         // Re-queue packets that were not added due to size limits.
-        for (auto req_iter = requeue.rbegin(); req_iter != requeue.rend(); ++req_iter) {
-            cSendPkts.push_front(*req_iter);
+        if (cSendPktsFirst.load()) {
+            for (auto req_iter = requeue.rbegin(); req_iter != requeue.rend(); ++req_iter) {
+                cSendPkts[0].push_front(*req_iter);
+            }
+        } else {
+            for (auto req_iter = requeue.rbegin(); req_iter != requeue.rend(); ++req_iter) {
+                cSendPkts[1].push_front(*req_iter);
+            }
         }
     }
 
@@ -2418,7 +2432,11 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
     sendInfo.receiver.port = destinationId.port;
     sendInfo.flags = (isChecked != 0 ? 0x0 : 0x4);
 
-    c->cSendPkts.push_back(sendInfo);
+    if (c->cSendPktsFirst.load()) {
+        c->cSendPkts[0].push_back(sendInfo);
+    } else {
+        c->cSendPkts[1].push_back(sendInfo);
+    }
 }
 
 unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx) {
@@ -2427,7 +2445,11 @@ unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx) {
         return 0;
     }
 
-    return c->cSendPkts.size();
+    if (c->cSendPktsFirst.load()) {
+        return c->cSendPkts[0].size();
+    } else {
+        return c->cSendPkts[1].size();
+    }
 }
 
 unsigned long UDPC_get_queued_size(UDPC_HContext ctx, UDPC_ConnectionId id, int *exists) {
