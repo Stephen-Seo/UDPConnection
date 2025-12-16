@@ -18,7 +18,6 @@
 
 #define UDPC_CHECK_LOG(ctx, type, ...) if(ctx->willLog(type)){ctx->log(type, __VA_ARGS__);}
 
-#include <array>
 #include <atomic>
 #include <bitset>
 #include <chrono>
@@ -255,8 +254,7 @@ public:
     std::unordered_set<PKContainer, PKContainer> peerPKWhitelist;
     std::deque<UDPC_PacketInfo> receivedPkts;
     std::mutex receivedPktsMutex;
-    std::array<TSLQueue<PktInfoWrapper>, 2> cSendPkts;
-    std::atomic_bool cSendPktsFirst;
+    TSLQueue<PktInfoWrapper> cSendPkts;
     // handled internally
     std::deque<UDPC_Event> internalEvents;
     std::mutex internalEventsMutex;
