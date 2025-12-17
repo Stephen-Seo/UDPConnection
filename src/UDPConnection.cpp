@@ -245,9 +245,7 @@ receivedPkts(),
 receivedPktsMutex(),
 cSendPkts(),
 internalEvents(),
-internalEventsMutex(),
 externalEvents(),
-externalEventsMutex(),
 rng_engine(),
 thread(),
 threadRunning(),
@@ -322,111 +320,113 @@ void UDPC::Context::update_impl() {
 
     // handle internalEvents
     {
-        std::lock_guard<std::mutex> intEvLock(internalEventsMutex);
-        while(!internalEvents.empty()) {
-            auto event = internalEvents.front();
-            internalEvents.pop_front();
-            switch(event.type) {
-            case UDPC_ET_REQUEST_CONNECT:
-            {
-                if(!isAcceptNewConnections.load()) {
-                    UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
-                        "Ignoring connection request because "
-                        "accept-new-connections flag is false");
-                    break;
-                }
-                unsigned char *sk = nullptr;
-                unsigned char *pk = nullptr;
-                if(keysSet.load()) {
-                    sk = this->sk;
-                    pk = this->pk;
-                }
-                UDPC::ConnectionData newCon(
-                    false,
-                    this,
-                    event.conId.addr,
-                    event.conId.scope_id,
-                    event.conId.port,
-#ifdef UDPC_LIBSODIUM_ENABLED
-                    flags.test(2) && event.v.enableLibSodium != 0,
-                    sk, pk);
-#else
-                    false,
-                    sk, pk);
-#endif
-                if(newCon.flags.test(5)) {
-                    UDPC_CHECK_LOG(this,
-                        UDPC_LoggingType::UDPC_ERROR,
-                        "Failed to init ConnectionData instance (libsodium "
-                        "init fail) while client establishing connection with ",
-                        event.conId.addr,
-                        " port ",
-                        event.conId.port);
-                    continue;
-                }
-                newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
-
-
-                std::lock_guard<std::mutex> conMapLock(conMapMutex);
-                if(conMap.find(event.conId) == conMap.end()) {
-                    conMap.insert(std::make_pair(
-                        event.conId,
-                        std::move(newCon)));
-                    auto addrConIter = addrConMap.find(event.conId.addr);
-                    if(addrConIter == addrConMap.end()) {
-                        auto insertResult = addrConMap.insert(std::make_pair(
-                            event.conId.addr,
-                            std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher>{}));
-                        assert(insertResult.second &&
-                            "new connection insert into addrConMap must not fail");
-                        addrConIter = insertResult.first;
+        bool isEmpty = false;
+        while(!isEmpty) {
+            auto next_event = internalEvents.top_and_pop_and_empty(&isEmpty);
+            if (next_event) {
+                const UDPC_Event &event = *next_event;
+                switch(event.type) {
+                case UDPC_ET_REQUEST_CONNECT:
+                {
+                    if(!isAcceptNewConnections.load()) {
+                        UDPC_CHECK_LOG(this, UDPC_LoggingType::UDPC_WARNING,
+                            "Ignoring connection request because "
+                            "accept-new-connections flag is false");
+                        break;
                     }
-                    addrConIter->second.insert(event.conId);
-                    UDPC_CHECK_LOG(this,
-                        UDPC_LoggingType::UDPC_INFO,
-                        "Client initiating connection to ",
+                    unsigned char *sk = nullptr;
+                    unsigned char *pk = nullptr;
+                    if(keysSet.load()) {
+                        sk = this->sk;
+                        pk = this->pk;
+                    }
+                    UDPC::ConnectionData newCon(
+                        false,
+                        this,
                         event.conId.addr,
-                        " port ",
+                        event.conId.scope_id,
                         event.conId.port,
-                        " ...");
-                } else {
-                    UDPC_CHECK_LOG(this,
-                        UDPC_LoggingType::UDPC_WARNING,
-                        "Client initiate connection, already connected to peer ",
-                        event.conId.addr,
-                        " port ",
-                        event.conId.port);
+#ifdef UDPC_LIBSODIUM_ENABLED
+                        flags.test(2) && event.v.enableLibSodium != 0,
+                        sk, pk);
+#else
+                        false,
+                        sk, pk);
+#endif
+                    if(newCon.flags.test(5)) {
+                        UDPC_CHECK_LOG(this,
+                            UDPC_LoggingType::UDPC_ERROR,
+                            "Failed to init ConnectionData instance (libsodium "
+                            "init fail) while client establishing connection with ",
+                            event.conId.addr,
+                            " port ",
+                            event.conId.port);
+                        continue;
+                    }
+                    newCon.sent = std::chrono::steady_clock::now() - UDPC::INIT_PKT_INTERVAL_DT;
+
+
+                    std::lock_guard<std::mutex> conMapLock(conMapMutex);
+                    if(conMap.find(event.conId) == conMap.end()) {
+                        conMap.insert(std::make_pair(
+                            event.conId,
+                            std::move(newCon)));
+                        auto addrConIter = addrConMap.find(event.conId.addr);
+                        if(addrConIter == addrConMap.end()) {
+                            auto insertResult = addrConMap.insert(std::make_pair(
+                                event.conId.addr,
+                                std::unordered_set<UDPC_ConnectionId, UDPC::ConnectionIdHasher>{}));
+                            assert(insertResult.second &&
+                                "new connection insert into addrConMap must not fail");
+                            addrConIter = insertResult.first;
+                        }
+                        addrConIter->second.insert(event.conId);
+                        UDPC_CHECK_LOG(this,
+                            UDPC_LoggingType::UDPC_INFO,
+                            "Client initiating connection to ",
+                            event.conId.addr,
+                            " port ",
+                            event.conId.port,
+                            " ...");
+                    } else {
+                        UDPC_CHECK_LOG(this,
+                            UDPC_LoggingType::UDPC_WARNING,
+                            "Client initiate connection, already connected to peer ",
+                            event.conId.addr,
+                            " port ",
+                            event.conId.port);
+                    }
                 }
-            }
-                break;
-            case UDPC_ET_REQUEST_DISCONNECT:
-            {
-                std::lock_guard<std::mutex> conMapLock(conMapMutex);
-                if(event.v.dropAllWithAddr != 0) {
-                    // drop all connections with same address
-                    auto addrConIter = addrConMap.find(event.conId.addr);
-                    if(addrConIter != addrConMap.end()) {
-                        for(auto identIter = addrConIter->second.begin();
-                                identIter != addrConIter->second.end();
-                                ++identIter) {
-                            assert(conMap.find(*identIter) != conMap.end()
-                                && "conMap must have connection listed in "
-                                "addrConMap");
-                            deletionMap.insert(*identIter);
+                    break;
+                case UDPC_ET_REQUEST_DISCONNECT:
+                {
+                    std::lock_guard<std::mutex> conMapLock(conMapMutex);
+                    if(event.v.dropAllWithAddr != 0) {
+                        // drop all connections with same address
+                        auto addrConIter = addrConMap.find(event.conId.addr);
+                        if(addrConIter != addrConMap.end()) {
+                            for(auto identIter = addrConIter->second.begin();
+                                    identIter != addrConIter->second.end();
+                                    ++identIter) {
+                                assert(conMap.find(*identIter) != conMap.end()
+                                    && "conMap must have connection listed in "
+                                    "addrConMap");
+                                deletionMap.insert(*identIter);
+                            }
+                        }
+                    } else {
+                        // drop only specific connection with addr and port
+                        auto iter = conMap.find(event.conId);
+                        if(iter != conMap.end()) {
+                            deletionMap.insert(iter->first);
                         }
                     }
-                } else {
-                    // drop only specific connection with addr and port
-                    auto iter = conMap.find(event.conId);
-                    if(iter != conMap.end()) {
-                        deletionMap.insert(iter->first);
-                    }
                 }
-            }
-                break;
-            default:
-                assert(!"internalEvents got invalid type");
-                break;
+                    break;
+                default:
+                    assert(!"internalEvents got invalid type");
+                    break;
+                }
             }
         }
     }
@@ -465,7 +465,6 @@ void UDPC::Context::update_impl() {
                 }
                 iter->second.toggledTimer = std::chrono::steady_clock::duration::zero();
                 if(isReceivingEvents.load()) {
-                    std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
                     externalEvents.push_back(UDPC_Event{
                         UDPC_ET_BAD_MODE, iter->first, false});
                 }
@@ -492,7 +491,6 @@ void UDPC::Context::update_impl() {
                         iter->second.port);
                     iter->second.flags.set(1);
                     if(isReceivingEvents.load()) {
-                        std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
                         externalEvents.push_back(UDPC_Event{
                             UDPC_ET_GOOD_MODE, iter->first, false});
                     }
@@ -536,11 +534,9 @@ void UDPC::Context::update_impl() {
             }
             if(isReceivingEvents.load()) {
                 if(flags.test(1) && cIter->second.flags.test(3)) {
-                    std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
                     externalEvents.push_back(UDPC_Event{
                         UDPC_ET_FAIL_CONNECT, *iter, false});
                 } else {
-                    std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
                     externalEvents.push_back(UDPC_Event{
                         UDPC_ET_DISCONNECTED, *iter, false});
                 }
@@ -1117,11 +1113,9 @@ void UDPC::Context::update_impl() {
             }
             if(isReceivingEvents.load()) {
                 if(flags.test(1) && iter->second.flags.test(3)) {
-                    std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
                     externalEvents.push_back(UDPC_Event{
                         UDPC_ET_FAIL_CONNECT, iter->first, false});
                 } else {
-                    std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
                     externalEvents.push_back(UDPC_Event{
                         UDPC_ET_DISCONNECTED, iter->first, false});
                 }
@@ -1411,7 +1405,6 @@ void UDPC::Context::update_impl() {
                 }
                 addrConIter->second.insert(identifier);
                 if(isReceivingEvents.load()) {
-                    std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
                     externalEvents.push_back(UDPC_Event{
                         UDPC_ET_CONNECTED,
                         identifier,
@@ -1519,7 +1512,6 @@ void UDPC::Context::update_impl() {
                     flags.test(2) && iter->second.flags.test(6) ?
                         ", libsodium enabled" : ", libsodium disabled");
                 if(isReceivingEvents.load()) {
-                    std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
                     externalEvents.push_back(UDPC_Event{
                         UDPC_ET_CONNECTED,
                         identifier,
@@ -1602,7 +1594,6 @@ void UDPC::Context::update_impl() {
                     }
                 }
                 if(isReceivingEvents.load()) {
-                    std::lock_guard<std::mutex> extEvLock(externalEventsMutex);
                     externalEvents.push_back(UDPC_Event{
                         UDPC_ET_DISCONNECTED, identifier, false});
                 }
@@ -2391,7 +2382,6 @@ void UDPC_client_initiate_connection(
     }
 #endif
 
-    std::lock_guard<std::mutex> intEvLock(c->internalEventsMutex);
     c->internalEvents.push_back(UDPC_Event{UDPC_ET_REQUEST_CONNECT, connectionId, enableLibSodium});
 }
 
@@ -2467,7 +2457,6 @@ void UDPC_drop_connection(UDPC_HContext ctx, UDPC_ConnectionId connectionId, int
         return;
     }
 
-    std::lock_guard<std::mutex> intEvLock(c->internalEventsMutex);
     c->internalEvents.push_back(UDPC_Event{UDPC_ET_REQUEST_DISCONNECT, connectionId, dropAllWithAddr});
     return;
 }
@@ -2575,15 +2564,14 @@ UDPC_Event UDPC_get_event(UDPC_HContext ctx, unsigned long *remaining) {
         return UDPC_Event{UDPC_ET_NONE, UDPC_create_id_anyaddr(0), 0};
     }
 
-    std::lock_guard<std::mutex> extEvLock(c->externalEventsMutex);
-    if(c->externalEvents.empty()) {
+    unsigned long size = 0;
+    auto next_event = c->externalEvents.top_and_pop_and_rsize(&size);
+    if(next_event) {
+        if(remaining) { *remaining = size; }
+        return *next_event;
+    } else {
         if(remaining) { *remaining = 0; }
         return UDPC_Event{UDPC_ET_NONE, UDPC_create_id_anyaddr(0), 0};
-    } else {
-        auto event = c->externalEvents.front();
-        c->externalEvents.pop_front();
-        if(remaining) { *remaining = c->externalEvents.size(); }
-        return event;
     }
 }
 

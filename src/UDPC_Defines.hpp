@@ -256,11 +256,9 @@ public:
     std::mutex receivedPktsMutex;
     TSLQueue<PktInfoWrapper> cSendPkts;
     // handled internally
-    std::deque<UDPC_Event> internalEvents;
-    std::mutex internalEventsMutex;
+    TSLQueue<UDPC_Event> internalEvents;
     // handled via interface, if isReceivingEvents is true
-    std::deque<UDPC_Event> externalEvents;
-    std::mutex externalEventsMutex;
+    TSLQueue<UDPC_Event> externalEvents;
 
     std::default_random_engine rng_engine;
 
