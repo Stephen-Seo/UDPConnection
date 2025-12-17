@@ -554,8 +554,8 @@ void UDPC::Context::update_impl() {
         bool isEmpty = false;
         while (!isEmpty) {
             auto next_wrapper = cSendPkts.top_and_pop_and_empty(&isEmpty);
-            UDPC_PacketInfo *next = &next_wrapper->pinfo;
             if (next_wrapper) {
+                UDPC_PacketInfo *next = &next_wrapper->pinfo;
                 std::lock_guard<std::mutex> conMapLock(conMapMutex);
                 auto iter = conMap.find(next->receiver);
                 if(iter != conMap.end()) {
@@ -1813,8 +1813,7 @@ void UDPC::Context::update_impl() {
     } while (true);
 }
 
-UDPC::PktInfoWrapper::PktInfoWrapper() : pinfo() {
-    pinfo.data = nullptr;
+UDPC::PktInfoWrapper::PktInfoWrapper() : pinfo(UDPC::get_empty_pinfo()) {
 }
 
 UDPC::PktInfoWrapper::PktInfoWrapper(UDPC_PacketInfo pinfo) : pinfo(pinfo) {
@@ -2396,7 +2395,8 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
         return;
     }
 
-    UDPC_PacketInfo sendInfo = UDPC::get_empty_pinfo();
+    UDPC::PktInfoWrapper sendInfoWrapper{};
+    UDPC_PacketInfo &sendInfo = sendInfoWrapper.pinfo;
     sendInfo.dataSize = size;
     sendInfo.data = (char*)std::malloc(sendInfo.dataSize);
     std::memcpy(sendInfo.data, data, size);
@@ -2406,7 +2406,7 @@ void UDPC_queue_send(UDPC_HContext ctx, UDPC_ConnectionId destinationId,
     sendInfo.receiver.port = destinationId.port;
     sendInfo.flags = (isChecked != 0 ? 0x0 : 0x4);
 
-    c->cSendPkts.push_back(sendInfo);
+    c->cSendPkts.push_back(std::move(sendInfoWrapper));
 }
 
 unsigned long UDPC_get_queue_send_current_size(UDPC_HContext ctx) {
