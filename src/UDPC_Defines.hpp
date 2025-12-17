@@ -252,8 +252,7 @@ public:
     std::unordered_map<uint32_t, UDPC_ConnectionId> idMap;
     std::unordered_set<UDPC_ConnectionId, ConnectionIdHasher> deletionMap;
     std::unordered_set<PKContainer, PKContainer> peerPKWhitelist;
-    std::deque<UDPC_PacketInfo> receivedPkts;
-    std::mutex receivedPktsMutex;
+    TSLQueue<UDPC_PacketInfo> receivedPkts;
     TSLQueue<PktInfoWrapper> cSendPkts;
     // handled internally
     TSLQueue<UDPC_Event> internalEvents;

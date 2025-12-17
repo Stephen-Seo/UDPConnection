@@ -242,7 +242,6 @@ idMap(),
 deletionMap(),
 peerPKWhitelist(),
 receivedPkts(),
-receivedPktsMutex(),
 cSendPkts(),
 internalEvents(),
 externalEvents(),
@@ -276,10 +275,9 @@ enableDisableFuncRunningCount(0)
 
 UDPC::Context::~Context() {
     // cleanup packets
-    for(auto iter = receivedPkts.begin();
-             iter != receivedPkts.end();
-           ++iter) {
-        std::free(iter->data);
+    while (!receivedPkts.empty()) {
+        auto pinfo_ptr = receivedPkts.top_and_pop();
+        std::free(pinfo_ptr->data);
     }
 }
 
@@ -1782,7 +1780,6 @@ void UDPC::Context::update_impl() {
             recPktInfo.rtt = durationToMS(iter->second.rtt);
             recPktInfo.id = seqID;
 
-            std::lock_guard<std::mutex> receivedPktsLock(receivedPktsMutex);
             receivedPkts.push_back(recPktInfo);
         } else if(pktType == 1 && bytes > (int)UDPC_LSFULL_HEADER_SIZE) {
             UDPC_PacketInfo recPktInfo = UDPC::get_empty_pinfo();
@@ -1803,7 +1800,6 @@ void UDPC::Context::update_impl() {
             recPktInfo.rtt = durationToMS(iter->second.rtt);
             recPktInfo.id = seqID;
 
-            std::lock_guard<std::mutex> receivedPktsLock(receivedPktsMutex);
             receivedPkts.push_back(recPktInfo);
         } else {
             UDPC_CHECK_LOG(this,
@@ -2581,15 +2577,14 @@ UDPC_PacketInfo UDPC_get_received(UDPC_HContext ctx, unsigned long *remaining) {
         return UDPC::get_empty_pinfo();
     }
 
-    std::lock_guard<std::mutex> receivedPktsLock(c->receivedPktsMutex);
-    if(c->receivedPkts.empty()) {
+    unsigned long size = 0;
+    auto pinfo_ptr = c->receivedPkts.top_and_pop_and_rsize(&size);
+    if(pinfo_ptr) {
+        if(remaining) { *remaining = size; }
+        return *pinfo_ptr;
+    } else {
         if(remaining) { *remaining = 0; }
         return UDPC::get_empty_pinfo();
-    } else {
-        auto pinfo = c->receivedPkts.front();
-        c->receivedPkts.pop_front();
-        if(remaining) { *remaining = c->receivedPkts.size(); }
-        return pinfo;
     }
 }
 
