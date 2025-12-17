@@ -29,6 +29,10 @@ class TSLQueue {
     bool push_back_nb(const T &data);
     void push_front(const T &data);
     bool push_front_nb(const T &data);
+    void push_back(T &&data);
+    bool push_back_nb(T &&data);
+    void push_front(T &&data);
+    bool push_front_nb(T &&data);
     std::unique_ptr<T> top();
     std::unique_ptr<T> top_nb();
     bool pop();
@@ -199,6 +203,84 @@ bool TSLQueue<T>::push_front_nb(const T &data) {
     if(writeLock.isValid()) {
         auto newNode = std::shared_ptr<TSLQNode>(new TSLQNode());
         newNode->data = std::unique_ptr<T>(new T(data));
+
+        auto first = head->next;
+        assert(first);
+
+        newNode->next = first;
+        newNode->prev = head;
+        first->prev = newNode;
+        head->next = newNode;
+
+        ++msize;
+
+        return true;
+    } else {
+        return false;
+    }
+}
+
+template <typename T>
+void TSLQueue<T>::push_back(T &&data) {
+    auto writeLock = sharedSpinLock->spin_write_lock();
+    auto newNode = std::shared_ptr<TSLQNode>(new TSLQNode());
+    newNode->data = std::unique_ptr<T>(new T(std::forward<T>(data)));
+
+    auto last = tail->prev.lock();
+    assert(last);
+
+    newNode->prev = last;
+    newNode->next = tail;
+    last->next = newNode;
+    tail->prev = newNode;
+    ++msize;
+}
+
+template <typename T>
+bool TSLQueue<T>::push_back_nb(T &&data) {
+    auto writeLock = sharedSpinLock->try_spin_write_lock();
+    if(writeLock.isValid()) {
+        auto newNode = std::shared_ptr<TSLQNode>(new TSLQNode());
+        newNode->data = std::unique_ptr<T>(new T(std::forward<T>(data)));
+
+        auto last = tail->prev.lock();
+        assert(last);
+
+        newNode->prev = last;
+        newNode->next = tail;
+        last->next = newNode;
+        tail->prev = newNode;
+        ++msize;
+
+        return true;
+    } else {
+        return false;
+    }
+}
+
+template <typename T>
+void TSLQueue<T>::push_front(T &&data) {
+    auto writeLock = sharedSpinLock->spin_write_lock();
+    auto newNode = std::shared_ptr<TSLQNode>(new TSLQNode());
+    newNode->data = std::unique_ptr<T>(new T(std::forward<T>(data)));
+
+    auto first = head->next;
+    assert(first);
+
+    newNode->next = first;
+    newNode->prev = head;
+    first->prev = newNode;
+    head->next = newNode;
+
+    ++msize;
+}
+
+template <typename T>
+bool TSLQueue<T>::push_front_nb(T &&data) {
+    auto writeLock = sharedSpinLock->try_spin_write_lock();
+    if(writeLock.isValid()) {
+        auto newNode = std::shared_ptr<TSLQNode>(new TSLQNode());
+        newNode->data = std::unique_ptr<T>(new T(std::forward<T>(data)));
 
         auto first = head->next;
         assert(first);
