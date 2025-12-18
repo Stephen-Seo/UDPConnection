@@ -568,7 +568,7 @@ void UDPC::Context::update_impl() {
                                 next->receiver.port,
                                 ", connection's queue reached max size");
                         }
-                        requeue.push_back(*next_wrapper);
+                        requeue.push_back(std::move(*next_wrapper));
                         continue;
                     }
                     iter->second.sendPkts.push_back(*next);
@@ -590,7 +590,7 @@ void UDPC::Context::update_impl() {
 
         // Re-queue packets that were not added due to size limits.
         for (auto req_iter = requeue.rbegin(); req_iter != requeue.rend(); ++req_iter) {
-            cSendPkts.push_front(*req_iter);
+            cSendPkts.push_front(std::move(*req_iter));
         }
     }
 
