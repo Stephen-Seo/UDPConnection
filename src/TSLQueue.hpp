@@ -140,6 +140,8 @@ TSLQueue<T> & TSLQueue<T>::operator=(TSLQueue &&other) {
     other.tail->prev = other.head;
 
     other.msize = 0;
+
+    return *this;
 }
 
 template <typename T>
